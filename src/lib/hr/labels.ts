@@ -160,6 +160,27 @@ export function attendanceStatusLabel(
   return ATTENDANCE_STATUS_LABELS[value as AttendanceStatus][locale];
 }
 
+export const PAYROLL_PERIOD_STATUS_LABELS: Record<
+  import("@/types/enums").PayrollPeriodStatus,
+  { ar: string; en: string }
+> = {
+  draft: { ar: "مسودة", en: "Draft" },
+  calculated: { ar: "محسوب", en: "Calculated" },
+  under_review: { ar: "قيد المراجعة", en: "Under review" },
+  approved: { ar: "معتمد", en: "Approved" },
+  locked: { ar: "مقفل", en: "Locked" },
+  paid: { ar: "مدفوع", en: "Paid" },
+  cancelled: { ar: "ملغى", en: "Cancelled" },
+};
+
+export function payrollPeriodStatusLabel(
+  value: import("@/types/enums").PayrollPeriodStatus | string | null | undefined,
+  locale: "ar" | "en" = "ar",
+) {
+  if (!value || !(value in PAYROLL_PERIOD_STATUS_LABELS)) return "—";
+  return PAYROLL_PERIOD_STATUS_LABELS[value as import("@/types/enums").PayrollPeriodStatus][locale];
+}
+
 /** Explicit directory columns — never include compensation/banking/ID docs. */
 export const EMPLOYEE_DIRECTORY_COLUMNS =
   "id, organization_id, profile_id, employee_number, job_title_ar, job_title_en, employment_status, employment_type, joining_date, contract_start, contract_end, probation_end, direct_manager_employee_id, work_location, nationality, is_active, terminated_at, created_at, updated_at" as const;

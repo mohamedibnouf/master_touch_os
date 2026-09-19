@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  Banknote,
   Bell,
   Building2,
   CalendarDays,
@@ -36,6 +37,8 @@ const primary = [
   { href: "/employees", label: "الموظفون", icon: Users },
   { href: "/leave", label: "الإجازات", icon: CalendarDays },
   { href: "/attendance", label: "حضور", icon: Clock },
+  { href: "/payroll", label: "الرواتب", icon: Banknote },
+  { href: "/my/payslips", label: "قسائمي", icon: Banknote },
   { href: "/departments", label: "الإدارات", icon: Building2 },
   { href: "/notifications", label: "التنبيهات", icon: Bell },
   { href: "/settings", label: "الإعدادات", icon: Settings },
@@ -57,6 +60,7 @@ export function Sidebar({
   canDepartments = true,
   canLeave = true,
   canAttendance = true,
+  canPayroll = true,
   open = false,
   onClose,
 }: {
@@ -64,6 +68,7 @@ export function Sidebar({
   canDepartments?: boolean;
   canLeave?: boolean;
   canAttendance?: boolean;
+  canPayroll?: boolean;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -75,6 +80,7 @@ export function Sidebar({
     if (item.href === "/departments") return canDepartments;
     if (item.href === "/leave") return canLeave;
     if (item.href === "/attendance") return canAttendance;
+    if (item.href === "/payroll" || item.href === "/my/payslips") return canPayroll;
     return true;
   });
 

@@ -76,6 +76,16 @@ export const DOMAIN_EVENTS = [
   "attendance.adjusted",
   "attendance.shift_assigned",
   "attendance.reconciled",
+  "payroll.period_created",
+  "payroll.calculated",
+  "payroll.submitted",
+  "payroll.reviewed",
+  "payroll.approved",
+  "payroll.locked",
+  "payroll.payment_recorded",
+  "payroll.cancelled",
+  "payroll.adjusted",
+  "payroll.settings_updated",
 ] as const;
 
 export type DomainEventType = (typeof DOMAIN_EVENTS)[number];

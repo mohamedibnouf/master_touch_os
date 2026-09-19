@@ -43,6 +43,18 @@ export type AttendanceStatus =
   | "off_day"
   | "missing_checkout";
 export type AttendanceSource = "self_service" | "hr_adjustment" | "system_reconcile" | "import";
+export type PayrollPeriodStatus =
+  | "draft"
+  | "calculated"
+  | "under_review"
+  | "approved"
+  | "locked"
+  | "paid"
+  | "cancelled";
+export type PayrollEarningKind = "recurring" | "one_time";
+export type PayrollLineSource = "calculated" | "manual" | "leave" | "attendance" | "system";
+export type PayrollPaymentMethod = "bank_transfer" | "cash" | "cheque" | "other";
+export type PayrollPaymentStatus = "unpaid" | "partial" | "paid";
 export type ProjectStatus = "draft" | "active" | "on_hold" | "completed" | "cancelled" | "archived";
 export type ProjectPriority = "low" | "medium" | "high" | "critical";
 export type RiskLevel = "low" | "medium" | "high" | "critical";

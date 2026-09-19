@@ -30,6 +30,16 @@ export async function AppShell({
     can(ctx.grants, "attendance.view_team", orgCtx) ||
     can(ctx.grants, "attendance.view_all", orgCtx) ||
     can(ctx.grants, "attendance.manage", orgCtx);
+  const canPayroll =
+    can(ctx.grants, "payroll.view_self", orgCtx) ||
+    can(ctx.grants, "payroll.view_all", orgCtx) ||
+    can(ctx.grants, "payroll.prepare", orgCtx) ||
+    can(ctx.grants, "payroll.review", orgCtx) ||
+    can(ctx.grants, "payroll.approve", orgCtx) ||
+    can(ctx.grants, "payroll.record_payment", orgCtx) ||
+    can(ctx.grants, "payroll.calculate", orgCtx) ||
+    can(ctx.grants, "payroll.adjust", orgCtx) ||
+    can(ctx.grants, "payroll.manage_settings", orgCtx);
 
   return (
     <AppShellFrame
@@ -41,6 +51,7 @@ export async function AppShell({
       canDepartments={canDepartments}
       canLeave={canLeave}
       canAttendance={canAttendance}
+      canPayroll={canPayroll}
     >
       {children}
     </AppShellFrame>

@@ -467,3 +467,155 @@ export type AttendanceAdjustment = {
   adjusted_by: string;
   adjusted_at: string;
 };
+
+export type PayrollSettings = {
+  id: string;
+  organization_id: string;
+  currency: string;
+  standard_payable_days: number;
+  deduct_unpaid_leave: boolean;
+  deduct_absence: boolean;
+  deduct_late_minutes: boolean;
+  rounding_precision: number;
+  default_payment_method: import("./enums").PayrollPaymentMethod;
+  calculation_basis: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollPeriod = {
+  id: string;
+  organization_id: string;
+  year: number;
+  month: number;
+  period_start: string;
+  period_end: string;
+  status: import("./enums").PayrollPeriodStatus;
+  employee_count: number;
+  total_gross: number;
+  total_deductions: number;
+  total_net: number;
+  engine_version: number;
+  created_by: string | null;
+  calculated_at: string | null;
+  calculated_by: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  locked_at: string | null;
+  locked_by: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollEntry = {
+  id: string;
+  organization_id: string;
+  payroll_period_id: string;
+  employee_id: string;
+  employee_number: string | null;
+  employee_name: string | null;
+  department_name: string | null;
+  contract_id: string | null;
+  primary_compensation_version_id: string | null;
+  compensation_version_ids: string[] | null;
+  base_salary: number;
+  housing_allowance: number;
+  transport_allowance: number;
+  other_allowances: number;
+  gross_recurring: number;
+  bank_account_id: string | null;
+  masked_iban: string | null;
+  eligible_start: string | null;
+  eligible_end: string | null;
+  payable_days: number;
+  present_days: number;
+  absent_days: number;
+  leave_days: number;
+  unpaid_leave_days: number;
+  late_minutes: number;
+  early_leave_minutes: number;
+  worked_minutes: number;
+  missing_checkout_count: number;
+  total_earnings: number;
+  total_deductions: number;
+  gross_pay: number;
+  net_pay: number;
+  payment_status: import("./enums").PayrollPaymentStatus;
+  calculation_details: Record<string, unknown>;
+  engine_version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollEntrySegment = {
+  id: string;
+  organization_id: string;
+  payroll_entry_id: string;
+  compensation_version_id: string;
+  segment_start: string;
+  segment_end: string;
+  payable_days: number;
+  basic_salary: number;
+  housing_allowance: number;
+  transport_allowance: number;
+  other_allowances: number;
+  monthly_gross: number;
+  segment_gross: number;
+  daily_rate: number;
+  created_at: string;
+};
+
+export type PayrollEarning = {
+  id: string;
+  organization_id: string;
+  payroll_entry_id: string;
+  payroll_period_id: string;
+  code: string;
+  description_ar: string;
+  description_en: string;
+  kind: import("./enums").PayrollEarningKind;
+  source: import("./enums").PayrollLineSource;
+  amount: number;
+  is_manual: boolean;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type PayrollDeduction = {
+  id: string;
+  organization_id: string;
+  payroll_entry_id: string;
+  payroll_period_id: string;
+  code: string;
+  description_ar: string;
+  description_en: string;
+  source: import("./enums").PayrollLineSource;
+  amount: number;
+  is_manual: boolean;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type PayrollPayment = {
+  id: string;
+  organization_id: string;
+  payroll_period_id: string;
+  payroll_entry_id: string;
+  payment_date: string;
+  payment_method: import("./enums").PayrollPaymentMethod;
+  payment_reference: string | null;
+  amount: number;
+  recorded_by: string | null;
+  notes: string | null;
+  created_at: string;
+};
