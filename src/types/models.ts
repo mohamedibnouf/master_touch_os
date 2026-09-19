@@ -28,6 +28,7 @@ export type Organization = {
   timezone: string;
   default_currency: string;
   status: OrganizationStatus;
+  leave_day_basis?: "calendar" | "working";
   created_at: string;
   updated_at: string;
 };
@@ -305,4 +306,164 @@ export type PendingAction = {
   dueAt: string | null;
   isOverdue: boolean;
   priority?: number;
+};
+
+export type LeaveType = {
+  id: string;
+  organization_id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  description_ar: string | null;
+  description_en: string | null;
+  is_paid: boolean;
+  annual_entitlement_days: number;
+  requires_attachment: boolean;
+  minimum_notice_days: number;
+  maximum_consecutive_days: number | null;
+  allow_carry_forward: boolean;
+  maximum_carry_forward_days: number | null;
+  allow_negative_balance: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeLeaveBalance = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  leave_type_id: string;
+  year: number;
+  opening_balance: number;
+  entitled_days: number;
+  carried_forward_days: number;
+  used_days: number;
+  pending_days: number;
+  adjustment_days: number;
+  available_days: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeaveRequest = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  reason: string | null;
+  attachment_document_id: string | null;
+  status: import("./enums").LeaveRequestStatus;
+  approval_stage: import("./enums").LeaveApprovalStage;
+  manager_profile_id: string | null;
+  manager_decided_at: string | null;
+  manager_decision: string | null;
+  manager_comment: string | null;
+  hr_profile_id: string | null;
+  hr_decided_at: string | null;
+  hr_decision: string | null;
+  hr_comment: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  cancelled_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeaveBalanceAdjustment = {
+  id: string;
+  organization_id: string;
+  balance_id: string;
+  employee_id: string;
+  leave_type_id: string;
+  year: number;
+  adjustment_days: number;
+  reason: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type AttendancePolicy = {
+  id: string;
+  organization_id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  description_ar: string | null;
+  description_en: string | null;
+  late_grace_minutes: number;
+  early_leave_grace_minutes: number;
+  minimum_work_minutes: number;
+  allow_manual_check_in: boolean;
+  allow_manual_check_out: boolean;
+  require_hr_approval_for_adjustment: boolean;
+  reconciliation_delay_hours: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AttendanceShift = {
+  id: string;
+  organization_id: string;
+  policy_id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  crosses_midnight: boolean;
+  working_days: number[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeShiftAssignment = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  shift_id: string;
+  effective_from: string;
+  effective_to: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type AttendanceRecord = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  shift_id: string | null;
+  attendance_date: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  worked_minutes: number;
+  late_minutes: number;
+  early_leave_minutes: number;
+  attendance_status: import("./enums").AttendanceStatus;
+  source: import("./enums").AttendanceSource;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AttendanceAdjustment = {
+  id: string;
+  organization_id: string;
+  attendance_record_id: string;
+  employee_id: string;
+  previous_values: Record<string, unknown>;
+  new_values: Record<string, unknown>;
+  reason: string;
+  adjusted_by: string;
+  adjusted_at: string;
 };

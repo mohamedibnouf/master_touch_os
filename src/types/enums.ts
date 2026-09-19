@@ -31,6 +31,18 @@ export type HrDocumentVisibility =
   | "finance_visible"
   | "restricted";
 export type CompensationVersionStatus = "active" | "superseded" | "cancelled";
+export type LeaveRequestStatus = "draft" | "submitted" | "approved" | "rejected" | "cancelled";
+export type LeaveApprovalStage = "none" | "manager" | "hr" | "complete";
+export type AttendanceStatus =
+  | "present"
+  | "late"
+  | "absent"
+  | "partial"
+  | "on_leave"
+  | "holiday"
+  | "off_day"
+  | "missing_checkout";
+export type AttendanceSource = "self_service" | "hr_adjustment" | "system_reconcile" | "import";
 export type ProjectStatus = "draft" | "active" | "on_hold" | "completed" | "cancelled" | "archived";
 export type ProjectPriority = "low" | "medium" | "high" | "critical";
 export type RiskLevel = "low" | "medium" | "high" | "critical";

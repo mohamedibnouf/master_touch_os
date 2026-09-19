@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotificationChannel, NotificationPriority } from "@/types/enums";
 import { logger } from "@/lib/logger";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export type NotificationPayload = {
   organizationId: string;
@@ -63,8 +64,23 @@ export class NotificationService {
     private readonly channels: NotificationChannelAdapter[],
   ) {}
 
+  /**
+   * In-app notifications are written with the service-role client.
+   * Authenticated RLS intentionally has no INSERT on `notifications`
+   * (recipients may only read/update their own rows).
+   */
   async notify(payload: NotificationPayload): Promise<string | null> {
-    const { data, error } = await this.supabase
+    let writer: SupabaseClient;
+    try {
+      writer = createAdminSupabaseClient();
+    } catch (error) {
+      logger.error("Failed to create admin client for notification", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      writer = this.supabase;
+    }
+
+    const { data, error } = await writer
       .from("notifications")
       .insert({
         organization_id: payload.organizationId,
@@ -88,7 +104,8 @@ export class NotificationService {
       if (channel.channel !== "in_app") {
         continue;
       }
-      await channel.send(data.id, payload);
+      // Deliveries also lack authenticated INSERT RLS — use the same writer.
+      await new InAppChannel(writer).send(data.id, payload);
     }
 
     return data.id;

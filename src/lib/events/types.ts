@@ -66,6 +66,16 @@ export const DOMAIN_EVENTS = [
   "project.budget_warning",
   "project.margin_warning",
   "project.cashflow_warning",
+  "leave_request.submitted",
+  "leave_request.manager_approved",
+  "leave_request.approved",
+  "leave_request.rejected",
+  "leave_request.cancelled",
+  "attendance.checked_in",
+  "attendance.checked_out",
+  "attendance.adjusted",
+  "attendance.shift_assigned",
+  "attendance.reconciled",
 ] as const;
 
 export type DomainEventType = (typeof DOMAIN_EVENTS)[number];

@@ -18,6 +18,18 @@ export async function AppShell({
     can(ctx.grants, "employee.create", orgCtx) ||
     can(ctx.grants, "department.update", orgCtx);
   const canDepartments = can(ctx.grants, "department.read", orgCtx);
+  const canLeave =
+    can(ctx.grants, "leave.view_self", orgCtx) ||
+    can(ctx.grants, "leave.request", orgCtx) ||
+    can(ctx.grants, "leave.view_team", orgCtx) ||
+    can(ctx.grants, "leave.view_all", orgCtx) ||
+    can(ctx.grants, "leave.manage", orgCtx);
+  const canAttendance =
+    can(ctx.grants, "attendance.view_self", orgCtx) ||
+    can(ctx.grants, "attendance.check_in", orgCtx) ||
+    can(ctx.grants, "attendance.view_team", orgCtx) ||
+    can(ctx.grants, "attendance.view_all", orgCtx) ||
+    can(ctx.grants, "attendance.manage", orgCtx);
 
   return (
     <AppShellFrame
@@ -27,6 +39,8 @@ export async function AppShell({
       jobTitle={ctx.employee?.job_title_ar ?? "حساب تشغيلي"}
       canEmployees={canEmployees}
       canDepartments={canDepartments}
+      canLeave={canLeave}
+      canAttendance={canAttendance}
     >
       {children}
     </AppShellFrame>

@@ -14,6 +14,8 @@ export function AppShellFrame({
   jobTitle,
   canEmployees,
   canDepartments,
+  canLeave,
+  canAttendance,
   children,
 }: {
   organizationNameAr: string;
@@ -22,6 +24,8 @@ export function AppShellFrame({
   jobTitle: string;
   canEmployees: boolean;
   canDepartments: boolean;
+  canLeave: boolean;
+  canAttendance: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -59,6 +63,8 @@ export function AppShellFrame({
       <Sidebar
         canEmployees={canEmployees}
         canDepartments={canDepartments}
+        canLeave={canLeave}
+        canAttendance={canAttendance}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />

@@ -1,4 +1,5 @@
 import type {
+  AttendanceStatus,
   CompensationVersionStatus,
   EmployeeContractStatus,
   EmployeeDocumentCategory,
@@ -6,6 +7,7 @@ import type {
   EmploymentStatus,
   EmploymentType,
   HrDocumentVisibility,
+  LeaveRequestStatus,
 } from "@/types/enums";
 
 export const EMPLOYMENT_TYPE_LABELS: Record<
@@ -124,6 +126,38 @@ export function maskIban(iban: string | null | undefined): string {
   const prefix = clean.substring(0, 4);
   const suffix = clean.substring(clean.length - 4);
   return `${prefix} **** **** **** ${suffix}`;
+}
+
+export const LEAVE_STATUS_LABELS: Record<LeaveRequestStatus, { ar: string; en: string }> = {
+  draft: { ar: "مسودة", en: "Draft" },
+  submitted: { ar: "مقدّم", en: "Submitted" },
+  approved: { ar: "معتمد", en: "Approved" },
+  rejected: { ar: "مرفوض", en: "Rejected" },
+  cancelled: { ar: "ملغى", en: "Cancelled" },
+};
+
+export function leaveStatusLabel(value: LeaveRequestStatus | string | null | undefined, locale: "ar" | "en" = "ar") {
+  if (!value || !(value in LEAVE_STATUS_LABELS)) return "—";
+  return LEAVE_STATUS_LABELS[value as LeaveRequestStatus][locale];
+}
+
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, { ar: string; en: string }> = {
+  present: { ar: "حاضر", en: "Present" },
+  late: { ar: "متأخر", en: "Late" },
+  absent: { ar: "غائب", en: "Absent" },
+  partial: { ar: "دوام جزئي", en: "Partial" },
+  on_leave: { ar: "في إجازة", en: "On leave" },
+  holiday: { ar: "عطلة رسمية", en: "Holiday" },
+  off_day: { ar: "يوم راحة", en: "Off day" },
+  missing_checkout: { ar: "بدون انصراف", en: "Missing checkout" },
+};
+
+export function attendanceStatusLabel(
+  value: AttendanceStatus | string | null | undefined,
+  locale: "ar" | "en" = "ar",
+) {
+  if (!value || !(value in ATTENDANCE_STATUS_LABELS)) return "—";
+  return ATTENDANCE_STATUS_LABELS[value as AttendanceStatus][locale];
 }
 
 /** Explicit directory columns — never include compensation/banking/ID docs. */

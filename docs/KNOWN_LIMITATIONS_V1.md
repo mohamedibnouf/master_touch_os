@@ -17,11 +17,11 @@ The items below are **explicitly deferred post-V1 roadmap capabilities** that ar
    - *Status in V1:* Base versioned compensation (`employee_compensation_versions`) and banking (`employee_bank_accounts`) data models are live and ready.
    - *Post-V1:* Batch monthly payroll calculations, deductions/overtime processors, WPS file generation, and payment slip dispatch.
 2. **Leave Management & Balances (Phase 4.3)**
-   - *Status in V1:* Prepared in HR architecture; leave tables and request flows are deferred.
-   - *Post-V1:* Annual leave accrual calculators, leave request approvals, balance ledger, and leave-calendar integration.
-3. **Attendance & Time Tracking (Phase 4.3)**
-   - *Status in V1:* Deferred.
-   - *Post-V1:* Daily check-in/out logs, biometric device sync, timesheet reconciliation.
+   - *Status:* Implemented in migration `056` (`leave_types`, `employee_leave_balances`, `leave_requests`, manager→HR RPCs). Apply `supabase/phase4_fix_056.sql` on production before enabling.
+   - *Known limits:* calendar/working day basis only (no public-holiday calendar yet); cross-year ranges rejected; attachment is document UUID reference (no dedicated leave upload UI); email/WhatsApp leave alerts deferred.
+3. **Attendance & Time Tracking (Phase 4.4)**
+   - *Status:* Implemented in migration `057` (`attendance_policies`, `attendance_shifts`, `employee_shift_assignments`, `attendance_records`, `attendance_adjustments`, check-in/out + reconcile RPCs). Apply `supabase/phase4_apply_057.sql` on production before enabling.
+   - *Known limits:* self-service + HR adjust only (no biometric device sync / geofencing); no payroll / overtime / WPS export linkage yet; holiday calendar not wired (status supports `holiday` when reconciled).
 4. **Saudi Statutory Labor Calculations (Phase 4.5)**
    - *Status in V1:* Compliance dates and document expiries are tracked.
    - *Post-V1:* Automated End-of-Service (EOS) award calculations and General Organization for Social Insurance (GOSI) contribution formulas.

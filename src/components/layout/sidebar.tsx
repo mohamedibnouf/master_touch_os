@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Building2,
+  CalendarDays,
   ClipboardList,
   FileText,
   FolderKanban,
@@ -17,6 +18,7 @@ import {
   Wrench,
   ShoppingCart,
   Wallet,
+  Clock,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,8 @@ const primary = [
   { href: "/approvals", label: "الموافقات", icon: Stamp },
   { href: "/documents", label: "المستندات", icon: FileText },
   { href: "/employees", label: "الموظفون", icon: Users },
+  { href: "/leave", label: "الإجازات", icon: CalendarDays },
+  { href: "/attendance", label: "حضور", icon: Clock },
   { href: "/departments", label: "الإدارات", icon: Building2 },
   { href: "/notifications", label: "التنبيهات", icon: Bell },
   { href: "/settings", label: "الإعدادات", icon: Settings },
@@ -51,11 +55,15 @@ const later = [{ label: "الجودة والسلامة" }, { label: "الذكا�
 export function Sidebar({
   canEmployees = true,
   canDepartments = true,
+  canLeave = true,
+  canAttendance = true,
   open = false,
   onClose,
 }: {
   canEmployees?: boolean;
   canDepartments?: boolean;
+  canLeave?: boolean;
+  canAttendance?: boolean;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -65,6 +73,8 @@ export function Sidebar({
   const links = primary.filter((item) => {
     if (item.href === "/employees") return canEmployees;
     if (item.href === "/departments") return canDepartments;
+    if (item.href === "/leave") return canLeave;
+    if (item.href === "/attendance") return canAttendance;
     return true;
   });
 
