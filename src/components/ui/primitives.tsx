@@ -116,10 +116,11 @@ export function PageHeader({
   );
 }
 
-export function EmptyState({ title }: { title: string }) {
+export function EmptyState({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-line bg-white px-6 py-12 text-center text-sm text-muted">
-      {title}
+    <div className="rounded-lg border border-dashed border-line bg-white px-6 py-10 text-center">
+      <p className="text-sm font-medium text-navy">{title}</p>
+      {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
     </div>
   );
 }

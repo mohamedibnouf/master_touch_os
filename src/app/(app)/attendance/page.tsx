@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -104,6 +104,9 @@ export default async function AttendanceDashboardPage() {
                 {todayRecord.early_leave_minutes} د
               </p>
             ) : null}
+            {todayRecord?.check_in_at && !todayRecord.check_out_at ? (
+              <p className="mt-1 text-xs text-warning">لم يُسجَّل الانصراف بعد.</p>
+            ) : null}
           </div>
           {todayRecord ? <Badge tone={todayRecord.attendance_status === "present" ? "success" : "warning"}>
             {attendanceStatusLabel(todayRecord.attendance_status)}
@@ -143,13 +146,14 @@ export default async function AttendanceDashboardPage() {
         )}
       </Card>
 
-      <Card className="overflow-x-auto p-0">
+      <Card className="mb-6 overflow-hidden p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">آخر الأيام</div>
         {recent.length === 0 ? (
           <div className="p-4">
             <EmptyState title="لا يوجد سجل حضور بعد." />
           </div>
         ) : (
+          <TableScroll>
           <table className="w-full min-w-[480px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
@@ -172,6 +176,7 @@ export default async function AttendanceDashboardPage() {
               ))}
             </tbody>
           </table>
+          </TableScroll>
         )}
       </Card>
     </div>

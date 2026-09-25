@@ -42,8 +42,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-a {
-  color: inherit;
+summary::-webkit-details-marker {
+  display: none;
 }
 
 /* Keep enterprise tables readable on narrow screens via parent overflow-x-auto */
@@ -57,4 +57,46 @@ a {
   max-width: calc(100vw - 24px);
   max-height: 90vh;
   overflow-y: auto;
+}
+
+/* Phase 5.3 — management report print */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  aside,
+  header,
+  [data-testid="management-nav"],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .management-report {
+    max-width: none !important;
+  }
+
+  .management-report a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
 }

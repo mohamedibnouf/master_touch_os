@@ -1,0 +1,60 @@
+import type { ReportCatalogItem } from "./types";
+
+export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
+  {
+    kind: "executive",
+    href: "/management/reports/executive",
+    titleAr: "الملخص التنفيذي",
+    titleEn: "Executive Summary",
+    descriptionAr: "موجز قرار حتمي: مقاييس، مخاطر عليا، ونشاط حديث.",
+    descriptionEn: "Deterministic decision brief: metrics, top risks, recent activity.",
+  },
+  {
+    kind: "projects",
+    href: "/management/reports/projects",
+    titleAr: "محفظة المشاريع",
+    titleEn: "Project Portfolio",
+    descriptionAr: "حالة المشاريع، التجاوزات المخططة، والمخاطر المرتبطة.",
+    descriptionEn: "Project status, planned-end overruns, and linked risks.",
+  },
+  {
+    kind: "operations",
+    href: "/management/reports/operations",
+    titleAr: "العمليات والموافقات",
+    titleEn: "Operations & Approvals",
+    descriptionAr: "طوابير الموافقات والمشتريات مع أعمار الانتباه الإداري.",
+    descriptionEn: "Approval and procurement queues with management attention ages.",
+  },
+  {
+    kind: "finance",
+    href: "/management/reports/finance",
+    titleAr: "التجاري / المالي",
+    titleEn: "Commercial / Financial",
+    descriptionAr: "أعداد الذمم والمستخلصات — المبالغ حسب الصلاحيات التشغيلية.",
+    descriptionEn: "Receivable/payable counts — amounts only via operational permissions.",
+  },
+  {
+    kind: "people",
+    href: "/management/reports/people",
+    titleAr: "الأفراد والحضور",
+    titleEn: "People & Attendance",
+    descriptionAr: "تجميعات الأفراد والامتثال والحضور دون بيانات رواتب.",
+    descriptionEn: "People, compliance, and attendance aggregates without pay data.",
+  },
+  {
+    kind: "payroll",
+    href: "/management/reports/payroll",
+    titleAr: "حالة المسير",
+    titleEn: "Payroll Status",
+    descriptionAr: "سير عمل فترات الرواتب — ليس تقرير رواتب فردية.",
+    descriptionEn: "Payroll period workflow — not an individual salary report.",
+  },
+  {
+    kind: "risks",
+    href: "/management/reports/risks",
+    titleAr: "سجل المخاطر",
+    titleEn: "Risk Register",
+    descriptionAr: "نتائج محرك المخاطر الحتمي 5.2 مع الأدلة والروابط.",
+    descriptionEn: "Canonical Phase 5.2 risk findings with evidence and links.",
+  },
+];

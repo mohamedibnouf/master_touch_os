@@ -358,6 +358,13 @@ export async function uploadDocumentAction(formData: FormData) {
     file,
   });
 
+  // Unique partial index: only one is_current=true per document
+  await supabase
+    .from("document_versions")
+    .update({ is_current: false, is_superseded: true, superseded_at: new Date().toISOString() })
+    .eq("document_id", documentId)
+    .eq("is_current", true);
+
   const { error: versionError } = await supabase.from("document_versions").insert({
     organization_id: ctx.organization.id,
     document_id: documentId,
@@ -368,6 +375,8 @@ export async function uploadDocumentAction(formData: FormData) {
     size_bytes: file.size,
     checksum: uploaded.checksum,
     uploaded_by: ctx.userId,
+    is_current: true,
+    is_superseded: false,
   });
   if (versionError) throw new DatabaseError(versionError);
 

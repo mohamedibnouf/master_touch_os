@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -71,7 +71,7 @@ export default async function DocumentsPage() {
       {documents.length === 0 ? (
         <EmptyState title="لا توجد مستندات بعد." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-white">
+        <TableScroll className="rounded-lg border border-line bg-white">
           <table className="min-w-full text-sm">
             <thead className="bg-paper text-right text-muted">
               <tr>
@@ -80,6 +80,7 @@ export default async function DocumentsPage() {
                 <th className="px-4 py-3 font-medium">الإصدار</th>
                 <th className="px-4 py-3 font-medium">الحالة</th>
                 <th className="px-4 py-3 font-medium">التاريخ</th>
+                <th className="px-4 py-3 font-medium">ذكاء</th>
               </tr>
             </thead>
             <tbody>
@@ -94,11 +95,24 @@ export default async function DocumentsPage() {
                   <td className="px-4 py-3 text-muted">
                     {new Date(doc.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
                   </td>
+                  <td className="px-4 py-3">
+                    {doc.category === "business_case" ? (
+                      <a
+                        href={`/documents/${doc.id}/intelligence`}
+                        className="text-navy underline"
+                        data-testid={`doc-intel-link-${doc.id}`}
+                      >
+                        تحليل
+                      </a>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
     </div>
   );

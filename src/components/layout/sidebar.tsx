@@ -20,28 +20,78 @@ import {
   ShoppingCart,
   Wallet,
   Clock,
+  Gauge,
+  Sparkles,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { AppNavFlags } from "./nav-flags";
 
-const primary = [
-  { href: "/", label: "الرئيسية", icon: LayoutDashboard },
-  { href: "/projects", label: "المشاريع", icon: FolderKanban },
-  { href: "/engineering", label: "الهندسة", icon: Wrench },
-  { href: "/document-control", label: "مراقبة الوثائق", icon: ClipboardList },
-  { href: "/procurement", label: "المشتريات", icon: ShoppingCart },
-  { href: "/finance", label: "المالية", icon: Wallet },
-  { href: "/search", label: "بحث موحّد", icon: Search },
-  { href: "/approvals", label: "الموافقات", icon: Stamp },
-  { href: "/documents", label: "المستندات", icon: FileText },
-  { href: "/employees", label: "الموظفون", icon: Users },
-  { href: "/leave", label: "الإجازات", icon: CalendarDays },
-  { href: "/attendance", label: "حضور", icon: Clock },
-  { href: "/payroll", label: "الرواتب", icon: Banknote },
-  { href: "/my/payslips", label: "قسائمي", icon: Banknote },
-  { href: "/departments", label: "الإدارات", icon: Building2 },
-  { href: "/notifications", label: "التنبيهات", icon: Bell },
-  { href: "/settings", label: "الإعدادات", icon: Settings },
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; show: keyof AppNavFlags | "always" };
+
+type NavGroup = { id: string; label: string; items: NavItem[] };
+
+const groups: NavGroup[] = [
+  {
+    id: "home",
+    label: "الرئيسية",
+    items: [{ href: "/", label: "عملي اليوم", icon: LayoutDashboard, show: "always" }],
+  },
+  {
+    id: "my",
+    label: "عملي",
+    items: [
+      { href: "/attendance", label: "الحضور", icon: Clock, show: "attendance" },
+      { href: "/leave", label: "الإجازات", icon: CalendarDays, show: "leave" },
+      { href: "/approvals", label: "الموافقات", icon: Stamp, show: "approvals" },
+      { href: "/notifications", label: "التنبيهات", icon: Bell, show: "notifications" },
+      { href: "/notifications/preferences", label: "تفضيلات التنبيه", icon: Bell, show: "notifications" },
+      { href: "/my/payslips", label: "قسائمي", icon: Banknote, show: "payslips" },
+    ],
+  },
+  {
+    id: "projects",
+    label: "المشاريع",
+    items: [
+      { href: "/projects", label: "المشاريع", icon: FolderKanban, show: "projects" },
+      { href: "/engineering", label: "الهندسة", icon: Wrench, show: "engineering" },
+      { href: "/document-control", label: "مراقبة الوثائق", icon: ClipboardList, show: "documentControl" },
+      { href: "/documents", label: "المستندات", icon: FileText, show: "documents" },
+      { href: "/search", label: "بحث موحّد", icon: Search, show: "search" },
+    ],
+  },
+  {
+    id: "commercial",
+    label: "التشغيل التجاري",
+    items: [
+      { href: "/procurement", label: "المشتريات", icon: ShoppingCart, show: "procurement" },
+      { href: "/finance", label: "المالية", icon: Wallet, show: "finance" },
+    ],
+  },
+  {
+    id: "people",
+    label: "الأفراد",
+    items: [
+      { href: "/employees", label: "الموظفون", icon: Users, show: "employees" },
+      { href: "/departments", label: "الإدارات", icon: Building2, show: "departments" },
+      { href: "/hr/leave", label: "إدارة الإجازات", icon: CalendarDays, show: "hrLeave" },
+      { href: "/hr/attendance", label: "إدارة الحضور", icon: Clock, show: "hrAttendance" },
+      { href: "/payroll", label: "الرواتب", icon: Banknote, show: "payroll" },
+    ],
+  },
+  {
+    id: "management",
+    label: "الإدارة",
+    items: [
+      { href: "/management", label: "مركز القيادة", icon: Gauge, show: "management" },
+      { href: "/management/analyst", label: "المحلل الذكي", icon: Sparkles, show: "analyst" },
+    ],
+  },
+  {
+    id: "system",
+    label: "النظام",
+    items: [{ href: "/settings", label: "الإعدادات", icon: Settings, show: "settings" }],
+  },
 ];
 
 const financeSubLinks = [
@@ -53,36 +103,18 @@ const financeSubLinks = [
   { href: "/finance/receivables", label: "ذمم العملاء" },
 ];
 
-const later = [{ label: "الجودة والسلامة" }, { label: "الذكاء الاصطناعي" }];
-
 export function Sidebar({
-  canEmployees = true,
-  canDepartments = true,
-  canLeave = true,
-  canAttendance = true,
-  canPayroll = true,
+  flags,
   open = false,
   onClose,
 }: {
-  canEmployees?: boolean;
-  canDepartments?: boolean;
-  canLeave?: boolean;
-  canAttendance?: boolean;
-  canPayroll?: boolean;
+  flags: AppNavFlags;
   open?: boolean;
   onClose?: () => void;
 }) {
   const pathname = usePathname();
   const onFinance = pathname.startsWith("/finance");
   const [isDesktop, setIsDesktop] = useState(false);
-  const links = primary.filter((item) => {
-    if (item.href === "/employees") return canEmployees;
-    if (item.href === "/departments") return canDepartments;
-    if (item.href === "/leave") return canLeave;
-    if (item.href === "/attendance") return canAttendance;
-    if (item.href === "/payroll" || item.href === "/my/payslips") return canPayroll;
-    return true;
-  });
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -92,12 +124,19 @@ export function Sidebar({
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  const visibleGroups = groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => item.show === "always" || flags[item.show]),
+    }))
+    .filter((g) => g.items.length > 0);
+
   return (
     <aside
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex h-full w-72 shrink-0 flex-col border-l border-white/10 bg-navy text-white",
+        "flex h-full w-72 shrink-0 flex-col border-l border-white/10 bg-navy text-white print:hidden",
         "fixed inset-y-0 start-0 z-50 transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 lg:transition-none",
         open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full lg:translate-x-0",
       )}
@@ -116,56 +155,55 @@ export function Sidebar({
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
-        {links.map((item) => {
-          const Icon = item.icon;
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const isFinance = item.href === "/finance";
-          return (
-            <div key={item.href}>
-              <Link
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition lg:min-h-0",
-                  active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white",
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-              {isFinance && onFinance ? (
-                <div className="me-2 mt-1 space-y-0.5 border-r border-white/10 pe-2">
-                  {financeSubLinks.map((sub) => {
-                    const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
-                    return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        onClick={onClose}
-                        data-testid={`sidebar-${sub.href.replaceAll("/", "-").slice(1)}`}
-                        className={cn(
-                          "block rounded-md py-2 pe-3 ps-6 text-xs transition",
-                          subActive ? "bg-white/10 text-white" : "text-white/55 hover:text-white/85",
-                        )}
-                      >
-                        {sub.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : null}
+      <nav className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4">
+        {visibleGroups.map((group) => (
+          <div key={group.id}>
+            {group.id !== "home" ? (
+              <p className="px-3 pb-1 text-[10px] font-semibold tracking-wide text-white/40">{group.label}</p>
+            ) : null}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const isFinance = item.href === "/finance";
+                return (
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onClose}
+                      className={cn(
+                        "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition lg:min-h-0",
+                        active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                    {isFinance && onFinance ? (
+                      <div className="me-2 mt-1 space-y-0.5 border-r border-white/10 pe-2">
+                        {financeSubLinks.map((sub) => {
+                          const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              onClick={onClose}
+                              data-testid={`sidebar-${sub.href.replaceAll("/", "-").slice(1)}`}
+                              className={cn(
+                                "block rounded-md py-2 pe-3 ps-6 text-xs transition",
+                                subActive ? "bg-white/10 text-white" : "text-white/55 hover:text-white/85",
+                              )}
+                            >
+                              {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-        <p className="px-3 pt-6 pb-2 text-[11px] font-semibold tracking-wide text-white/40">وحدات لاحقة</p>
-        {later.map((item) => (
-          <div
-            key={item.label}
-            className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-white/35"
-          >
-            <span>{item.label}</span>
-            <span className="text-[10px]">لاحقاً</span>
           </div>
         ))}
       </nav>

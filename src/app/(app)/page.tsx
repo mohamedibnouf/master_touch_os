@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { AttendanceRepository } from "@/server/repositories/attendance.repository";
+import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
 import { commercialEntityHref } from "@/lib/commercial/entity-routes";
+import { pendingActionHref } from "@/lib/work-item-href";
+import { notificationEntityHref } from "@/lib/notifications/href";
+import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import { attendanceStatusLabel } from "@/lib/hr/labels";
+import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 
 export default async function DashboardPage() {
   const ctx = await getAuthContext();
@@ -13,8 +20,13 @@ export default async function DashboardPage() {
 
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
-  const dashboard = await repo.dashboard(ctx.organization.id, ctx.userId);
+  const showOrgStats =
+    hasPermission(ctx, "reports.management.read") || hasPermission(ctx, "employee.read");
   const canReadAudit = hasPermission(ctx, "audit.read");
+  const dashboard = await repo.dashboard(ctx.organization.id, ctx.userId, {
+    includeOrgStats: showOrgStats,
+    includeAudit: canReadAudit,
+  });
 
   // Procurement My Actions — pulled live
   type ProcAction = { id: string; label: string; href: string; status: string; overdue: boolean };
@@ -230,34 +242,190 @@ export default async function DashboardPage() {
 
   procActions.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1));
 
-  const cards = [
-    { label: "المشاريع النشطة", value: dashboard.stats.activeProjects, href: "/projects" },
-    { label: "مشاريع عالية المخاطر", value: dashboard.stats.projectsAtRisk, href: "/projects?risk=high" },
-    { label: "موافقات معلّقة", value: dashboard.stats.pendingApprovals, href: "/approvals" },
-    { label: "موافقات متأخرة", value: dashboard.stats.overdueApprovals, href: "/approvals?overdue=1" },
-    { label: "موظفون نشطون", value: dashboard.stats.activeEmployees, href: "/employees" },
-    { label: "تنبيهات غير مقروءة", value: dashboard.stats.unreadNotifications, href: "/notifications" },
-  ];
+  const greetingName = ctx.profile.full_name_ar || ctx.profile.full_name_en || "مرحباً";
+  const displayDate = new Date().toLocaleDateString("ar-SA", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Riyadh",
+  });
+  const todayYmd = riyadhTodayYmd();
+  const attendanceToday = new Date().toISOString().slice(0, 10);
+
+  let attendance: Awaited<ReturnType<AttendanceRepository["getRecordForDate"]>> = null;
+  let shiftName: string | null = null;
+  if (ctx.employee && hasPermission(ctx, "attendance.view_self")) {
+    const attRepo = new AttendanceRepository(supabase);
+    attendance = await attRepo.getRecordForDate(ctx.organization.id, ctx.employee.id, attendanceToday);
+    const assignment = await attRepo.getActiveAssignment(ctx.organization.id, ctx.employee.id, attendanceToday);
+    if (assignment) {
+      const shift = await attRepo.getShift(ctx.organization.id, assignment.shift_id);
+      shiftName = shift?.name_ar ?? null;
+    }
+  }
+
+  let leaveAvailable: number | null = null;
+  let leavePendingCount = 0;
+  if (ctx.employee && hasPermission(ctx, "leave.view_self")) {
+    const leaveRepo = new LeaveRepository(supabase);
+    const [balances, requests] = await Promise.all([
+      leaveRepo.listBalances(ctx.organization.id, ctx.employee.id, new Date().getFullYear()),
+      leaveRepo.listRequestsForEmployee(ctx.organization.id, ctx.employee.id),
+    ]);
+    leaveAvailable = balances.reduce((sum, b) => sum + Number(b.available_days ?? 0), 0);
+    leavePendingCount = requests.filter((r) => r.status === "submitted").length;
+  }
+
+  const recentNotes = hasPermission(ctx, "notification.read")
+    ? (await repo.listNotifications(ctx.userId)).slice(0, 5)
+    : [];
+
+  const canCheckIn = hasPermission(ctx, "attendance.check_in") && ctx.employee && !attendance?.check_in_at;
+  const canCheckOut =
+    hasPermission(ctx, "attendance.check_out") &&
+    ctx.employee &&
+    Boolean(attendance?.check_in_at) &&
+    !attendance?.check_out_at;
+
+  const myApprovals = dashboard.pendingActions.filter((a) => a.kind === "approval").length;
+  const cards = showOrgStats
+    ? [
+        { label: "المشاريع النشطة", value: dashboard.stats.activeProjects, href: "/projects" },
+        { label: "مشاريع عالية المخاطر", value: dashboard.stats.projectsAtRisk, href: "/projects?risk=high" },
+        { label: "موافقات معلّقة (المنشأة)", value: dashboard.stats.pendingApprovals, href: "/approvals" },
+        { label: "موافقات متأخرة", value: dashboard.stats.overdueApprovals, href: "/approvals?overdue=1" },
+        { label: "موظفون نشطون", value: dashboard.stats.activeEmployees, href: "/employees" },
+        { label: "تنبيهات غير مقروءة", value: dashboard.stats.unreadNotifications, href: "/notifications" },
+      ]
+    : [];
 
   return (
-    <div>
-      <PageHeader title="الرئيسية" description="ملخص تشغيلي من البيانات الفعلية للنظام" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
-          <Link key={card.label} href={card.href}>
-            <Card className="transition hover:border-navy/30">
-              <p className="text-sm text-muted">{card.label}</p>
-              <p className="mt-2 text-3xl font-semibold text-navy">{card.value}</p>
-            </Card>
-          </Link>
-        ))}
+    <div data-testid="employee-home">
+      <PageHeader
+        title={`مرحباً، ${greetingName}`}
+        description={`${displayDate} · ما الذي تحتاج إنجازه اليوم؟`}
+      />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {hasPermission(ctx, "attendance.view_self") ? (
+          <Card data-testid="home-attendance">
+            <p className="text-sm text-muted">الحضور · {todayYmd}</p>
+            <p className="mt-1 text-xl font-semibold text-navy">
+              {attendance ? attendanceStatusLabel(attendance.attendance_status) : "لم يُسجَّل بعد"}
+            </p>
+            {shiftName ? <p className="mt-1 text-xs text-muted">{shiftName}</p> : null}
+            {attendance?.check_in_at && !attendance.check_out_at ? (
+              <Badge tone="warning" className="mt-2">
+                لم يُسجَّل الانصراف
+              </Badge>
+            ) : null}
+            <div className="mt-3 flex flex-col gap-2">
+              {canCheckIn ? (
+                <form action={checkInAction}>
+                  <Button type="submit" className="w-full" data-testid="home-check-in">
+                    تسجيل دخول
+                  </Button>
+                </form>
+              ) : null}
+              {canCheckOut ? (
+                <form action={checkOutAction}>
+                  <Button type="submit" variant="secondary" className="w-full" data-testid="home-check-out">
+                    تسجيل انصراف
+                  </Button>
+                </form>
+              ) : null}
+              <Link href="/attendance" className="text-sm text-navy underline">
+                صفحة الحضور
+              </Link>
+            </div>
+          </Card>
+        ) : null}
+
+        {hasPermission(ctx, "leave.view_self") ? (
+          <Card data-testid="home-leave">
+            <p className="text-sm text-muted">الإجازات</p>
+            <p className="mt-1 text-xl font-semibold text-navy">
+              {leaveAvailable == null ? "—" : `${leaveAvailable} يوم متاح`}
+            </p>
+            <p className="mt-1 text-xs text-muted">{leavePendingCount} طلب قيد المعالجة</p>
+            <Link href="/leave" className="mt-3 inline-block text-sm text-navy underline">
+              إجازاتي
+            </Link>
+          </Card>
+        ) : null}
+
+        <Card data-testid="home-approvals">
+          <p className="text-sm text-muted">بانتظار قرارك</p>
+          <p className="mt-1 text-xl font-semibold text-navy">{myApprovals + procActions.length}</p>
+          <p className="mt-1 text-xs text-muted">موافقات وإجراءات تشغيلية مخصّصة لك</p>
+          {hasPermission(ctx, "approval.review") || hasPermission(ctx, "approval.approve") ? (
+            <Link href="/approvals" className="mt-3 inline-block text-sm text-navy underline">
+              صندوق الموافقات
+            </Link>
+          ) : null}
+        </Card>
+
+        {hasPermission(ctx, "notification.read") ? (
+          <Card>
+            <p className="text-sm text-muted">تنبيهات غير مقروءة</p>
+            <p className="mt-1 text-xl font-semibold text-navy">{dashboard.stats.unreadNotifications}</p>
+            <Link href="/notifications" className="mt-3 inline-block text-sm text-navy underline">
+              مركز التنبيهات
+            </Link>
+          </Card>
+        ) : null}
       </div>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+      <div className="mb-6 flex flex-wrap gap-2">
+        {hasPermission(ctx, "project.read") ? (
+          <Link href="/projects">
+            <Button variant="secondary">المشاريع</Button>
+          </Link>
+        ) : null}
+        {hasPermission(ctx, "leave.request") ? (
+          <Link href="/leave/new">
+            <Button variant="secondary">طلب إجازة</Button>
+          </Link>
+        ) : null}
+        {hasPermission(ctx, "reports.management.read") ? (
+          <Link href="/management">
+            <Button variant="secondary">مركز القيادة</Button>
+          </Link>
+        ) : null}
+        {hasPermission(ctx, "reports.management.read") ? (
+          <Link href="/management/analyst">
+            <Button variant="secondary">المحلل الذكي</Button>
+          </Link>
+        ) : null}
+        {hasPermission(ctx, "document.read") ? (
+          <Link href="/documents">
+            <Button variant="secondary">المستندات</Button>
+          </Link>
+        ) : null}
+      </div>
+
+      {cards.length > 0 ? (
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map((card) => (
+            <Link key={card.label} href={card.href}>
+              <Card className="transition hover:border-navy/30">
+                <p className="text-sm text-muted">{card.label}</p>
+                <p className="mt-2 text-3xl font-semibold text-navy">{card.value}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-2 grid gap-6 xl:grid-cols-2">
         <Card>
-          <h2 className="mb-4 text-lg font-semibold text-navy">إجراءاتي المعلقة</h2>
+          <h2 className="mb-4 text-lg font-semibold text-navy">عملي اليوم</h2>
           {dashboard.pendingActions.length === 0 && procActions.length === 0 ? (
-            <p className="text-sm text-muted">لا توجد إجراءات معلقة حالياً.</p>
+            <EmptyState
+              title="لا توجد إجراءات معلقة حالياً"
+              description="عندما يُسند إليك اعتماد أو خطوة تشغيلية ستظهر هنا."
+            />
           ) : (
             <ul className="space-y-3">
               {procActions.slice(0, 15).map((action) => (
@@ -268,15 +436,17 @@ export default async function DashboardPage() {
                     </Link>
                     <p className="text-xs text-muted">{action.status}</p>
                   </div>
-                  <span className={action.overdue ? "text-xs text-danger font-medium" : "text-xs text-muted"}>
-                    {action.overdue ? "⚠️ متأخر" : ""}
+                  <span className={action.overdue ? "text-xs font-medium text-danger" : "text-xs text-muted"}>
+                    {action.overdue ? "متأخر" : ""}
                   </span>
                 </li>
               ))}
               {dashboard.pendingActions.map((action) => (
                 <li key={action.id} className="flex items-center justify-between border-b border-line pb-3 last:border-0">
                   <div>
-                    <p className="text-sm font-medium">{action.title}</p>
+                    <Link href={pendingActionHref(action)} className="text-sm font-medium text-navy underline">
+                      {action.title}
+                    </Link>
                     <p className="text-xs text-muted">
                       {action.kind === "approval"
                         ? "موافقة"
@@ -303,11 +473,41 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
+          <h2 className="mb-4 text-lg font-semibold text-navy">تنبيهات أخيرة</h2>
+          {!hasPermission(ctx, "notification.read") ? (
+            <p className="text-sm text-muted">عرض التنبيهات يتطلب صلاحية الإشعار.</p>
+          ) : recentNotes.length === 0 ? (
+            <EmptyState title="لا توجد تنبيهات" description="ستظهر هنا الرسائل الداخلية الموجّهة إليك." />
+          ) : (
+            <ul className="space-y-3">
+              {recentNotes.map((item) => {
+                const href = notificationEntityHref(item.entity_type, item.entity_id);
+                return (
+                  <li key={item.id} className="border-b border-line pb-3 last:border-0">
+                    {href ? (
+                      <Link href={href} className="text-sm font-medium text-navy underline">
+                        {item.title}
+                      </Link>
+                    ) : (
+                      <p className="text-sm font-medium">{item.title}</p>
+                    )}
+                    <p className="text-xs text-muted">
+                      {item.read_at ? "مقروء" : "جديد"} ·{" "}
+                      {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {canReadAudit ? (
+        <Card className="mt-6">
           <h2 className="mb-4 text-lg font-semibold text-navy">آخر النشاطات</h2>
-          {!canReadAudit ? (
-            <p className="text-sm text-muted">عرض سجل النشاط يتطلب صلاحية التدقيق.</p>
-          ) : dashboard.recentActivity.length === 0 ? (
-            <p className="text-sm text-muted">لا يوجد نشاط مسجّل بعد.</p>
+          {dashboard.recentActivity.length === 0 ? (
+            <EmptyState title="لا يوجد نشاط مسجّل بعد." />
           ) : (
             <ul className="space-y-3">
               {dashboard.recentActivity.map((item) => (
@@ -321,7 +521,7 @@ export default async function DashboardPage() {
             </ul>
           )}
         </Card>
-      </div>
+      ) : null}
     </div>
   );
 }

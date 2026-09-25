@@ -1,0 +1,22 @@
+export type AppNavFlags = {
+  employees: boolean;
+  departments: boolean;
+  leave: boolean;
+  attendance: boolean;
+  payroll: boolean;
+  payslips: boolean;
+  hrLeave: boolean;
+  hrAttendance: boolean;
+  management: boolean;
+  projects: boolean;
+  engineering: boolean;
+  documentControl: boolean;
+  documents: boolean;
+  procurement: boolean;
+  finance: boolean;
+  approvals: boolean;
+  notifications: boolean;
+  search: boolean;
+  settings: boolean;
+  analyst: boolean;
+};

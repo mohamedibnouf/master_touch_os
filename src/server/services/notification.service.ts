@@ -14,6 +14,8 @@ export type NotificationPayload = {
   entityType?: string | null;
   entityId?: string | null;
   priority?: NotificationPriority;
+  dedupKey?: string | null;
+  href?: string | null;
 };
 
 export interface NotificationChannelAdapter {
@@ -28,11 +30,15 @@ export class InAppChannel implements NotificationChannelAdapter {
 
   async send(notificationId: string, payload: NotificationPayload): Promise<void> {
     void payload;
+    const at = new Date().toISOString();
     await this.supabase.from("notification_deliveries").insert({
       notification_id: notificationId,
+      organization_id: payload.organizationId,
+      recipient_profile_id: payload.recipientProfileId,
       channel: this.channel,
       status: "delivered",
-      attempted_at: new Date().toISOString(),
+      attempted_at: at,
+      delivered_at: at,
     });
   }
 }
@@ -78,6 +84,31 @@ export class NotificationService {
         message: error instanceof Error ? error.message : String(error),
       });
       writer = this.supabase;
+    }
+
+    const dedup =
+      payload.dedupKey ??
+      (payload.entityId ? `${payload.type}:${payload.entityId}:${payload.recipientProfileId}` : null);
+
+    const { data: hubId, error: hubError } = await writer.rpc("upsert_operational_notification", {
+      p_organization_id: payload.organizationId,
+      p_recipient_profile_id: payload.recipientProfileId,
+      p_event_type: payload.type,
+      p_type: payload.type,
+      p_title: payload.title,
+      p_message: payload.message,
+      p_entity_type: payload.entityType ?? null,
+      p_entity_id: payload.entityId ?? null,
+      p_href: payload.href ?? null,
+      p_priority: payload.priority ?? "normal",
+      p_dedup_key: dedup,
+      p_channels: ["in_app"],
+    });
+    if (!hubError && hubId) {
+      return String(hubId);
+    }
+    if (hubError && !/does not exist|schema cache|upsert_operational_notification/i.test(hubError.message ?? "")) {
+      logger.warn("Hub notification RPC failed; using legacy insert", { message: hubError.message });
     }
 
     const { data, error } = await writer

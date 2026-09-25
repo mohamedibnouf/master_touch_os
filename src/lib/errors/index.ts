@@ -141,6 +141,20 @@ export class StorageError extends AppError {
   }
 }
 
+export class RateLimitedError extends AppError {
+  constructor(retryAfterSeconds?: number) {
+    super({
+      code: "RATE_LIMITED",
+      status: 429,
+      message: "Rate limited",
+      userMessageAr: "تم تجاوز حد طلبات التحليل. حاول بعد قليل.",
+      userMessageEn: "Analysis rate limit exceeded. Please try again shortly.",
+      details: retryAfterSeconds != null ? { retryAfterSeconds } : undefined,
+    });
+    this.name = "RateLimitedError";
+  }
+}
+
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }

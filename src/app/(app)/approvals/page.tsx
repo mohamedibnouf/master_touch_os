@@ -53,7 +53,7 @@ export default async function ApprovalsPage({
   const canDecide = hasPermission(ctx, "approval.approve") || hasPermission(ctx, "approval.reject");
 
   return (
-    <div>
+    <div data-testid="approvals-page">
       <PageHeader
         title="الموافقات"
         description="طلبات الاعتماد الرسمية برموز القرار A–E"

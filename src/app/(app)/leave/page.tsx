@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -112,13 +112,14 @@ export default async function LeaveDashboardPage() {
         )}
       </Card>
 
-      <Card className="overflow-x-auto p-0">
+      <Card className="overflow-hidden p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">السجل</div>
         {requests.length === 0 ? (
           <div className="p-4">
             <EmptyState title="لا يوجد سجل إجازات بعد." />
           </div>
         ) : (
+          <TableScroll>
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
@@ -147,6 +148,7 @@ export default async function LeaveDashboardPage() {
               ))}
             </tbody>
           </table>
+          </TableScroll>
         )}
       </Card>
     </div>

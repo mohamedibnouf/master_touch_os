@@ -9,7 +9,7 @@ export default async function LoginPage({
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center px-4" data-testid="login-page">
       <div className="w-full max-w-md rounded-xl border border-line bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-8">
           <p className="text-xs font-semibold tracking-[0.2em] text-bronze">MASTER TOUCH</p>

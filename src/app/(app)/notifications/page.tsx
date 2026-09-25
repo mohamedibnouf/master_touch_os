@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { notificationEntityHref } from "@/lib/notifications/href";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -15,14 +17,24 @@ export default async function NotificationsPage() {
   const notifications = await repo.listNotifications(ctx.userId);
 
   return (
-    <div>
-      <PageHeader title="التنبيهات" description="قناة داخلية للتطبيق — البريد وواتساب لاحقاً عبر نفس الخدمة" />
+    <div data-testid="notifications-page">
+      <PageHeader
+        title="التنبيهات"
+        description="القناة الداخلية المعتمدة. البريد وواتساب والجهاز تُدار من التفضيلات بعد ترحيل 062."
+        actions={
+          <Link href="/notifications/preferences" className="text-sm text-navy underline">
+            التفضيلات وإشعارات الجهاز
+          </Link>
+        }
+      />
 
       {notifications.length === 0 ? (
         <EmptyState title="لا توجد تنبيهات." />
       ) : (
         <div className="space-y-3">
-          {notifications.map((item) => (
+          {notifications.map((item) => {
+            const href = notificationEntityHref(item.entity_type, item.entity_id);
+            return (
             <Card key={item.id} className={item.read_at ? "opacity-70" : undefined}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -42,6 +54,11 @@ export default async function NotificationsPage() {
                     {item.type} ·{" "}
                     {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
                   </p>
+                  {href ? (
+                    <Link href={href} className="mt-2 inline-block text-sm text-navy underline">
+                      فتح السجل المرتبط
+                    </Link>
+                  ) : null}
                 </div>
                 {!item.read_at ? (
                   <form action={markNotificationReadAction}>
@@ -53,7 +70,8 @@ export default async function NotificationsPage() {
                 ) : null}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

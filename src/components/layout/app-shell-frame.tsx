@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { signOutAction } from "@/modules/auth/actions";
 import { Button } from "@/components/ui/primitives";
+import type { AppNavFlags } from "./nav-flags";
+import type { HeaderNotice } from "./header-notifications";
+import { HeaderNotifications } from "./header-notifications";
 import { Sidebar } from "./sidebar";
 
 export function AppShellFrame({
@@ -12,27 +15,22 @@ export function AppShellFrame({
   organizationNameEn,
   userName,
   jobTitle,
-  canEmployees,
-  canDepartments,
-  canLeave,
-  canAttendance,
-  canPayroll,
+  flags,
+  unreadCount,
+  notices,
   children,
 }: {
   organizationNameAr: string;
   organizationNameEn: string;
   userName: string;
   jobTitle: string;
-  canEmployees: boolean;
-  canDepartments: boolean;
-  canLeave: boolean;
-  canAttendance: boolean;
-  canPayroll: boolean;
+  flags: AppNavFlags;
+  unreadCount: number;
+  notices: HeaderNotice[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  // Close drawer when the route changes (Link onClick also closes; this covers back/forward).
   const routeKey = pathname;
   const [openForRoute, setOpenForRoute] = useState(routeKey);
   const drawerOpen = navOpen && openForRoute === routeKey;
@@ -57,28 +55,21 @@ export function AppShellFrame({
         <button
           type="button"
           aria-label="إغلاق القائمة"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden print:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
 
-      <Sidebar
-        canEmployees={canEmployees}
-        canDepartments={canDepartments}
-        canLeave={canLeave}
-        canAttendance={canAttendance}
-        canPayroll={canPayroll}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
+      <Sidebar flags={flags} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-line bg-white px-3 py-3 md:px-6">
+        <header className="flex items-center gap-2 border-b border-line bg-white px-3 py-2.5 md:px-6 print:hidden">
           <button
             type="button"
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line text-navy lg:hidden"
             aria-label="فتح القائمة"
             aria-expanded={drawerOpen}
+            aria-controls="app-sidebar"
             onClick={() => setDrawerOpen(true)}
           >
             <Menu className="h-5 w-5" />
@@ -89,7 +80,10 @@ export function AppShellFrame({
             <p className="truncate text-xs text-muted">{organizationNameEn}</p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            {flags.notifications ? (
+              <HeaderNotifications unreadCount={unreadCount} items={notices} />
+            ) : null}
             <div className="hidden min-w-0 text-left text-sm sm:block">
               <p className="max-w-[10rem] truncate font-medium md:max-w-[14rem]">{userName}</p>
               <p className="max-w-[10rem] truncate text-xs text-muted md:max-w-[14rem]">{jobTitle}</p>
@@ -102,7 +96,7 @@ export function AppShellFrame({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6">{children}</main>
+        <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6 print:p-0">{children}</main>
       </div>
     </div>
   );

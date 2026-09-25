@@ -32,7 +32,7 @@ export default async function ProjectsPage({
   const pages = Math.max(1, Math.ceil(total / 20));
 
   return (
-    <div>
+    <div data-testid="projects-page">
       <PageHeader
         title="المشاريع"
         description="سجل مشاريع الشركة مع التصفية والترقيم"

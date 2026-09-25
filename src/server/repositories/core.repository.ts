@@ -353,12 +353,20 @@ export class CoreRepository {
     return data ?? [];
   }
 
-  async dashboard(organizationId: string, profileId: string): Promise<{
+  async dashboard(
+    organizationId: string,
+    profileId: string,
+    options?: { includeOrgStats?: boolean; includeAudit?: boolean },
+  ): Promise<{
     stats: DashboardStats;
     pendingActions: PendingAction[];
     recentActivity: AuditLogRecord[];
   }> {
     const now = new Date().toISOString();
+    const includeOrgStats = options?.includeOrgStats === true;
+    const includeAudit = options?.includeAudit === true;
+    const skipCount = Promise.resolve({ count: 0 });
+    const skipAudit = Promise.resolve({ data: [] as AuditLogRecord[] });
     const [
       activeProjects,
       projectsAtRisk,
@@ -374,33 +382,43 @@ export class CoreRepository {
       myInspections,
       recentActivity,
     ] = await Promise.all([
-      this.supabase
-        .from("projects")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("status", "active"),
-      this.supabase
-        .from("projects")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("status", "active")
-        .in("risk_level", ["high", "critical"]),
-      this.supabase
-        .from("approval_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .in("status", ["pending", "in_progress"]),
-      this.supabase
-        .from("approval_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .in("status", ["pending", "in_progress"])
-        .lt("due_at", now),
-      this.supabase
-        .from("employees")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("is_active", true),
+      includeOrgStats
+        ? this.supabase
+            .from("projects")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .eq("status", "active")
+        : skipCount,
+      includeOrgStats
+        ? this.supabase
+            .from("projects")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .eq("status", "active")
+            .in("risk_level", ["high", "critical"])
+        : skipCount,
+      includeOrgStats
+        ? this.supabase
+            .from("approval_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .in("status", ["pending", "in_progress"])
+        : skipCount,
+      includeOrgStats
+        ? this.supabase
+            .from("approval_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .in("status", ["pending", "in_progress"])
+            .lt("due_at", now)
+        : skipCount,
+      includeOrgStats
+        ? this.supabase
+            .from("employees")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .eq("is_active", true)
+        : skipCount,
       this.supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
@@ -448,12 +466,14 @@ export class CoreRepository {
         .or(`site_engineer_id.eq.${profileId},quality_engineer_id.eq.${profileId},requested_by.eq.${profileId}`)
         .in("status", ["ready", "submitted", "scheduled", "failed", "reinspection_required"])
         .limit(15),
-      this.supabase
-        .from("audit_logs")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false })
-        .limit(8),
+      includeAudit
+        ? this.supabase
+            .from("audit_logs")
+            .select("*")
+            .eq("organization_id", organizationId)
+            .order("created_at", { ascending: false })
+            .limit(8)
+        : skipAudit,
     ]);
 
     const pendingActions: PendingAction[] = [];
