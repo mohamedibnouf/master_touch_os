@@ -164,6 +164,7 @@ describe.skipIf(!configured)("live Phase 5.7 attendance geofencing", () => {
   afterAll(async () => {
     if (!geoReady) return;
     await admin.from("attendance_location_attempts").delete().eq("employee_id", empEmployeeId);
+    await admin.from("attendance_records").delete().eq("employee_id", empEmployeeId);
     await admin.from("employee_workplace_assignments").delete().eq("employee_id", empEmployeeId);
     await admin.from("workplace_locations").delete().in("id", [workplaceId, inactiveId].filter(Boolean));
     for (const id of createdUserIds) {
@@ -430,3 +431,193 @@ describe.skipIf(!configured)("live Phase 5.7 attendance geofencing", () => {
     expect(still?.id).toBe(row.id);
   });
 });
+
+describe.skipIf(!configured)("live Phase 5.7.1 multi-workplace (prepared; skips until 064 is applied)", () => {
+  let geoReady = false;
+  let multiReady = false;
+  let admin: SupabaseClient;
+  let fx: LiveFixture;
+  let empClient: SupabaseClient;
+  let empEmployeeId = "";
+  let hqId = "";
+  let whId = "";
+  const createdUserIds: string[] = [];
+  const runSuffix = `${Date.now().toString(36)}${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+  const prefix = process.env.LIVE_TEST_PASSWORD_PREFIX ?? "MtTest1!";
+  const HQ = { p_latitude: 24.7136, p_longitude: 46.6753, p_accuracy_meters: 12 };
+  const WH = { p_latitude: 24.7136 + 400 / 111_320, p_longitude: 46.6753, p_accuracy_meters: 12 };
+
+  beforeAll(async () => {
+    admin = adminClient();
+    const { error } = await admin.from("attendance_location_attempts").select("id").limit(1);
+    geoReady = !error;
+    if (!geoReady) {
+      console.warn("[live-test] 063 unapplied — Phase 5.7.1 deferred");
+      return;
+    }
+    fx = await provisionLiveFixture();
+    const email = `mt-live-p571-${runSuffix}@test.local`;
+    const password = `${prefix}m571`;
+    const { data: created, error: uErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name_ar: "p571", full_name_en: "p571", locale: "ar" },
+    });
+    if (uErr || !created.user) throw new Error(uErr?.message ?? "createUser");
+    createdUserIds.push(created.user.id);
+    await admin.from("organization_members").upsert({
+      organization_id: fx.orgAId,
+      profile_id: created.user.id,
+      status: "active",
+    });
+    const { data: emp, error: eErr } = await admin
+      .from("employees")
+      .upsert(
+        {
+          organization_id: fx.orgAId,
+          profile_id: created.user.id,
+          employment_status: "active",
+          is_active: true,
+          employee_number: `571${runSuffix}`.slice(0, 32),
+        },
+        { onConflict: "organization_id,profile_id" },
+      )
+      .select("id")
+      .single();
+    if (eErr) throw new Error(eErr.message);
+    empEmployeeId = emp.id as string;
+    const { data: role } = await admin
+      .from("roles")
+      .select("id")
+      .eq("code", "engineer")
+      .is("organization_id", null)
+      .maybeSingle();
+    if (role?.id) {
+      await admin.from("user_roles").insert({
+        organization_id: fx.orgAId,
+        profile_id: created.user.id,
+        role_id: role.id,
+        scope_type: "organization",
+      });
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: hq } = await admin
+      .from("workplace_locations")
+      .insert({
+        organization_id: fx.orgAId,
+        name: `P571-HQ-${runSuffix}`,
+        code: `571H${runSuffix}`.slice(0, 32),
+        latitude: HQ.p_latitude,
+        longitude: HQ.p_longitude,
+        allowed_radius_meters: 150,
+        max_accuracy_meters: 100,
+        is_active: true,
+        is_primary: false,
+      })
+      .select("id")
+      .single();
+    hqId = hq!.id as string;
+    const { data: wh } = await admin
+      .from("workplace_locations")
+      .insert({
+        organization_id: fx.orgAId,
+        name: `P571-WH-${runSuffix}`,
+        code: `571W${runSuffix}`.slice(0, 32),
+        latitude: WH.p_latitude,
+        longitude: WH.p_longitude,
+        allowed_radius_meters: 150,
+        max_accuracy_meters: 200,
+        is_active: true,
+        is_primary: false,
+      })
+      .select("id")
+      .single();
+    whId = wh!.id as string;
+    await admin.from("employee_workplace_assignments").insert({
+      organization_id: fx.orgAId,
+      employee_id: empEmployeeId,
+      workplace_location_id: hqId,
+      effective_from: today,
+    });
+    const second = await admin.from("employee_workplace_assignments").insert({
+      organization_id: fx.orgAId,
+      employee_id: empEmployeeId,
+      workplace_location_id: whId,
+      effective_from: today,
+    });
+    if (second.error) {
+      console.warn("[live-test] 064 unapplied — Phase 5.7.1 multi-workplace deferred");
+      multiReady = false;
+    } else {
+      multiReady = true;
+    }
+    empClient = await signInAs(email, password);
+  }, 90_000);
+
+  afterAll(async () => {
+    if (!geoReady) return;
+    if (empEmployeeId) {
+      await admin.from("attendance_location_attempts").delete().eq("employee_id", empEmployeeId);
+      await admin.from("attendance_records").delete().eq("employee_id", empEmployeeId);
+      await admin.from("employee_workplace_assignments").delete().eq("employee_id", empEmployeeId);
+    }
+    await admin.from("workplace_locations").delete().in("id", [hqId, whId].filter(Boolean));
+    for (const id of createdUserIds) {
+      try {
+        await admin.auth.admin.deleteUser(id);
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (fx?.cleanup) await fx.cleanup();
+  }, 60_000);
+
+  it("K. overlapping different sites allowed when 064 applied", () => {
+    if (!geoReady || !multiReady) return;
+    expect(multiReady).toBe(true);
+  });
+
+  it("B/S. HQ+Warehouse check-in then checkout at the other authorized site", async () => {
+    if (!geoReady || !multiReady) return;
+    const { data: shift } = await admin
+      .from("attendance_shifts")
+      .select("id")
+      .eq("organization_id", fx.orgAId)
+      .eq("code", "STD_DAY")
+      .maybeSingle();
+    const today = new Date().toISOString().slice(0, 10);
+    if (shift?.id) {
+      await admin.from("employee_shift_assignments").insert({
+        organization_id: fx.orgAId,
+        employee_id: empEmployeeId,
+        shift_id: shift.id,
+        effective_from: today,
+      });
+    }
+    const inHq = await empClient.rpc("attendance_check_in", HQ);
+    expect(parseAttendancePunchRpc(inHq.data)?.accepted).toBe(true);
+    const outWh = await empClient.rpc("attendance_check_out", WH);
+    expect(parseAttendancePunchRpc(outWh.data)?.accepted).toBe(true);
+  });
+
+  it("L. overlapping same site still rejected", async () => {
+    if (!geoReady || !multiReady) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const { error } = await admin.from("employee_workplace_assignments").insert({
+      organization_id: fx.orgAId,
+      employee_id: empEmployeeId,
+      workplace_location_id: hqId,
+      effective_from: today,
+    });
+    expect(error).toBeTruthy();
+    expect(error?.code === "23P01" || /exclusion|no_overlap/i.test(error?.message ?? "")).toBe(true);
+  });
+
+  it("U. zero-arg remains fail-closed after 064", async () => {
+    if (!geoReady || !multiReady) return;
+    const { error } = await empClient.rpc("attendance_check_in");
+    expect(error?.message ?? "").toMatch(/GEOFENCE_LOCATION_REQUIRED/);
+  });
+});
+

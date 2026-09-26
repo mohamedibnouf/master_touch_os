@@ -21,7 +21,7 @@ The items below are **explicitly deferred post-V1 roadmap capabilities** that ar
    - *Known limits:* calendar/working day basis only (no public-holiday calendar yet); cross-year ranges rejected; attachment is document UUID reference (no dedicated leave upload UI); email/WhatsApp leave alerts deferred.
 3. **Attendance & Time Tracking (Phase 4.4)**
    - *Status:* Implemented in migration `057` (+ RPC repair `058`). Apply `supabase/phase4_fix_057.sql` then `phase4_fix_058.sql` on production before enabling.
-   - *Known limits:* self-service + HR adjust + **Phase 5.7 geofencing** (migration `063`, unapplied until review). Browser GPS is evidence, not anti-spoofing. No biometric devices; no continuous tracking; rejected geofence attempts never change payroll.
+   - *Known limits:* self-service + HR adjust + **Phase 5.7 geofencing** (migration `063` applied; **064 multi-workplace not applied until review**). Browser GPS is evidence, not anti-spoofing. No biometric devices; no continuous tracking; rejected geofence attempts never change payroll. Attendance requires an **explicit** workplace assignment (org primary is not a punch fallback).
 ### B. Management Intelligence & AI (Phases 5.x)
 1. **Executive Command Center (Phase 5.1)**
    - *Status:* Implemented as `/management` deterministic intelligence layer (aggregates + attention from risk engine). Gate: `reports.management.read`. No AI provider.

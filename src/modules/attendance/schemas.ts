@@ -102,6 +102,7 @@ export const upsertWorkplaceLocationSchema = z.object({
   max_accuracy_meters: z.coerce.number().int().min(10).max(1000).optional().nullable(),
   is_active: z.coerce.boolean().default(true),
   is_primary: z.coerce.boolean().default(false),
+  timezone: z.string().min(1).max(64).optional().nullable(),
 });
 
 export const reconcileAttendanceSchema = z.object({

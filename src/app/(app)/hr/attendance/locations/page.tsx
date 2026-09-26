@@ -2,10 +2,15 @@ import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { CoreRepository } from "@/server/repositories/core.repository";
-import { assignEmployeeWorkplaceAction, upsertWorkplaceLocationAction } from "@/server/use-cases/attendance";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  assignEmployeeWorkplaceAction,
+  endEmployeeWorkplaceAssignmentAction,
+  removeEmployeeWorkplaceAssignmentAction,
+  upsertWorkplaceLocationAction,
+} from "@/server/use-cases/attendance";
 import { FillCurrentLocationButton } from "@/components/attendance/fill-current-location-button";
 
 export default async function HrWorkplaceLocationsPage() {
@@ -25,26 +30,31 @@ export default async function HrWorkplaceLocationsPage() {
     );
   }
   const core = new CoreRepository(supabase);
-  const [places, employees, assignmentRows] = await Promise.all([
+  const [places, employees, assignments] = await Promise.all([
     repo.listWorkplaces(ctx.organization.id),
     core.listEmployees(ctx.organization.id),
-    supabase
-      .from("employee_workplace_assignments")
-      .select("workplace_location_id")
-      .eq("organization_id", ctx.organization.id)
-      .then((r) => r.data ?? []),
+    repo.listWorkplaceAssignments(ctx.organization.id),
   ]);
-  const assignedCount = new Map<string, number>();
-  for (const row of assignmentRows as { workplace_location_id: string }[]) {
-    assignedCount.set(row.workplace_location_id, (assignedCount.get(row.workplace_location_id) ?? 0) + 1);
+  const nameByWorkplace = new Map(places.map((p) => [p.id, p.name]));
+  const nameByEmployee = new Map(
+    employees.map((e) => [e.id, e.profiles?.full_name_ar || e.employee_number || e.id]),
+  );
+
+  function assignmentStatus(from: string, to: string | null) {
+    if (from > today) return "قادم";
+    if (to == null || to >= today) return "سارٍ";
+    return "منتهٍ";
   }
 
   return (
     <div data-testid="attendance-locations">
-      <PageHeader title="مواقع العمل" description="نطاقات معتمدة لتسجيل الحضور. الموقع يُتحقق منه على الخادم فقط." />
+      <PageHeader
+        title="مواقع العمل"
+        description="مواقع غير محدودة. الحضور يُقبل فقط من التعيينات الصريحة. الموقع الأساسي للمنشأة لا يمنح صلاحية البصمة تلقائياً."
+      />
 
       <Card className="mb-6" data-testid="workplace-create-form">
-        <h2 className="mb-4 font-semibold text-navy">إضافة / تحديث موقع</h2>
+        <h2 className="mb-4 font-semibold text-navy">إضافة موقع</h2>
         <form action={upsertWorkplaceLocationAction} className="grid gap-3">
           <Field label="الاسم">
             <Input name="name" required maxLength={160} />
@@ -70,9 +80,12 @@ export default async function HrWorkplaceLocationsPage() {
           <Field label="أقصى دقة مقبولة (متر)">
             <Input name="max_accuracy_meters" type="number" defaultValue={100} min={10} max={1000} />
           </Field>
+          <Field label="المنطقة الزمنية">
+            <Input name="timezone" defaultValue="Asia/Riyadh" maxLength={64} />
+          </Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="is_primary" />
-            موقع أساسي للمنشأة
+            موقع أساسي للمنشأة (للعرض فقط — لا يصرّح بالحضور)
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="is_active" defaultChecked />
@@ -83,16 +96,11 @@ export default async function HrWorkplaceLocationsPage() {
       </Card>
 
       <Card className="mb-6 overflow-x-auto p-0">
-        <div className="border-b border-line px-4 py-3 font-semibold text-navy">المواقع</div>
-        <table className="w-full min-w-[720px] text-sm">
+        <div className="border-b border-line px-4 py-3 font-semibold text-navy">المواقع — تعديل / تفعيل / إيقاف</div>
+        <table className="w-full min-w-[880px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الاسم</th>
-              <th className="px-4 py-3 text-right">الإحداثيات</th>
-              <th className="px-4 py-3 text-right">القطر</th>
-              <th className="px-4 py-3 text-right">الدقة</th>
-              <th className="px-4 py-3 text-right">الحالة</th>
-              <th className="px-4 py-3 text-right">الموظفون</th>
+              <th className="px-4 py-3 text-right">الموقع</th>
               <th className="px-4 py-3 text-right">تعديل</th>
             </tr>
           </thead>
@@ -100,49 +108,54 @@ export default async function HrWorkplaceLocationsPage() {
             {places.map((p) => (
               <tr key={p.id} className="border-t border-line align-top">
                 <td className="px-4 py-3">
-                  {p.name}
-                  {p.is_primary ? " · أساسي" : ""}
+                  <p className="font-medium text-navy">
+                    {p.name}
+                    {p.is_primary ? " · أساسي" : ""}
+                  </p>
+                  <p className="mt-1 dir-ltr text-left text-xs text-muted">
+                    {Number(p.latitude).toFixed(5)}, {Number(p.longitude).toFixed(5)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {p.is_active ? "نشط" : "موقوف"} · لا يُحذف الموقع المرتبط بسجل حضور
+                  </p>
                 </td>
-                <td className="px-4 py-3 dir-ltr text-left">
-                  {Number(p.latitude).toFixed(5)}, {Number(p.longitude).toFixed(5)}
-                </td>
-                <td className="px-4 py-3">{p.allowed_radius_meters} م</td>
-                <td className="px-4 py-3">{p.max_accuracy_meters ?? "—"} م</td>
-                <td className="px-4 py-3">{p.is_active ? "نشط" : "موقوف"}</td>
-                <td className="px-4 py-3">{assignedCount.get(p.id) ?? 0}</td>
                 <td className="px-4 py-3">
-                  <form action={upsertWorkplaceLocationAction} className="grid min-w-[12rem] gap-1 text-xs">
+                  <form action={upsertWorkplaceLocationAction} className="grid gap-2 text-xs" data-testid={`workplace-edit-${p.id}`}>
                     <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="name" value={p.name} />
-                    <input type="hidden" name="code" value={p.code ?? ""} />
-                    <input type="hidden" name="address" value={p.address ?? ""} />
-                    <input type="hidden" name="latitude" value={String(p.latitude)} />
-                    <input type="hidden" name="longitude" value={String(p.longitude)} />
-                    <label className="flex items-center gap-1">
-                      قطر
-                      <Input name="allowed_radius_meters" type="number" defaultValue={p.allowed_radius_meters} min={10} max={2000} className="h-8" />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      دقة
-                      <Input
-                        name="max_accuracy_meters"
-                        type="number"
-                        defaultValue={p.max_accuracy_meters ?? 100}
-                        min={10}
-                        max={1000}
-                        className="h-8"
-                      />
-                    </label>
+                    <Input name="name" defaultValue={p.name} required maxLength={160} />
+                    <Input name="code" defaultValue={p.code ?? ""} maxLength={32} placeholder="الرمز" />
+                    <Input name="address" defaultValue={p.address ?? ""} maxLength={500} placeholder="العنوان" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input name="latitude" type="number" step="any" defaultValue={String(p.latitude)} required />
+                      <Input name="longitude" type="number" step="any" defaultValue={String(p.longitude)} required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label>
+                        قطر
+                        <Input name="allowed_radius_meters" type="number" defaultValue={p.allowed_radius_meters} min={10} max={2000} />
+                      </label>
+                      <label>
+                        دقة
+                        <Input
+                          name="max_accuracy_meters"
+                          type="number"
+                          defaultValue={p.max_accuracy_meters ?? 100}
+                          min={10}
+                          max={1000}
+                        />
+                      </label>
+                    </div>
+                    <Input name="timezone" defaultValue={p.timezone || "Asia/Riyadh"} maxLength={64} />
                     <label className="flex items-center gap-1">
                       <input type="checkbox" name="is_active" defaultChecked={p.is_active} />
                       نشط
                     </label>
                     <label className="flex items-center gap-1">
                       <input type="checkbox" name="is_primary" defaultChecked={p.is_primary} />
-                      أساسي
+                      أساسي للمنشأة
                     </label>
                     <Button type="submit" variant="secondary" className="min-h-9 text-xs">
-                      حفظ
+                      حفظ التعديل
                     </Button>
                   </form>
                 </td>
@@ -152,8 +165,9 @@ export default async function HrWorkplaceLocationsPage() {
         </table>
       </Card>
 
-      <Card data-testid="workplace-assign-form">
-        <h2 className="mb-4 font-semibold text-navy">تعيين موظف لموقع</h2>
+      <Card className="mb-6" data-testid="workplace-assign-form">
+        <h2 className="mb-4 font-semibold text-navy">تعيين موقع لموظف</h2>
+        <p className="mb-3 text-xs text-muted">يمكن تعيين مواقع متعددة في نفس الفترة ما دامت المواقع مختلفة.</p>
         <form action={assignEmployeeWorkplaceAction} className="grid gap-3">
           <Field label="الموظف">
             <Select name="employeeId" required>
@@ -181,8 +195,68 @@ export default async function HrWorkplaceLocationsPage() {
           <Field label="ساري إلى (اختياري)">
             <Input type="date" name="effectiveTo" />
           </Field>
-          <Button type="submit">حفظ التعيين</Button>
+          <Button type="submit">إضافة تعيين</Button>
         </form>
+      </Card>
+
+      <Card className="overflow-x-auto p-0" data-testid="workplace-assignment-list">
+        <div className="border-b border-line px-4 py-3 font-semibold text-navy">تعيينات الموظفين</div>
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="bg-paper text-muted">
+            <tr>
+              <th className="px-4 py-3 text-right">الموظف</th>
+              <th className="px-4 py-3 text-right">الموقع</th>
+              <th className="px-4 py-3 text-right">من</th>
+              <th className="px-4 py-3 text-right">إلى</th>
+              <th className="px-4 py-3 text-right">الحالة</th>
+              <th className="px-4 py-3 text-right">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignments.length === 0 ? (
+              <tr>
+                <td className="px-4 py-4 text-muted" colSpan={6}>
+                  لا توجد تعيينات بعد. الموظفون بلا تعيين لا يمكنهم تسجيل الحضور.
+                </td>
+              </tr>
+            ) : (
+              assignments.map((a) => {
+                const status = assignmentStatus(a.effective_from, a.effective_to);
+                const canRemove = status !== "سارٍ";
+                return (
+                  <tr key={a.id} className="border-t border-line">
+                    <td className="px-4 py-3">{nameByEmployee.get(a.employee_id) ?? a.employee_id}</td>
+                    <td className="px-4 py-3">{nameByWorkplace.get(a.workplace_location_id) ?? a.workplace_location_id}</td>
+                    <td className="px-4 py-3">{a.effective_from}</td>
+                    <td className="px-4 py-3">{a.effective_to ?? "مفتوح"}</td>
+                    <td className="px-4 py-3">{status}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-2">
+                        {status === "سارٍ" ? (
+                          <form action={endEmployeeWorkplaceAssignmentAction}>
+                            <input type="hidden" name="assignmentId" value={a.id} />
+                            <input type="hidden" name="effectiveTo" value={today} />
+                            <Button type="submit" variant="secondary" className="min-h-8 text-xs">
+                              إنهاء التعيين
+                            </Button>
+                          </form>
+                        ) : null}
+                        {canRemove ? (
+                          <form action={removeEmployeeWorkplaceAssignmentAction}>
+                            <input type="hidden" name="assignmentId" value={a.id} />
+                            <Button type="submit" variant="secondary" className="min-h-8 text-xs">
+                              حذف التعيين
+                            </Button>
+                          </form>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </Card>
     </div>
   );

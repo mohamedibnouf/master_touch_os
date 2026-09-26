@@ -1,21 +1,19 @@
-# Phase 5.7 — Attendance geofencing (migration review)
+# Phase 5.7 / 5.7.1 — Attendance geofencing
 
-**063 is not applied.** Apply only after this hardening review, from `supabase/phase5_apply_063.sql` (byte-identical to `supabase/migrations/063_phase5_attendance_geofencing.sql`).
+**063 is applied** (immutable). **064 is not applied.** Apply 064 only after this review, from `supabase/phase5_apply_064.sql` (byte-identical to `supabase/migrations/064_phase5_multi_workplace_attendance.sql`).
 
-Do not apply 001–062. Do not create 064. Do not start Phase 5.8.
+Do not edit 001–063. Do not create 065. Do not start Phase 5.8.
 
-## Safe rollout (required)
+## Safe rollout (064)
 
-1. Deploy this geo-aware application **first** (feature detection: if 063 tables/views are missing, UI still uses zero-arg 058 punch).
-2. Apply `supabase/phase5_apply_063.sql` in the SQL editor.
-3. Configure at least one workplace (employee assignment or org primary).
-4. Confirm punches use 3-arg RPCs. Zero-arg overloads remain but **fail closed** (`GEOFENCE_LOCATION_REQUIRED`) — they never record attendance without a geofence.
+1. Deploy this multi-workplace application **first** (matching still works with a single assignment on 063 until 064 is applied; overlapping second sites will fail until 064).
+2. Apply `supabase/phase5_apply_064.sql` in the SQL editor (preflight aborts if same-site overlapping assignment rows already exist).
+3. Assign each employee explicitly to every workplace they may punch. Org primary does **not** authorize attendance.
+4. Confirm punches still use 3-arg RPCs. Zero-arg overloads remain fail-closed (`GEOFENCE_LOCATION_REQUIRED`).
 
-Do **not** apply 063 before this application is in production.
+## 064 behavior
 
-## Hardening in this revision
-
-- Invalid coordinates persist as NULL/NULL, never fabricated 0,0.
-- Punch RPCs return jsonb `{ accepted, reason_code, attempt_id, attendance_record }` so rejected attempts COMMIT. Zero-arg remains fail-closed.
-- Employee-facing `workplace_locations_directory` omits HQ lat/lng.
-- Accuracy column is `max_accuracy_meters` (accept if reported accuracy ≤ threshold).
+- Eligible set = covering **explicit** assignments of **active** workplaces (Riyadh today).
+- Nearest valid site wins (per-site radius + accuracy). Tie-break: workplace id.
+- Check-out from any currently authorized site.
+- Deactivate rather than delete historical workplaces.

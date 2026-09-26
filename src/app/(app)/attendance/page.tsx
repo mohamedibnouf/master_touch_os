@@ -50,9 +50,9 @@ export default async function AttendanceDashboardPage() {
   const shift = assignment
     ? await repo.getShift(ctx.organization.id, assignment.shift_id)
     : null;
-  const workplace = geofenceReady
-    ? await repo.resolveWorkplaceForEmployee(ctx.organization.id, ctx.employee.id, today)
-    : null;
+  const workplaces = geofenceReady
+    ? await repo.listEligibleWorkplacesForEmployee(ctx.organization.id, ctx.employee.id, today)
+    : [];
 
   const canCheckIn = hasPermission(ctx, "attendance.check_in") && !todayRecord?.check_in_at;
   const canCheckOut =
@@ -154,29 +154,31 @@ export default async function AttendanceDashboardPage() {
       </Card>
 
       <Card className="mb-6" data-testid="attendance-workplace-card">
-        <h2 className="mb-2 font-semibold text-navy">موقع العمل</h2>
-        {workplace ? (
-          <div className="text-sm">
-            <p className="font-medium text-navy">{workplace.name}</p>
-            <p className="mt-1 text-muted">
-              النطاق المسموح {workplace.allowed_radius_meters} م
-              {workplace.max_accuracy_meters
-                ? ` · أقصى خطأ مسموح ≤ ${workplace.max_accuracy_meters} م`
-                : ""}
-              {workplace.is_active ? "" : " · غير متاح"}
-            </p>
-            {todayRecord?.check_in_location_verified != null ? (
-              <p className="mt-1 text-xs text-muted">
-                تحقق الدخول: {todayRecord.check_in_location_verified ? "داخل النطاق" : "غير متحقَّق"}
-                {todayRecord.check_in_distance_meters != null
-                  ? ` · المسافة ${todayRecord.check_in_distance_meters} م`
-                  : ""}
-              </p>
-            ) : null}
-          </div>
+        <h2 className="mb-2 font-semibold text-navy">مواقع الحضور المسموحة</h2>
+        {workplaces.length > 0 ? (
+          <ul className="space-y-2 text-sm">
+            {workplaces.map((place) => (
+              <li key={place.id}>
+                <p className="font-medium text-navy">{place.name}</p>
+                <p className="mt-0.5 text-muted">
+                  النطاق المسموح {place.allowed_radius_meters} م
+                  {place.max_accuracy_meters ? ` · أقصى خطأ مسموح ≤ ${place.max_accuracy_meters} م` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
         ) : (
           <p className="text-sm text-muted">لم يتم تحديد موقع عمل معتمد لهذا الموظف.</p>
         )}
+        <p className="mt-3 text-xs text-muted">
+          لا تحتاج لاختيار الموقع. عند التسجيل يحدد الخادم أقرب موقع مصرّح داخل النطاق.
+        </p>
+        {todayRecord?.check_in_location_verified != null ? (
+          <p className="mt-1 text-xs text-muted">
+            تحقق الدخول: {todayRecord.check_in_location_verified ? "داخل النطاق" : "غير متحقَّق"}
+            {todayRecord.check_in_distance_meters != null ? ` · المسافة ${todayRecord.check_in_distance_meters} م` : ""}
+          </p>
+        ) : null}
       </Card>
 
       <Card className="mb-6" data-testid="attendance-shift-card">

@@ -8,7 +8,10 @@ import type {
   AttendanceRecord,
   AttendanceShift,
   EmployeeShiftAssignment,
+  EmployeeWorkplaceAssignment,
+  WorkplaceLocation,
 } from "@/types/models";
+import { WORKPLACE_DIRECTORY_SAFE_COLUMNS } from "@/modules/attendance/geofence";
 
 function fail(error: { message?: string } | null): never {
   throw new DatabaseError(error);
@@ -188,9 +191,7 @@ export class AttendanceRepository {
   ): Promise<Array<Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude">>> {
     const { data, error } = await this.supabase
       .from("workplace_locations_directory")
-      .select(
-        "id, organization_id, name, code, address, allowed_radius_meters, max_accuracy_meters, timezone, is_active, is_primary, created_at, updated_at",
-      )
+      .select(WORKPLACE_DIRECTORY_SAFE_COLUMNS)
       .eq("organization_id", organizationId)
       .order("name");
     if (error) fail(error);
@@ -209,33 +210,57 @@ export class AttendanceRepository {
     return (data ?? []) as import("@/types/models").WorkplaceLocation[];
   }
 
-  async resolveWorkplaceForEmployee(
+  async listEligibleWorkplacesForEmployee(
     organizationId: string,
     employeeId: string,
     onDate: string,
-  ): Promise<Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude"> | null> {
-    const { data: asg } = await this.supabase
+  ): Promise<Array<Omit<WorkplaceLocation, "latitude" | "longitude">>> {
+    const { data: asg, error: asgErr } = await this.supabase
       .from("employee_workplace_assignments")
       .select("workplace_location_id")
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
       .lte("effective_from", onDate)
-      .or(`effective_to.is.null,effective_to.gte.${onDate}`)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const workplaceId = (asg as { workplace_location_id?: string } | null)?.workplace_location_id;
-    let q = this.supabase
+      .or(`effective_to.is.null,effective_to.gte.${onDate}`);
+    if (asgErr) fail(asgErr);
+    const ids = [
+      ...new Set(
+        (asg ?? [])
+          .map((r) => (r as { workplace_location_id?: string }).workplace_location_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (ids.length === 0) return [];
+    const { data, error } = await this.supabase
       .from("workplace_locations_directory")
-      .select(
-        "id, organization_id, name, code, address, allowed_radius_meters, max_accuracy_meters, timezone, is_active, is_primary, created_at, updated_at",
-      )
-      .eq("organization_id", organizationId);
-    if (workplaceId) q = q.eq("id", workplaceId);
-    else q = q.eq("is_primary", true);
-    const { data, error } = await q.maybeSingle();
+      .select(WORKPLACE_DIRECTORY_SAFE_COLUMNS)
+      .eq("organization_id", organizationId)
+      .in("id", ids)
+      .eq("is_active", true)
+      .order("name");
     if (error) fail(error);
-    return (data as Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude"> | null) ?? null;
+    return (data ?? []) as Array<Omit<WorkplaceLocation, "latitude" | "longitude">>;
+  }
+
+  async resolveWorkplaceForEmployee(
+    organizationId: string,
+    employeeId: string,
+    onDate: string,
+  ): Promise<Omit<WorkplaceLocation, "latitude" | "longitude"> | null> {
+    const list = await this.listEligibleWorkplacesForEmployee(organizationId, employeeId, onDate);
+    return list[0] ?? null;
+  }
+
+  async listWorkplaceAssignments(organizationId: string): Promise<EmployeeWorkplaceAssignment[]> {
+    const { data, error } = await this.supabase
+      .from("employee_workplace_assignments")
+      .select(
+        "id, organization_id, employee_id, workplace_location_id, effective_from, effective_to, is_primary, created_at",
+      )
+      .eq("organization_id", organizationId)
+      .order("effective_from", { ascending: false });
+    if (error) fail(error);
+    return (data ?? []) as EmployeeWorkplaceAssignment[];
   }
 
   async listLocationAttempts(

@@ -23,7 +23,7 @@ import {
   upsertWorkplaceLocationSchema,
 } from "@/modules/attendance/schemas";
 import type { AttendanceRecord } from "@/types/models";
-import { geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
+import { canAddWorkplaceAssignment, geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
   if (value == null || value === "") return fallback;
@@ -270,6 +270,7 @@ export async function upsertWorkplaceLocationAction(formData: FormData) {
     max_accuracy_meters: accRaw ? accRaw : null,
     is_active: formBool(formData.get("is_active"), false),
     is_primary: formBool(formData.get("is_primary"), false),
+    timezone: String(formData.get("timezone") ?? "").trim() || "Asia/Riyadh",
   });
   if (!parsed.success) {
     throw new ValidationError("بيانات موقع العمل غير مكتملة.", "Workplace data is incomplete.");
@@ -284,12 +285,29 @@ export async function upsertWorkplaceLocationAction(formData: FormData) {
     longitude: parsed.data.longitude,
     allowed_radius_meters: parsed.data.allowed_radius_meters,
     max_accuracy_meters: parsed.data.max_accuracy_meters ?? 100,
+    timezone: parsed.data.timezone || "Asia/Riyadh",
     is_active: parsed.data.is_active,
     is_primary: parsed.data.is_primary,
     created_by: ctx.userId,
   };
   const audit = new AuditService(supabase);
+  const auditFields = {
+    name: row.name,
+    code: row.code,
+    address: row.address,
+    allowed_radius_meters: row.allowed_radius_meters,
+    max_accuracy_meters: row.max_accuracy_meters,
+    timezone: row.timezone,
+    is_active: row.is_active,
+    is_primary: row.is_primary,
+  };
   if (parsed.data.id) {
+    const { data: previous } = await supabase
+      .from("workplace_locations")
+      .select("is_active")
+      .eq("id", parsed.data.id)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle();
     const { error } = await supabase
       .from("workplace_locations")
       .update(row)
@@ -309,8 +327,17 @@ export async function upsertWorkplaceLocationAction(formData: FormData) {
       action: "workplace.updated",
       entityType: "workplace_location",
       entityId: parsed.data.id,
-      newValues: { name: row.name, is_active: row.is_active, is_primary: row.is_primary },
+      newValues: auditFields,
     });
+    if (previous && previous.is_active !== row.is_active) {
+      await audit.log({
+        organizationId: ctx.organization.id,
+        action: row.is_active ? "workplace.activated" : "workplace.deactivated",
+        entityType: "workplace_location",
+        entityId: parsed.data.id,
+        newValues: { is_active: row.is_active, name: row.name },
+      });
+    }
   } else {
     const { data, error } = await supabase.from("workplace_locations").insert(row).select("id").single();
     if (error) {
@@ -327,7 +354,7 @@ export async function upsertWorkplaceLocationAction(formData: FormData) {
       action: "workplace.created",
       entityType: "workplace_location",
       entityId: data.id,
-      newValues: { name: row.name },
+      newValues: auditFields,
     });
   }
   revalidatePath("/hr/attendance/locations");
@@ -347,6 +374,29 @@ export async function assignEmployeeWorkplaceAction(formData: FormData) {
     throw new ValidationError("بيانات تعيين الموقع غير مكتملة.", "Workplace assignment data is incomplete.");
   }
   const supabase = await createServerSupabaseClient();
+  const { data: existingRows } = await supabase
+    .from("employee_workplace_assignments")
+    .select("workplace_location_id, effective_from, effective_to")
+    .eq("organization_id", ctx.organization.id)
+    .eq("employee_id", parsed.data.employeeId);
+  const overlap = canAddWorkplaceAssignment(
+    (existingRows ?? []).map((r) => ({
+      workplaceId: r.workplace_location_id as string,
+      effectiveFrom: r.effective_from as string,
+      effectiveTo: (r.effective_to as string | null) ?? null,
+    })),
+    {
+      workplaceId: parsed.data.workplaceId,
+      effectiveFrom: parsed.data.effectiveFrom,
+      effectiveTo: parsed.data.effectiveTo ?? null,
+    },
+  );
+  if (!overlap.ok) {
+    throw new ValidationError(
+      "هذا الموظف معيَّن بالفعل لهذا الموقع في فترة متداخلة.",
+      "This employee already has an overlapping assignment for the same workplace.",
+    );
+  }
   const { error } = await supabase.from("employee_workplace_assignments").insert({
     organization_id: ctx.organization.id,
     employee_id: parsed.data.employeeId,
@@ -357,7 +407,10 @@ export async function assignEmployeeWorkplaceAction(formData: FormData) {
   });
   if (error) {
     if (error.code === "23P01" || /no_overlap|exclusion/i.test(error.message ?? "")) {
-      throw new ValidationError("تعيين الموقع يتداخل مع فترة سارية لنفس الموظف.", "Workplace assignment overlaps an existing period.");
+      throw new ValidationError(
+        "هذا الموظف معيَّن بالفعل لهذا الموقع في فترة متداخلة.",
+        "This employee already has an overlapping assignment for the same workplace.",
+      );
     }
     if (/WORKPLACE_ORG_MISMATCH/i.test(error.message ?? "")) {
       throw new ValidationError("لا يمكن ربط موظف بموقع عمل خارج المنشأة.", "Workplace and employee must belong to the same organization.");
@@ -369,7 +422,84 @@ export async function assignEmployeeWorkplaceAction(formData: FormData) {
     action: "workplace.assigned",
     entityType: "employee_workplace_assignment",
     entityId: parsed.data.employeeId,
-    newValues: { workplace_id: parsed.data.workplaceId },
+    newValues: { workplace_id: parsed.data.workplaceId, effective_from: parsed.data.effectiveFrom, effective_to: parsed.data.effectiveTo },
+  });
+  revalidatePath("/hr/attendance/locations");
+  revalidatePath("/attendance");
+}
+
+export async function endEmployeeWorkplaceAssignmentAction(formData: FormData) {
+  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+  const id = String(formData.get("assignmentId") ?? "").trim();
+  const endedOn = String(formData.get("effectiveTo") ?? "").trim() || new Date().toISOString().slice(0, 10);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
+  }
+  const supabase = await createServerSupabaseClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("employee_workplace_assignments")
+    .select("id, employee_id, workplace_location_id, effective_from")
+    .eq("id", id)
+    .eq("organization_id", ctx.organization.id)
+    .maybeSingle();
+  if (fetchErr) throw new DatabaseError(fetchErr);
+  if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
+  if (endedOn < String(row.effective_from)) {
+    throw new ValidationError("تاريخ الانتهاء لا يمكن أن يسبق تاريخ البداية.", "End date cannot precede start date.");
+  }
+  const { error } = await supabase
+    .from("employee_workplace_assignments")
+    .update({ effective_to: endedOn })
+    .eq("id", id)
+    .eq("organization_id", ctx.organization.id);
+  if (error) throw new DatabaseError(error);
+  await new AuditService(supabase).log({
+    organizationId: ctx.organization.id,
+    action: "workplace.assignment_ended",
+    entityType: "employee_workplace_assignment",
+    entityId: id,
+    newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id, effective_to: endedOn },
+  });
+  revalidatePath("/hr/attendance/locations");
+  revalidatePath("/attendance");
+}
+
+export async function removeEmployeeWorkplaceAssignmentAction(formData: FormData) {
+  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+  const id = String(formData.get("assignmentId") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const supabase = await createServerSupabaseClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("employee_workplace_assignments")
+    .select("id, employee_id, workplace_location_id, effective_from, effective_to")
+    .eq("id", id)
+    .eq("organization_id", ctx.organization.id)
+    .maybeSingle();
+  if (fetchErr) throw new DatabaseError(fetchErr);
+  if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
+  const started = String(row.effective_from) <= today;
+  const stillOpen = row.effective_to == null || String(row.effective_to) >= today;
+  if (started && stillOpen) {
+    throw new ValidationError(
+      "لا يمكن حذف تعيين سارٍ. أنهِ الفترة أولاً للحفاظ على السجل.",
+      "Cannot delete an active assignment. End the period first.",
+    );
+  }
+  const { error } = await supabase
+    .from("employee_workplace_assignments")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", ctx.organization.id);
+  if (error) throw new DatabaseError(error);
+  await new AuditService(supabase).log({
+    organizationId: ctx.organization.id,
+    action: "workplace.assignment_removed",
+    entityType: "employee_workplace_assignment",
+    entityId: id,
+    newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id },
   });
   revalidatePath("/hr/attendance/locations");
   revalidatePath("/attendance");

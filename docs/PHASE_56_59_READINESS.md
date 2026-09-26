@@ -12,7 +12,7 @@ in-app channel, stub `EmailChannel` / `WhatsAppChannel` / `PushChannel`,
 | D. Reminders | Server time / Riyadh dates | Scheduler/cron/queue | Yes (jobs) | Worker | Idempotent, tenant-scoped |
 | E. Escalation | Approval steps + due_at + risk engine | Escalation policy tables, SLA | Yes | None required | Do not auto-approve |
 | F. Manager summaries | Reports + Analyst | Scheduled digest job | Maybe | Email/push | Same RBAC as reports |
-| G. Geofence attendance | Phase 5.7 code + **063 unapplied** | Manual apply of 063 after review | **Yes (`063`)** | Browser Geolocation | Evidence not anti-spoofing; server Haversine only |
+| G. Geofence attendance | Phase 5.7 + **063 applied**; **064 unapplied** | Manual apply of 064 after review | **Yes (`063`; `064` pending)** | Browser Geolocation | Evidence not anti-spoofing; server Haversine; explicit assignments only |
 | H–I. HR incentives/deductions | Payroll adjustments exist | Policy engine, recurring rules | Likely | None | Payroll privacy |
 | J. Payroll input generation | Attendance minutes + leave days | Job that writes draft payroll inputs | Maybe | None | No browser service role |
 

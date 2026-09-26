@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAddWorkplaceAssignment,
   decideGeofence,
+  decideGeofenceForWorkplaces,
   evidenceCoordinatesToStore,
   formatEvidenceCoordinates,
   geofenceUserMessage,
@@ -9,8 +11,10 @@ import {
   isValidLatitude,
   isValidLongitude,
   parseAttendancePunchRpc,
+  resolveEligibleWorkplaceIds,
   resolveWorkplaceId,
   stripExactCoordinates,
+  WORKPLACE_DIRECTORY_SAFE_COLUMNS,
 } from "./geofence";
 
 const ORIGIN = { latitude: 24.7136, longitude: 46.6753 };
@@ -20,13 +24,22 @@ function offsetNorth(meters: number) {
   return { latitude: ORIGIN.latitude + deg, longitude: ORIGIN.longitude };
 }
 
-const workplace = {
-  id: "wp1",
+const hq = {
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   isActive: true,
   latitude: ORIGIN.latitude,
   longitude: ORIGIN.longitude,
   allowedRadiusMeters: 150,
   maxAccuracyMeters: 100 as number | null,
+};
+
+const warehouse = {
+  id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  isActive: true,
+  latitude: ORIGIN.latitude + 400 / 111_320,
+  longitude: ORIGIN.longitude,
+  allowedRadiusMeters: 150,
+  maxAccuracyMeters: 200 as number | null,
 };
 
 describe("haversine and radius boundary", () => {
@@ -71,96 +84,196 @@ describe("haversine and radius boundary", () => {
   it("rejects invalid coordinates", () => {
     expect(isValidLatitude(91)).toBe(false);
     expect(isValidLongitude(-181)).toBe(false);
-    expect(decideGeofence({ latitude: 91, longitude: 0, accuracyMeters: 10, workplace }).result).toBe(
+    expect(decideGeofence({ latitude: 91, longitude: 0, accuracyMeters: 10, workplace: hq }).result).toBe(
       "INVALID_LOCATION",
     );
   });
 });
 
-describe("accuracy and workplace resolution", () => {
-  it("rejects poor accuracy without expanding radius", () => {
-    const poor = decideGeofence({
-      latitude: ORIGIN.latitude,
-      longitude: ORIGIN.longitude,
-      accuracyMeters: 450,
-      workplace,
-    });
-    expect(poor.result).toBe("POOR_ACCURACY");
-    expect(poor.distanceMeters).toBeNull();
-    const ok = decideGeofence({
-      latitude: ORIGIN.latitude,
-      longitude: ORIGIN.longitude,
-      accuracyMeters: 35,
-      workplace,
-    });
-    expect(ok.result).toBe("ACCEPTED");
+describe("Phase 5.7.1 multi-workplace matching A–L", () => {
+  it("A. HQ only → HQ accepted", () => {
+    const d = decideGeofence({ latitude: ORIGIN.latitude, longitude: ORIGIN.longitude, accuracyMeters: 20, workplace: hq });
+    expect(d.result).toBe("ACCEPTED");
+    expect(d.workplaceId).toBe(hq.id);
   });
 
-  it("rejects missing or inactive workplace", () => {
+  it("B. HQ + Warehouse can each be accepted independently", () => {
+    const atHq = decideGeofenceForWorkplaces({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 20,
+      coveringAssignmentCount: 2,
+      workplaces: [hq, warehouse],
+    });
+    expect(atHq.result).toBe("ACCEPTED");
+    expect(atHq.workplaceId).toBe(hq.id);
+    const atWh = decideGeofenceForWorkplaces({
+      ...offsetNorth(400),
+      accuracyMeters: 20,
+      coveringAssignmentCount: 2,
+      workplaces: [hq, warehouse],
+    });
+    expect(atWh.result).toBe("ACCEPTED");
+    expect(atWh.workplaceId).toBe(warehouse.id);
+  });
+
+  it("C. assigned HQ only but standing at Warehouse → OUTSIDE_GEOFENCE", () => {
+    const d = decideGeofenceForWorkplaces({
+      ...offsetNorth(400),
+      accuracyMeters: 20,
+      coveringAssignmentCount: 1,
+      workplaces: [hq],
+    });
+    expect(d.result).toBe("OUTSIDE_GEOFENCE");
+    expect(d.workplaceId).toBe(hq.id);
+  });
+
+  it("D. no assignment → NO_WORKPLACE even if org primary exists in the workplace list", () => {
+    const d = decideGeofenceForWorkplaces({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 20,
+      coveringAssignmentCount: 0,
+      workplaces: [hq],
+    });
+    expect(d.result).toBe("NO_WORKPLACE");
+    expect(d.workplaceId).toBeNull();
+  });
+
+  it("E. assigned site inactive → INACTIVE_WORKPLACE", () => {
     expect(
-      decideGeofence({ latitude: ORIGIN.latitude, longitude: ORIGIN.longitude, accuracyMeters: 10, workplace: null })
-        .result,
-    ).toBe("NO_WORKPLACE");
-    expect(
-      decideGeofence({
+      decideGeofenceForWorkplaces({
         latitude: ORIGIN.latitude,
         longitude: ORIGIN.longitude,
         accuracyMeters: 10,
-        workplace: { ...workplace, isActive: false },
+        coveringAssignmentCount: 1,
+        workplaces: [{ ...hq, isActive: false }],
       }).result,
     ).toBe("INACTIVE_WORKPLACE");
   });
 
-  it("uses assignment covering the date then org primary", () => {
+  it("F. outside every assigned site → OUTSIDE_GEOFENCE", () => {
+    const d = decideGeofenceForWorkplaces({
+      ...offsetNorth(2000),
+      accuracyMeters: 20,
+      coveringAssignmentCount: 2,
+      workplaces: [hq, warehouse],
+    });
+    expect(d.result).toBe("OUTSIDE_GEOFENCE");
+  });
+
+  it("G. inside site but poor GPS accuracy → POOR_ACCURACY", () => {
+    const poor = decideGeofence({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 450,
+      workplace: hq,
+    });
+    expect(poor.result).toBe("POOR_ACCURACY");
+    expect(poor.workplaceId).toBe(hq.id);
+    expect(poor.distanceMeters).toBe(0);
+  });
+
+  it("H. inside A with poor accuracy but inside B with valid accuracy → B accepted", () => {
+    const tight = { ...hq, maxAccuracyMeters: 30 };
+    const loose = {
+      ...warehouse,
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      maxAccuracyMeters: 200,
+    };
+    const d = decideGeofenceForWorkplaces({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 80,
+      coveringAssignmentCount: 2,
+      workplaces: [tight, loose],
+    });
+    expect(d.result).toBe("ACCEPTED");
+    expect(d.workplaceId).toBe(loose.id);
+  });
+
+  it("I. inside two valid sites → nearest selected", () => {
+    const near = { ...hq, allowedRadiusMeters: 500 };
+    const far = { ...warehouse, allowedRadiusMeters: 500 };
+    const d = decideGeofenceForWorkplaces({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 20,
+      coveringAssignmentCount: 2,
+      workplaces: [far, near],
+    });
+    expect(d.result).toBe("ACCEPTED");
+    expect(d.workplaceId).toBe(near.id);
+  });
+
+  it("J. equal distance → deterministic lower workplace id", () => {
+    const a = { ...hq, id: "cccccccc-cccc-cccc-cccc-cccccccccccc" };
+    const b = { ...hq, id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" };
+    const d = decideGeofenceForWorkplaces({
+      latitude: ORIGIN.latitude,
+      longitude: ORIGIN.longitude,
+      accuracyMeters: 20,
+      coveringAssignmentCount: 2,
+      workplaces: [a, b],
+    });
+    expect(d.workplaceId).toBe(b.id);
+  });
+
+  it("K. overlapping assignment ranges for different sites → allowed", () => {
     expect(
-      resolveWorkplaceId({
-        assignments: [{ workplaceId: "a", effectiveFrom: "2026-01-01", effectiveTo: "2026-01-31" }],
-        primaryWorkplaceId: "primary",
-        onDate: "2026-01-15",
-      }),
-    ).toBe("a");
+      canAddWorkplaceAssignment(
+        [{ workplaceId: "hq", effectiveFrom: "2026-01-01", effectiveTo: null }],
+        { workplaceId: "wh", effectiveFrom: "2026-01-01", effectiveTo: null },
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("L. overlapping assignment ranges for the same site → rejected", () => {
     expect(
-      resolveWorkplaceId({
-        assignments: [
-          { workplaceId: "a", effectiveFrom: "2026-01-01", effectiveTo: "2026-01-31" },
-          { workplaceId: "b", effectiveFrom: "2026-02-01", effectiveTo: null },
-        ],
-        primaryWorkplaceId: "primary",
-        onDate: "2026-01-31",
-      }),
-    ).toBe("a");
-    expect(
-      resolveWorkplaceId({
-        assignments: [
-          { workplaceId: "a", effectiveFrom: "2026-01-01", effectiveTo: "2026-01-31" },
-          { workplaceId: "b", effectiveFrom: "2026-02-01", effectiveTo: null },
-        ],
-        primaryWorkplaceId: "primary",
-        onDate: "2026-02-01",
-      }),
-    ).toBe("b");
+      canAddWorkplaceAssignment(
+        [{ workplaceId: "hq", effectiveFrom: "2026-01-01", effectiveTo: null }],
+        { workplaceId: "hq", effectiveFrom: "2026-06-01", effectiveTo: null },
+      ),
+    ).toEqual({ ok: false, reason: "same_workplace_overlap" });
+  });
+});
+
+describe("accuracy, directory privacy, and assignment resolution", () => {
+  it("does not use org primary as punch authorization", () => {
     expect(
       resolveWorkplaceId({
         assignments: [],
-        primaryWorkplaceId: null,
+        primaryWorkplaceId: "primary",
         onDate: "2026-01-15",
       }),
     ).toBeNull();
+    expect(
+      resolveEligibleWorkplaceIds({
+        assignments: [{ workplaceId: "a", effectiveFrom: "2026-01-01", effectiveTo: "2026-01-31" }],
+        onDate: "2026-01-15",
+      }),
+    ).toEqual(["a"]);
   });
 
   it("accepts a point ~80m north and rejects ~400m north", () => {
     const inside = decideGeofence({
       ...offsetNorth(80),
       accuracyMeters: 20,
-      workplace,
+      workplace: hq,
     });
     expect(inside.result).toBe("ACCEPTED");
     const outside = decideGeofence({
       ...offsetNorth(400),
       accuracyMeters: 20,
-      workplace,
+      workplace: hq,
     });
     expect(outside.result).toBe("OUTSIDE_GEOFENCE");
+  });
+
+  it("P. directory column list has no latitude/longitude", () => {
+    expect(WORKPLACE_DIRECTORY_SAFE_COLUMNS).not.toMatch(/latitude/);
+    expect(WORKPLACE_DIRECTORY_SAFE_COLUMNS).not.toMatch(/longitude/);
   });
 
   it("maps RPC exception text to Arabic user copy", () => {
