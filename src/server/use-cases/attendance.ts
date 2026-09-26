@@ -19,8 +19,11 @@ import {
   reconcileAttendanceSchema,
   upsertAttendancePolicySchema,
   upsertAttendanceShiftSchema,
+  assignEmployeeWorkplaceSchema,
+  upsertWorkplaceLocationSchema,
 } from "@/modules/attendance/schemas";
 import type { AttendanceRecord } from "@/types/models";
+import { geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
   if (value == null || value === "") return fallback;
@@ -36,6 +39,7 @@ function revalidateAttendancePaths() {
   revalidatePath("/hr/attendance/shifts");
   revalidatePath("/hr/attendance/assignments");
   revalidatePath("/hr/attendance/adjustments");
+  revalidatePath("/hr/attendance/locations");
 }
 
 async function notifyEmployeeProfile(
@@ -71,44 +75,118 @@ async function notifyEmployeeProfile(
   });
 }
 
-export async function checkInAction(_formData?: FormData) {
+function interpretLocationPunch(data: unknown, error: { message?: string } | null): void {
+  if (error) mapAttendanceRpcError(error);
+  const parsed = parseAttendancePunchRpc(data);
+  if (!parsed) {
+    throw new ValidationError("تعذر تسجيل الحضور. حاول مرة أخرى.", "Attendance could not be recorded.");
+  }
+  if (!parsed.accepted) {
+    const mapped = geofenceUserMessage(parsed.reason_code);
+    throw new ValidationError(mapped.ar, mapped.en);
+  }
+}
+
+function mapAttendanceRpcError(error: { message?: string } | null): never {
+  const msg = error?.message ?? "";
+  if (/does not exist|schema cache|attendance_check_in/i.test(msg) && /p_latitude|function/i.test(msg)) {
+    throw new ValidationError("ترحيل 063 غير مطبّق بعد.", "Migration 063 is not applied.");
+  }
+  if (/GEOFENCE_|NO_WORKPLACE|OUTSIDE|POOR_ACCURACY|INACTIVE_WORKPLACE|INVALID_LOCATION|LOCATION_REQUIRED/i.test(msg)) {
+    const mapped = geofenceUserMessage(msg);
+    throw new ValidationError(mapped.ar, mapped.en);
+  }
+  throw new DatabaseError(error);
+}
+
+export async function checkInAction() {
   const ctx = authorize(await getAuthContext(), "attendance.check_in");
   if (!ctx.employee) {
     throw new ValidationError("لا يوجد سجل موظف مرتبط بحسابك.", "No employee record linked to your account.");
   }
-  const parsed = checkInSchema.safeParse({});
-  if (!parsed.success) {
-    throw new ValidationError("بيانات غير صالحة.", "Invalid data.");
-  }
-
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("attendance_check_in");
-  if (error) throw new DatabaseError(error);
-
-  const record = data as AttendanceRecord;
+  const { error } = await supabase.rpc("attendance_check_in");
+  if (error) mapAttendanceRpcError(error);
   revalidateAttendancePaths();
-  void ctx;
-  void record;
 }
 
-export async function checkOutAction(_formData?: FormData) {
+export async function checkOutAction() {
   const ctx = authorize(await getAuthContext(), "attendance.check_out");
   if (!ctx.employee) {
     throw new ValidationError("لا يوجد سجل موظف مرتبط بحسابك.", "No employee record linked to your account.");
   }
-  const parsed = checkOutSchema.safeParse({});
-  if (!parsed.success) {
-    throw new ValidationError("بيانات غير صالحة.", "Invalid data.");
-  }
-
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("attendance_check_out");
-  if (error) throw new DatabaseError(error);
-
-  const record = data as AttendanceRecord;
+  const { error } = await supabase.rpc("attendance_check_out");
+  if (error) mapAttendanceRpcError(error);
   revalidateAttendancePaths();
-  void ctx;
-  void record;
+}
+
+export type AttendancePunchState = { ok: boolean; message?: string };
+
+export async function checkInWithLocationAction(
+  _prev: AttendancePunchState | null,
+  formData: FormData,
+): Promise<AttendancePunchState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.check_in");
+    if (!ctx.employee) {
+      return { ok: false, message: "لا يوجد سجل موظف مرتبط بحسابك." };
+    }
+    const parsed = checkInSchema.safeParse({
+      latitude: formData.get("latitude"),
+      longitude: formData.get("longitude"),
+      accuracyMeters: formData.get("accuracyMeters"),
+    });
+    if (!parsed.success) {
+      return { ok: false, message: "تعذر التحقق من إحداثيات الموقع." };
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.rpc("attendance_check_in", {
+      p_latitude: parsed.data.latitude,
+      p_longitude: parsed.data.longitude,
+      p_accuracy_meters: parsed.data.accuracyMeters,
+    });
+    interpretLocationPunch(data, error);
+    revalidateAttendancePaths();
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ValidationError) return { ok: false, message: err.userMessageAr };
+    if (err instanceof DatabaseError) return { ok: false, message: err.userMessageAr };
+    return { ok: false, message: "تعذر تسجيل الحضور. حاول مرة أخرى." };
+  }
+}
+
+export async function checkOutWithLocationAction(
+  _prev: AttendancePunchState | null,
+  formData: FormData,
+): Promise<AttendancePunchState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.check_out");
+    if (!ctx.employee) {
+      return { ok: false, message: "لا يوجد سجل موظف مرتبط بحسابك." };
+    }
+    const parsed = checkOutSchema.safeParse({
+      latitude: formData.get("latitude"),
+      longitude: formData.get("longitude"),
+      accuracyMeters: formData.get("accuracyMeters"),
+    });
+    if (!parsed.success) {
+      return { ok: false, message: "تعذر التحقق من إحداثيات الموقع." };
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.rpc("attendance_check_out", {
+      p_latitude: parsed.data.latitude,
+      p_longitude: parsed.data.longitude,
+      p_accuracy_meters: parsed.data.accuracyMeters,
+    });
+    interpretLocationPunch(data, error);
+    revalidateAttendancePaths();
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ValidationError) return { ok: false, message: err.userMessageAr };
+    if (err instanceof DatabaseError) return { ok: false, message: err.userMessageAr };
+    return { ok: false, message: "تعذر تسجيل الانصراف. حاول مرة أخرى." };
+  }
 }
 
 export async function adjustAttendanceRecordAction(formData: FormData) {
@@ -175,6 +253,125 @@ export async function assignEmployeeShiftAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath("/hr/attendance/assignments");
+  revalidatePath("/attendance");
+}
+
+export async function upsertWorkplaceLocationAction(formData: FormData) {
+  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+  const accRaw = String(formData.get("max_accuracy_meters") ?? "").trim();
+  const parsed = upsertWorkplaceLocationSchema.safeParse({
+    id: String(formData.get("id") ?? "").trim() || undefined,
+    name: formData.get("name"),
+    code: String(formData.get("code") ?? "").trim() || null,
+    address: String(formData.get("address") ?? "").trim() || null,
+    latitude: formData.get("latitude"),
+    longitude: formData.get("longitude"),
+    allowed_radius_meters: formData.get("allowed_radius_meters") || 150,
+    max_accuracy_meters: accRaw ? accRaw : null,
+    is_active: formBool(formData.get("is_active"), false),
+    is_primary: formBool(formData.get("is_primary"), false),
+  });
+  if (!parsed.success) {
+    throw new ValidationError("بيانات موقع العمل غير مكتملة.", "Workplace data is incomplete.");
+  }
+  const supabase = await createServerSupabaseClient();
+  const row = {
+    organization_id: ctx.organization.id,
+    name: parsed.data.name,
+    code: parsed.data.code || null,
+    address: parsed.data.address,
+    latitude: parsed.data.latitude,
+    longitude: parsed.data.longitude,
+    allowed_radius_meters: parsed.data.allowed_radius_meters,
+    max_accuracy_meters: parsed.data.max_accuracy_meters ?? 100,
+    is_active: parsed.data.is_active,
+    is_primary: parsed.data.is_primary,
+    created_by: ctx.userId,
+  };
+  const audit = new AuditService(supabase);
+  if (parsed.data.id) {
+    const { error } = await supabase
+      .from("workplace_locations")
+      .update(row)
+      .eq("id", parsed.data.id)
+      .eq("organization_id", ctx.organization.id);
+    if (error) {
+      if (error.code === "23505") {
+        throw new ValidationError(
+          "تعذر حفظ الموقع الأساسي: يجب أن يبقى موقع أساسي واحد فقط لكل منشأة.",
+          "Could not save primary workplace: only one primary is allowed per organization.",
+        );
+      }
+      throw new DatabaseError(error);
+    }
+    await audit.log({
+      organizationId: ctx.organization.id,
+      action: "workplace.updated",
+      entityType: "workplace_location",
+      entityId: parsed.data.id,
+      newValues: { name: row.name, is_active: row.is_active, is_primary: row.is_primary },
+    });
+  } else {
+    const { data, error } = await supabase.from("workplace_locations").insert(row).select("id").single();
+    if (error) {
+      if (error.code === "23505") {
+        throw new ValidationError(
+          "تعذر حفظ الموقع الأساسي: يجب أن يبقى موقع أساسي واحد فقط لكل منشأة.",
+          "Could not save primary workplace: only one primary is allowed per organization.",
+        );
+      }
+      throw new DatabaseError(error);
+    }
+    await audit.log({
+      organizationId: ctx.organization.id,
+      action: "workplace.created",
+      entityType: "workplace_location",
+      entityId: data.id,
+      newValues: { name: row.name },
+    });
+  }
+  revalidatePath("/hr/attendance/locations");
+  revalidatePath("/attendance");
+}
+
+export async function assignEmployeeWorkplaceAction(formData: FormData) {
+  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+  const toRaw = String(formData.get("effectiveTo") ?? "").trim();
+  const parsed = assignEmployeeWorkplaceSchema.safeParse({
+    employeeId: formData.get("employeeId"),
+    workplaceId: formData.get("workplaceId"),
+    effectiveFrom: formData.get("effectiveFrom"),
+    effectiveTo: toRaw || null,
+  });
+  if (!parsed.success) {
+    throw new ValidationError("بيانات تعيين الموقع غير مكتملة.", "Workplace assignment data is incomplete.");
+  }
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.from("employee_workplace_assignments").insert({
+    organization_id: ctx.organization.id,
+    employee_id: parsed.data.employeeId,
+    workplace_location_id: parsed.data.workplaceId,
+    effective_from: parsed.data.effectiveFrom,
+    effective_to: parsed.data.effectiveTo,
+    created_by: ctx.userId,
+  });
+  if (error) {
+    if (error.code === "23P01" || /no_overlap|exclusion/i.test(error.message ?? "")) {
+      throw new ValidationError("تعيين الموقع يتداخل مع فترة سارية لنفس الموظف.", "Workplace assignment overlaps an existing period.");
+    }
+    if (/WORKPLACE_ORG_MISMATCH/i.test(error.message ?? "")) {
+      throw new ValidationError("لا يمكن ربط موظف بموقع عمل خارج المنشأة.", "Workplace and employee must belong to the same organization.");
+    }
+    throw new DatabaseError(error);
+  }
+  await new AuditService(supabase).log({
+    organizationId: ctx.organization.id,
+    action: "workplace.assigned",
+    entityType: "employee_workplace_assignment",
+    entityId: parsed.data.employeeId,
+    newValues: { workplace_id: parsed.data.workplaceId },
+  });
+  revalidatePath("/hr/attendance/locations");
   revalidatePath("/attendance");
 }
 

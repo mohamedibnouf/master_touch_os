@@ -11,6 +11,29 @@ import {
 
 const configured = liveTestConfigured();
 
+const GEO_PUNCH = { p_latitude: 24.7136, p_longitude: 46.6753, p_accuracy_meters: 12 };
+
+async function rpcAttendancePunch(
+  client: SupabaseClient,
+  fn: "attendance_check_in" | "attendance_check_out",
+) {
+  const withGeo = await client.rpc(fn, GEO_PUNCH);
+  if (!withGeo.error && withGeo.data && typeof withGeo.data === "object") {
+    const p = withGeo.data as { accepted?: boolean; reason_code?: string; attendance_record?: unknown };
+    if (typeof p.accepted === "boolean") {
+      if (!p.accepted) return { data: null, error: { message: p.reason_code ?? "GEOFENCE_REJECTED" } };
+      return { data: p.attendance_record, error: null };
+    }
+  }
+  if (withGeo.error) {
+    const msg = withGeo.error.message ?? "";
+    if (/could not find the function|does not exist|PGRST202|schema cache/i.test(msg)) {
+      return client.rpc(fn);
+    }
+  }
+  return withGeo;
+}
+
 function uniqueEmployeeNumber(tag: string, runSuffix: string): string {
   return `44${tag}${runSuffix}`.slice(0, 32);
 }
@@ -205,6 +228,39 @@ describe.skipIf(!configured)("live Phase 4.4 attendance management", () => {
       if (aErr) throw new Error(`assign emp: ${aErr.message}`);
     }
 
+    const { error: geoProbe } = await admin.from("workplace_locations").select("id").limit(1);
+    if (!geoProbe) {
+      const { data: wp } = await admin
+        .from("workplace_locations")
+        .insert({
+          organization_id: fx.orgAId,
+          name: `P44-GEO-${runSuffix}`,
+          code: `P44G${runSuffix}`.slice(0, 32),
+          latitude: 24.7136,
+          longitude: 46.6753,
+          allowed_radius_meters: 150,
+          max_accuracy_meters: 100,
+          is_active: true,
+          is_primary: false,
+        })
+        .select("id")
+        .maybeSingle();
+      if (wp?.id) {
+        await admin.from("employee_workplace_assignments").insert({
+          organization_id: fx.orgAId,
+          employee_id: empEmployeeId,
+          workplace_location_id: wp.id,
+          effective_from: today,
+        });
+        await admin.from("employee_workplace_assignments").insert({
+          organization_id: fx.orgAId,
+          employee_id: peerEmployeeId,
+          workplace_location_id: wp.id,
+          effective_from: today,
+        });
+      }
+    }
+
     const { data: leaveType } = await admin
       .from("leave_types")
       .select("id")
@@ -245,12 +301,12 @@ describe.skipIf(!configured)("live Phase 4.4 attendance management", () => {
   });
 
   it("02 — employee check-in then check-out", async () => {
-    const { data: cin, error: inErr } = await empClient.rpc("attendance_check_in");
+    const { data: cin, error: inErr } = await rpcAttendancePunch(empClient, "attendance_check_in");
     expect(inErr).toBeNull();
     expect(cin?.check_in_at).toBeTruthy();
     expect(cin?.employee_id).toBe(empEmployeeId);
 
-    const { data: cout, error: outErr } = await empClient.rpc("attendance_check_out");
+    const { data: cout, error: outErr } = await rpcAttendancePunch(empClient, "attendance_check_out");
     expect(outErr).toBeNull();
     expect(cout?.check_out_at).toBeTruthy();
     expect(Number(cout?.worked_minutes)).toBeGreaterThanOrEqual(0);
@@ -335,7 +391,10 @@ describe.skipIf(!configured)("live Phase 4.4 attendance management", () => {
       });
     }
 
-    await Promise.all([peerClient.rpc("attendance_check_in"), peerClient.rpc("attendance_check_in")]);
+    await Promise.all([
+      rpcAttendancePunch(peerClient, "attendance_check_in"),
+      rpcAttendancePunch(peerClient, "attendance_check_in"),
+    ]);
 
     const { data: rows } = await admin
       .from("attendance_records")

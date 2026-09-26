@@ -166,6 +166,33 @@ async function createFixture(runId: string): Promise<AttendanceFixture> {
     created_by: hr.userId,
   });
 
+  const { error: geoProbe } = await admin.from("workplace_locations").select("id").limit(1);
+  if (!geoProbe) {
+    const { data: wp } = await admin
+      .from("workplace_locations")
+      .insert({
+        organization_id: ORG_ID,
+        name: `E2E-GEO-${runSuffix}`,
+        code: `E2G${runSuffix}`.slice(0, 32),
+        latitude: 24.7136,
+        longitude: 46.6753,
+        allowed_radius_meters: 250,
+        max_accuracy_meters: 100,
+        is_active: true,
+        is_primary: false,
+      })
+      .select("id")
+      .maybeSingle();
+    if (wp?.id) {
+      await admin.from("employee_workplace_assignments").insert({
+        organization_id: ORG_ID,
+        employee_id: employee.employeeId,
+        workplace_location_id: wp.id,
+        effective_from: today,
+      });
+    }
+  }
+
   return { runId: runSuffix, employee, manager, hr, shiftId: shift.id as string };
 }
 
@@ -196,6 +223,20 @@ test.describe("Phase 4.4 Attendance Management E2E", () => {
   });
 
   test("employee checks in and out", async ({ page }) => {
+    await page.addInitScript(() => {
+      const coords = {
+        latitude: 24.7136,
+        longitude: 46.6753,
+        accuracy: 12,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      };
+      navigator.geolocation.getCurrentPosition = (success) => {
+        success({ coords, timestamp: Date.now() } as GeolocationPosition);
+      };
+    });
     await signInViaUI(page, fx.employee.email, fx.employee.password);
     await assertAuthenticatedPage(page);
     await gotoApp(page, "/attendance");

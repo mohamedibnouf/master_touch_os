@@ -1,8 +1,12 @@
 import { z } from "zod";
 
-export const checkInSchema = z.object({});
+export const checkInSchema = z.object({
+  latitude: z.coerce.number().gte(-90).lte(90),
+  longitude: z.coerce.number().gte(-180).lte(180),
+  accuracyMeters: z.coerce.number().gte(0).max(50_000),
+});
 
-export const checkOutSchema = z.object({});
+export const checkOutSchema = checkInSchema;
 
 export const adjustAttendanceSchema = z.object({
   recordId: z.string().uuid(),
@@ -74,6 +78,30 @@ export const upsertAttendanceShiftSchema = z.object({
     })
     .pipe(z.array(z.number().int().min(0).max(6)).min(1)),
   is_active: z.coerce.boolean().default(true),
+});
+
+export const assignEmployeeWorkplaceSchema = z.object({
+  employeeId: z.string().uuid(),
+  workplaceId: z.string().uuid(),
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  effectiveTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+});
+
+export const upsertWorkplaceLocationSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(2).max(160),
+  code: z.string().max(32).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  latitude: z.coerce.number().gte(-90).lte(90),
+  longitude: z.coerce.number().gte(-180).lte(180),
+  allowed_radius_meters: z.coerce.number().int().min(10).max(2000),
+  max_accuracy_meters: z.coerce.number().int().min(10).max(1000).optional().nullable(),
+  is_active: z.coerce.boolean().default(true),
+  is_primary: z.coerce.boolean().default(false),
 });
 
 export const reconcileAttendanceSchema = z.object({

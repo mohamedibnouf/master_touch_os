@@ -6,6 +6,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
+import { formatEvidenceCoordinates } from "@/modules/attendance/geofence";
 import { reconcileAttendanceAction } from "@/server/use-cases/attendance";
 
 async function employeeNameMap(
@@ -50,9 +51,14 @@ export default async function HrAttendancePage({
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const records = await repo.listRecordsForDate(ctx.organization.id, date, status);
+  const canEvidence = hasPermission(ctx, "attendance.view_location_evidence");
+  const geofenceReady = await repo.geofenceSchemaReady();
+  const attempts = geofenceReady
+    ? await repo.listLocationAttempts(ctx.organization.id, { includeCoordinates: canEvidence, limit: 50 })
+    : [];
   const names = await employeeNameMap(
     supabase,
-    records.map((r) => r.employee_id),
+    [...records.map((r) => r.employee_id), ...attempts.map((a) => a.employee_id)],
   );
 
   const present = records.filter((r) => ["present", "late", "partial"].includes(r.attendance_status)).length;
@@ -64,6 +70,11 @@ export default async function HrAttendancePage({
   const canPolicies = hasPermission(ctx, "attendance.manage_policies");
   const canShifts = hasPermission(ctx, "attendance.manage_shifts");
   const canAdjust = hasPermission(ctx, "attendance.adjust");
+  const workplaces = geofenceReady ? await repo.listWorkplaceDirectory(ctx.organization.id) : [];
+  const workplaceNames = new Map(workplaces.map((w) => [w.id, w.name]));
+  const rejectedToday = attempts.filter(
+    (a) => a.created_at.slice(0, 10) === date && a.result !== "ACCEPTED",
+  ).length;
 
   return (
     <div data-testid="attendance-hr-dashboard">
@@ -100,11 +111,18 @@ export default async function HrAttendancePage({
                 </Button>
               </Link>
             ) : null}
+            {hasPermission(ctx, "attendance.manage_locations") ? (
+              <Link href="/hr/attendance/locations">
+                <Button variant="secondary" className="w-full sm:w-auto" data-testid="attendance-locations-link">
+                  مواقع العمل
+                </Button>
+              </Link>
+            ) : null}
           </div>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Card>
           <p className="text-sm text-muted">حاضر</p>
           <p className="mt-1 text-2xl font-semibold text-navy" data-testid="attendance-hr-present-count">
@@ -126,6 +144,12 @@ export default async function HrAttendancePage({
         <Card>
           <p className="text-sm text-muted">في إجازة</p>
           <p className="mt-1 text-2xl font-semibold text-navy">{onLeave}</p>
+        </Card>
+        <Card>
+          <p className="text-sm text-muted">رفض النطاق</p>
+          <p className="mt-1 text-2xl font-semibold text-navy" data-testid="attendance-hr-geofence-reject-count">
+            {rejectedToday}
+          </p>
         </Card>
       </div>
 
@@ -169,6 +193,46 @@ export default async function HrAttendancePage({
               </Button>
             </div>
           </form>
+        </Card>
+      ) : null}
+
+      {geofenceReady && attempts.length > 0 ? (
+        <Card className="mb-6 overflow-x-auto p-0" data-testid="attendance-location-attempts">
+          <div className="border-b border-line px-4 py-3 font-semibold text-navy">محاولات الموقع (مرفوضة/مقبولة)</div>
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-paper text-muted">
+              <tr>
+                <th className="px-4 py-3 text-right">الموظف</th>
+                <th className="px-4 py-3 text-right">الإجراء</th>
+                <th className="px-4 py-3 text-right">النتيجة</th>
+                <th className="px-4 py-3 text-right">الموقع</th>
+                <th className="px-4 py-3 text-right">المسافة</th>
+                <th className="px-4 py-3 text-right">الدقة</th>
+                <th className="px-4 py-3 text-right">الوقت</th>
+                {canEvidence ? <th className="px-4 py-3 text-right">الإحداثيات</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {attempts.slice(0, 30).map((a) => (
+                <tr key={a.id} className="border-t border-line">
+                  <td className="px-4 py-3">{names.get(a.employee_id) ?? a.employee_id.slice(0, 8)}</td>
+                  <td className="px-4 py-3">{a.action === "CHECK_IN" ? "دخول" : "انصراف"}</td>
+                  <td className="px-4 py-3">{a.result}</td>
+                  <td className="px-4 py-3">
+                    {a.workplace_location_id ? (workplaceNames.get(a.workplace_location_id) ?? "—") : "—"}
+                  </td>
+                  <td className="px-4 py-3">{a.distance_meters ?? "—"}</td>
+                  <td className="px-4 py-3">{a.accuracy_meters ?? "—"}</td>
+                  <td className="px-4 py-3">{new Date(a.created_at).toLocaleString("ar-SA")}</td>
+                  {canEvidence ? (
+                    <td className="px-4 py-3 dir-ltr text-left text-xs">
+                      {formatEvidenceCoordinates(a.latitude, a.longitude)}
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Card>
       ) : null}
 

@@ -175,4 +175,83 @@ export class AttendanceRepository {
     if (error) fail(error);
     return (data as AttendanceRecord | null) ?? null;
   }
+
+  async geofenceSchemaReady(): Promise<boolean> {
+    const dir = await this.supabase.from("workplace_locations_directory").select("id").limit(1);
+    if (!dir.error) return true;
+    const { error } = await this.supabase.from("workplace_locations").select("id").limit(1);
+    return !error;
+  }
+
+  async listWorkplaceDirectory(
+    organizationId: string,
+  ): Promise<Array<Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude">>> {
+    const { data, error } = await this.supabase
+      .from("workplace_locations_directory")
+      .select(
+        "id, organization_id, name, code, address, allowed_radius_meters, max_accuracy_meters, timezone, is_active, is_primary, created_at, updated_at",
+      )
+      .eq("organization_id", organizationId)
+      .order("name");
+    if (error) fail(error);
+    return (data ?? []) as Array<Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude">>;
+  }
+
+  async listWorkplaces(organizationId: string): Promise<import("@/types/models").WorkplaceLocation[]> {
+    const { data, error } = await this.supabase
+      .from("workplace_locations")
+      .select(
+        "id, organization_id, name, code, address, latitude, longitude, allowed_radius_meters, max_accuracy_meters, timezone, is_active, is_primary, created_at, updated_at",
+      )
+      .eq("organization_id", organizationId)
+      .order("name");
+    if (error) fail(error);
+    return (data ?? []) as import("@/types/models").WorkplaceLocation[];
+  }
+
+  async resolveWorkplaceForEmployee(
+    organizationId: string,
+    employeeId: string,
+    onDate: string,
+  ): Promise<Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude"> | null> {
+    const { data: asg } = await this.supabase
+      .from("employee_workplace_assignments")
+      .select("workplace_location_id")
+      .eq("organization_id", organizationId)
+      .eq("employee_id", employeeId)
+      .lte("effective_from", onDate)
+      .or(`effective_to.is.null,effective_to.gte.${onDate}`)
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const workplaceId = (asg as { workplace_location_id?: string } | null)?.workplace_location_id;
+    let q = this.supabase
+      .from("workplace_locations_directory")
+      .select(
+        "id, organization_id, name, code, address, allowed_radius_meters, max_accuracy_meters, timezone, is_active, is_primary, created_at, updated_at",
+      )
+      .eq("organization_id", organizationId);
+    if (workplaceId) q = q.eq("id", workplaceId);
+    else q = q.eq("is_primary", true);
+    const { data, error } = await q.maybeSingle();
+    if (error) fail(error);
+    return (data as Omit<import("@/types/models").WorkplaceLocation, "latitude" | "longitude"> | null) ?? null;
+  }
+
+  async listLocationAttempts(
+    organizationId: string,
+    opts?: { includeCoordinates?: boolean; limit?: number },
+  ): Promise<import("@/types/models").AttendanceLocationAttempt[]> {
+    const columns = opts?.includeCoordinates
+      ? "id, organization_id, employee_id, workplace_location_id, action, result, latitude, longitude, accuracy_meters, distance_meters, reason_code, created_at"
+      : "id, organization_id, employee_id, workplace_location_id, action, result, accuracy_meters, distance_meters, reason_code, created_at";
+    const { data, error } = await this.supabase
+      .from("attendance_location_attempts")
+      .select(columns)
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(opts?.limit ?? 100);
+    if (error) fail(error);
+    return (data ?? []) as unknown as import("@/types/models").AttendanceLocationAttempt[];
+  }
 }

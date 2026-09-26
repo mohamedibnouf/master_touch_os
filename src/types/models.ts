@@ -452,8 +452,59 @@ export type AttendanceRecord = {
   attendance_status: import("./enums").AttendanceStatus;
   source: import("./enums").AttendanceSource;
   notes: string | null;
+  check_in_workplace_id?: string | null;
+  check_in_accuracy_meters?: number | null;
+  check_in_distance_meters?: number | null;
+  check_in_location_verified?: boolean | null;
+  check_out_workplace_id?: string | null;
+  check_out_accuracy_meters?: number | null;
+  check_out_distance_meters?: number | null;
+  check_out_location_verified?: boolean | null;
   created_at: string;
   updated_at: string;
+};
+
+export type WorkplaceLocation = {
+  id: string;
+  organization_id: string;
+  name: string;
+  code: string | null;
+  address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  allowed_radius_meters: number;
+  max_accuracy_meters: number | null;
+  timezone: string;
+  is_active: boolean;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeWorkplaceAssignment = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  workplace_location_id: string;
+  effective_from: string;
+  effective_to: string | null;
+  is_primary: boolean;
+  created_at: string;
+};
+
+export type AttendanceLocationAttempt = {
+  id: string;
+  organization_id: string;
+  employee_id: string;
+  workplace_location_id: string | null;
+  action: "CHECK_IN" | "CHECK_OUT";
+  result: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  accuracy_meters: number | null;
+  distance_meters: number | null;
+  reason_code: string;
+  created_at: string;
 };
 
 export type AttendanceAdjustment = {

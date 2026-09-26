@@ -6,6 +6,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
+import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 
 function formatTs(value: string | null) {
@@ -40,13 +41,17 @@ export default async function AttendanceDashboardPage() {
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
 
-  const [todayRecord, recent, assignment] = await Promise.all([
+  const [todayRecord, recent, assignment, geofenceReady] = await Promise.all([
     repo.getRecordForDate(ctx.organization.id, ctx.employee.id, today),
     repo.listRecordsForEmployee(ctx.organization.id, ctx.employee.id, { limit: 7 }),
     repo.getActiveAssignment(ctx.organization.id, ctx.employee.id, today),
+    repo.geofenceSchemaReady(),
   ]);
   const shift = assignment
     ? await repo.getShift(ctx.organization.id, assignment.shift_id)
+    : null;
+  const workplace = geofenceReady
+    ? await repo.resolveWorkplaceForEmployee(ctx.organization.id, ctx.employee.id, today)
     : null;
 
   const canCheckIn = hasPermission(ctx, "attendance.check_in") && !todayRecord?.check_in_at;
@@ -115,20 +120,63 @@ export default async function AttendanceDashboardPage() {
 
         <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row">
           {canCheckIn ? (
-            <form action={checkInAction} className="w-full sm:w-auto">
-              <Button type="submit" className="w-full sm:w-auto" data-testid="attendance-check-in">
-                تسجيل دخول
-              </Button>
-            </form>
+            geofenceReady ? (
+              <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="attendance-check-in" />
+            ) : (
+              <form action={checkInAction} className="w-full sm:w-auto">
+                <Button type="submit" className="w-full sm:w-auto" data-testid="attendance-check-in">
+                  تسجيل الحضور
+                </Button>
+              </form>
+            )
           ) : null}
           {canCheckOut ? (
-            <form action={checkOutAction} className="w-full sm:w-auto">
-              <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="attendance-check-out">
-                تسجيل انصراف
-              </Button>
-            </form>
+            geofenceReady ? (
+              <GeofencePunchButton
+                action="check_out"
+                label="تسجيل الانصراف"
+                testId="attendance-check-out"
+                variant="secondary"
+              />
+            ) : (
+              <form action={checkOutAction} className="w-full sm:w-auto">
+                <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="attendance-check-out">
+                  تسجيل الانصراف
+                </Button>
+              </form>
+            )
           ) : null}
         </div>
+        <p className="mt-3 text-xs text-muted">
+          يستخدم النظام موقعك فقط للتحقق من وجودك داخل نطاق موقع العمل عند تسجيل الحضور أو الانصراف. لا يتم تتبعك بشكل
+          مستمر. تحديد الموقع عبر المتصفح دليل تشغيلي وليس ضماناً ضد تزييف GPS.
+        </p>
+      </Card>
+
+      <Card className="mb-6" data-testid="attendance-workplace-card">
+        <h2 className="mb-2 font-semibold text-navy">موقع العمل</h2>
+        {workplace ? (
+          <div className="text-sm">
+            <p className="font-medium text-navy">{workplace.name}</p>
+            <p className="mt-1 text-muted">
+              النطاق المسموح {workplace.allowed_radius_meters} م
+              {workplace.max_accuracy_meters
+                ? ` · أقصى خطأ مسموح ≤ ${workplace.max_accuracy_meters} م`
+                : ""}
+              {workplace.is_active ? "" : " · غير متاح"}
+            </p>
+            {todayRecord?.check_in_location_verified != null ? (
+              <p className="mt-1 text-xs text-muted">
+                تحقق الدخول: {todayRecord.check_in_location_verified ? "داخل النطاق" : "غير متحقَّق"}
+                {todayRecord.check_in_distance_meters != null
+                  ? ` · المسافة ${todayRecord.check_in_distance_meters} م`
+                  : ""}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">لم يتم تحديد موقع عمل معتمد لهذا الموظف.</p>
+        )}
       </Card>
 
       <Card className="mb-6" data-testid="attendance-shift-card">

@@ -11,9 +11,11 @@ describe("attendance permissions catalog", () => {
         "attendance.check_in",
         "attendance.check_out",
         "attendance.manage",
+        "attendance.manage_locations",
         "attendance.manage_policies",
         "attendance.manage_shifts",
         "attendance.view_all",
+        "attendance.view_location_evidence",
         "attendance.view_self",
         "attendance.view_team",
       ].sort(),
@@ -54,6 +56,8 @@ describe("attendance permissions catalog", () => {
         "attendance.adjust",
         "attendance.manage_policies",
         "attendance.manage_shifts",
+        "attendance.manage_locations",
+        "attendance.view_location_evidence",
       ]),
     );
   });

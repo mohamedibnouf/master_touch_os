@@ -12,6 +12,7 @@ import { pendingActionHref } from "@/lib/work-item-href";
 import { notificationEntityHref } from "@/lib/notifications/href";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
+import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 
 export default async function DashboardPage() {
@@ -255,14 +256,18 @@ export default async function DashboardPage() {
 
   let attendance: Awaited<ReturnType<AttendanceRepository["getRecordForDate"]>> = null;
   let shiftName: string | null = null;
+  let geofenceReady = false;
+  const attRepo = new AttendanceRepository(supabase);
   if (ctx.employee && hasPermission(ctx, "attendance.view_self")) {
-    const attRepo = new AttendanceRepository(supabase);
     attendance = await attRepo.getRecordForDate(ctx.organization.id, ctx.employee.id, attendanceToday);
     const assignment = await attRepo.getActiveAssignment(ctx.organization.id, ctx.employee.id, attendanceToday);
     if (assignment) {
       const shift = await attRepo.getShift(ctx.organization.id, assignment.shift_id);
       shiftName = shift?.name_ar ?? null;
     }
+  }
+  if (ctx.employee) {
+    geofenceReady = await attRepo.geofenceSchemaReady();
   }
 
   let leaveAvailable: number | null = null;
@@ -322,18 +327,31 @@ export default async function DashboardPage() {
             ) : null}
             <div className="mt-3 flex flex-col gap-2">
               {canCheckIn ? (
-                <form action={checkInAction}>
-                  <Button type="submit" className="w-full" data-testid="home-check-in">
-                    تسجيل دخول
-                  </Button>
-                </form>
+                geofenceReady ? (
+                  <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="home-check-in" />
+                ) : (
+                  <form action={checkInAction}>
+                    <Button type="submit" className="w-full" data-testid="home-check-in">
+                      تسجيل الحضور
+                    </Button>
+                  </form>
+                )
               ) : null}
               {canCheckOut ? (
-                <form action={checkOutAction}>
-                  <Button type="submit" variant="secondary" className="w-full" data-testid="home-check-out">
-                    تسجيل انصراف
-                  </Button>
-                </form>
+                geofenceReady ? (
+                  <GeofencePunchButton
+                    action="check_out"
+                    label="تسجيل الانصراف"
+                    testId="home-check-out"
+                    variant="secondary"
+                  />
+                ) : (
+                  <form action={checkOutAction}>
+                    <Button type="submit" variant="secondary" className="w-full" data-testid="home-check-out">
+                      تسجيل الانصراف
+                    </Button>
+                  </form>
+                )
               ) : null}
               <Link href="/attendance" className="text-sm text-navy underline">
                 صفحة الحضور
