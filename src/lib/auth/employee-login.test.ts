@@ -79,6 +79,7 @@ describe("employee-number login mapping", () => {
     expect(email).toContain("@login.mastertouch.internal");
     expect(email.startsWith("mt.")).toBe(true);
     expect(isEmailIdentifier(email)).toBe(true);
+    expect(email).not.toContain(".@");
   });
 
   it("marks HR login state: no account ready vs ready vs disabled", () => {

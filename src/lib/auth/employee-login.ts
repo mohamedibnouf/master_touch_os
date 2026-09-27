@@ -51,12 +51,22 @@ export function isEmployeeLoginAllowed(input: {
 /** Internal Auth email — never shown on employee login UI. */
 export function generateInternalAuthEmail(organizationId: string, employeeNumber: string): string {
   const org = organizationId.replace(/-/g, "").slice(0, 12);
-  const num = normalizeEmployeeNumber(employeeNumber)
+  const raw = normalizeEmployeeNumber(employeeNumber);
+  const ascii = raw
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
     .slice(0, 40);
-  return `mt.${org}.${num}@login.mastertouch.internal`;
+  const local = ascii.length > 0 ? ascii : utf8HexToken(`${organizationId}:${raw}`);
+  return `mt.${org}.${local}@login.mastertouch.internal`;
+}
+
+function utf8HexToken(value: string): string {
+  return Array.from(new TextEncoder().encode(value))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 24);
 }
 
 export type EmployeeLoginUiStatus = "not_provisioned" | "ready" | "disabled";

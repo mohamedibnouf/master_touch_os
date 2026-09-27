@@ -4,7 +4,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ConflictError, DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -14,15 +14,23 @@ import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
-import { generateInternalAuthEmail } from "@/lib/auth/employee-login";
 import {
-  createEmployeeLoginProvisioned,
   createEmployeeValidationMessageAr,
-  employeeNumberConflictMessage,
   hrCreateRoleAssignmentError,
   logCreateEmployeeValidationFailure,
   readCreateEmployeeFormData,
 } from "@/lib/hr/create-employee-form";
+import {
+  assertCreateEmployeeAuthRequest,
+  buildCreateEmployeeAuthRequest,
+  buildCreateEmployeeInsertPayload,
+  buildCreateEmployeeMembershipPayload,
+  mapAuthCreateUserFailure,
+  mapDepartmentInsertFailure,
+  mapEmployeeInsertFailure,
+  mapMembershipInsertFailure,
+  mapRoleInsertFailure,
+} from "@/lib/hr/create-employee-runtime";
 import {
   activateEmployeeContractSchema,
   assignDepartmentSchema,
@@ -112,71 +120,64 @@ export async function createEmployeeAction(
   }
 
   const employeeNumber = parsed.data.employee_number.trim();
-  const authEmail =
-    emptyToNull(parsed.data.email) ?? generateInternalAuthEmail(ctx.organization.id, employeeNumber);
-  const initialPassword = parsed.data.initial_password;
-  const loginProvisioned = createEmployeeLoginProvisioned(initialPassword);
-
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email: authEmail,
-    email_confirm: true,
-    password: initialPassword ?? crypto.randomUUID() + "A1!",
-    user_metadata: {
-      full_name_ar: parsed.data.full_name_ar,
-      full_name_en: parsed.data.full_name_en,
-      locale: "ar",
-      employee_number: employeeNumber,
-      login_provisioned: loginProvisioned,
-    },
+  const authRequest = buildCreateEmployeeAuthRequest({
+    organizationId: ctx.organization.id,
+    employeeNumber,
+    fullNameAr: parsed.data.full_name_ar,
+    fullNameEn: parsed.data.full_name_en,
+    email: parsed.data.email,
+    initialPassword: parsed.data.initial_password,
   });
-  if (error || !created.user) throw new DatabaseError(error);
+  assertCreateEmployeeAuthRequest(authRequest);
 
-  await admin.from("organization_members").upsert({
-    organization_id: ctx.organization.id,
-    profile_id: created.user.id,
-    status: "active",
+  const { data: created, error } = await admin.auth.admin.createUser(authRequest.params);
+  if (error || !created?.user) mapAuthCreateUserFailure(error ?? new Error("auth.createUser empty"));
+  const profileId = created.user.id;
+
+  const membership = buildCreateEmployeeMembershipPayload(ctx.organization.id, profileId);
+  const { error: memberError } = await admin.from("organization_members").upsert(membership, {
+    onConflict: "organization_id,profile_id",
   });
+  if (memberError) mapMembershipInsertFailure(memberError);
 
   const { data: employee, error: employeeError } = await admin
     .from("employees")
-    .insert({
-      organization_id: ctx.organization.id,
-      profile_id: created.user.id,
-      employee_number: employeeNumber,
-      job_title_ar: parsed.data.job_title_ar ?? null,
-      job_title_en: parsed.data.job_title_en ?? null,
-      employment_type: emptyToNull(parsed.data.employment_type),
-      nationality: emptyToNull(parsed.data.nationality),
-      work_location: emptyToNull(parsed.data.work_location),
-      joining_date: emptyToNull(parsed.data.joining_date),
-      employment_status: "active",
-      is_active: true,
-    })
+    .insert(
+      buildCreateEmployeeInsertPayload({
+        organizationId: ctx.organization.id,
+        profileId,
+        employeeNumber,
+        jobTitleAr: parsed.data.job_title_ar,
+        jobTitleEn: parsed.data.job_title_en,
+        employmentType: parsed.data.employment_type,
+        nationality: parsed.data.nationality,
+        workLocation: parsed.data.work_location,
+        joiningDate: parsed.data.joining_date,
+      }),
+    )
     .select("id")
     .single<{ id: string }>();
-  if (employeeError) {
-    const conflict = employeeNumberConflictMessage(employeeError);
-    if (conflict) throw new ConflictError(conflict, "Employee number already exists.");
-    throw new DatabaseError(employeeError);
-  }
+  if (employeeError) mapEmployeeInsertFailure(employeeError);
 
   if (parsed.data.department_id && employee) {
-    await admin.from("employee_departments").insert({
+    const { error: deptError } = await admin.from("employee_departments").insert({
       organization_id: ctx.organization.id,
       employee_id: employee.id,
       department_id: parsed.data.department_id,
       is_primary: true,
     });
+    if (deptError) mapDepartmentInsertFailure(deptError);
   }
 
   if (parsed.data.role_id) {
-    await admin.from("user_roles").insert({
+    const { error: roleError } = await admin.from("user_roles").insert({
       organization_id: ctx.organization.id,
-      profile_id: created.user.id,
+      profile_id: profileId,
       role_id: parsed.data.role_id,
       scope_type: "organization",
       granted_by: ctx.userId,
     });
+    if (roleError) mapRoleInsertFailure(roleError);
   }
 
   const supabase = await createServerSupabaseClient();
@@ -184,7 +185,7 @@ export async function createEmployeeAction(
     organizationId: ctx.organization.id,
     action: "employee.created",
     entityType: "employee",
-    entityId: employee?.id ?? created.user.id,
+    entityId: employee?.id ?? profileId,
     newValues: { employee_number: employeeNumber },
   });
   await new EventService(supabase).publish({
@@ -192,7 +193,7 @@ export async function createEmployeeAction(
     organizationId: ctx.organization.id,
     actorId: ctx.userId,
     entityType: "employee",
-    entityId: employee?.id ?? created.user.id,
+    entityId: employee?.id ?? profileId,
     payload: { employee_number: employeeNumber },
     correlationId: generateCorrelationId(),
     occurredAt: new Date().toISOString(),
