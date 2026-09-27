@@ -76,7 +76,7 @@ export default async function EmployeesPage() {
             يتطلب صلاحية إنشاء موظف. سجّل الدخول للموظف يتم بالرقم الوظيفي وكلمة المرور — ليس بالبريد.
             تعيين الأدوار يتطلب صلاحية منفصلة.
           </p>
-          <ServerActionForm action={createEmployeeAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createEmployeeAction} className="grid gap-3 md:grid-cols-2" testId="employee-create-form">
             <Field label="الرقم الوظيفي">
               <Input name="employee_number" required data-testid="employee-create-number" />
             </Field>
@@ -85,6 +85,7 @@ export default async function EmployeesPage() {
                 name="initial_password"
                 type="password"
                 autoComplete="new-password"
+                minLength={8}
                 data-testid="employee-create-password"
               />
             </Field>
@@ -92,10 +93,10 @@ export default async function EmployeesPage() {
               <Input name="email" type="email" data-testid="employee-create-email" />
             </Field>
             <Field label="الاسم بالعربية">
-              <Input name="full_name_ar" required data-testid="employee-create-name-ar" />
+              <Input name="full_name_ar" required minLength={2} data-testid="employee-create-name-ar" />
             </Field>
             <Field label="الاسم بالإنجليزية">
-              <Input name="full_name_en" required data-testid="employee-create-name-en" />
+              <Input name="full_name_en" required minLength={2} data-testid="employee-create-name-en" />
             </Field>
             <Field label="المسمى الوظيفي">
               <Input name="job_title_ar" data-testid="employee-create-title" />

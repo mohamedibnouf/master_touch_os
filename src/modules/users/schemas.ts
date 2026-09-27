@@ -18,10 +18,32 @@ export const createUserSchema = z.object({
   joining_date: z.string().optional().or(z.literal("")),
 });
 
-export const createEmployeeSchema = createUserSchema.extend({
+const employmentTypeEnum = z.enum([
+  "permanent",
+  "fixed_term",
+  "part_time",
+  "temporary",
+  "consultant",
+]);
+
+/** HR /employees create form — not createUserSchema (that still requires email). */
+export const createEmployeeSchema = z.object({
   employee_number: z.string().trim().min(1).max(64),
-  email: z.union([z.literal(""), z.string().email()]).optional(),
-  initial_password: z.union([z.literal(""), z.string().min(8).max(128)]).optional(),
+  full_name_ar: z.string().trim().min(2).max(200),
+  full_name_en: z.string().trim().min(2).max(200),
+  email: z.string().email().optional(),
+  initial_password: z.string().min(8).max(128).optional(),
+  job_title_ar: z.string().trim().max(160).optional(),
+  job_title_en: z.string().trim().max(160).optional(),
+  department_id: z.string().uuid().optional(),
+  role_id: z.string().uuid().optional(),
+  employment_type: employmentTypeEnum.optional(),
+  nationality: z.string().trim().max(120).optional(),
+  work_location: z.string().trim().max(160).optional(),
+  joining_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export const provisionEmployeeLoginSchema = z.object({

@@ -4,7 +4,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { ConflictError, DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -15,7 +15,14 @@ import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
 import { generateInternalAuthEmail } from "@/lib/auth/employee-login";
-import { isPrivilegedRoleCode } from "@/lib/hr/roles";
+import {
+  createEmployeeLoginProvisioned,
+  createEmployeeValidationMessageAr,
+  employeeNumberConflictMessage,
+  hrCreateRoleAssignmentError,
+  logCreateEmployeeValidationFailure,
+  readCreateEmployeeFormData,
+} from "@/lib/hr/create-employee-form";
 import {
   activateEmployeeContractSchema,
   assignDepartmentSchema,
@@ -69,23 +76,14 @@ export async function createEmployeeAction(
     hasPermission(ctx, "employee.create") || hasPermission(ctx, "user.create");
   if (!canCreate) throw new ForbiddenError({ permission: "employee.create" });
 
-  const parsed = createEmployeeSchema.safeParse({
-    email: formData.get("email") || undefined,
-    full_name_ar: formData.get("full_name_ar"),
-    full_name_en: formData.get("full_name_en"),
-    job_title_ar: formData.get("job_title_ar") || undefined,
-    job_title_en: formData.get("job_title_en") || undefined,
-    department_id: formData.get("department_id") || undefined,
-    role_id: formData.get("role_id") || undefined,
-    employee_number: formData.get("employee_number"),
-    employment_type: formData.get("employment_type") || undefined,
-    nationality: formData.get("nationality") || undefined,
-    work_location: formData.get("work_location") || undefined,
-    joining_date: formData.get("joining_date") || undefined,
-    initial_password: formData.get("initial_password") || undefined,
-  });
+  const payload = readCreateEmployeeFormData(formData);
+  const parsed = createEmployeeSchema.safeParse(payload);
   if (!parsed.success) {
-    throw new ValidationError("بيانات الموظف غير مكتملة.", "Employee data is incomplete.");
+    logCreateEmployeeValidationFailure(payload, parsed.error);
+    throw new ValidationError(
+      createEmployeeValidationMessageAr(parsed.error),
+      "Employee create validation failed.",
+    );
   }
 
   if (parsed.data.role_id && !hasPermission(ctx, "role.assign")) {
@@ -99,10 +97,16 @@ export async function createEmployeeAction(
       .select("code, is_external")
       .eq("id", parsed.data.role_id)
       .maybeSingle<{ code: string; is_external: boolean }>();
-    if (roleRow?.is_external) {
+    const roleBlock = hrCreateRoleAssignmentError({
+      roleId: parsed.data.role_id,
+      canAssignRole: hasPermission(ctx, "role.assign"),
+      isPlatformAdmin: ctx.profile.is_platform_admin,
+      role: roleRow,
+    });
+    if (roleBlock === "external") {
       throw new ValidationError("لا يمكن منح الأدوار الخارجية صلاحية داخلية.", "External roles cannot be granted internal access.");
     }
-    if (isPrivilegedRoleCode(roleRow?.code) && !ctx.profile.is_platform_admin) {
+    if (roleBlock === "privileged") {
       throw new ValidationError("لا يمكن منح هذا الدور من مسار الموارد البشرية.", "That role cannot be assigned from the HR path.");
     }
   }
@@ -110,8 +114,8 @@ export async function createEmployeeAction(
   const employeeNumber = parsed.data.employee_number.trim();
   const authEmail =
     emptyToNull(parsed.data.email) ?? generateInternalAuthEmail(ctx.organization.id, employeeNumber);
-  const initialPassword = emptyToNull(parsed.data.initial_password);
-  const loginProvisioned = Boolean(initialPassword);
+  const initialPassword = parsed.data.initial_password;
+  const loginProvisioned = createEmployeeLoginProvisioned(initialPassword);
 
   const { data: created, error } = await admin.auth.admin.createUser({
     email: authEmail,
@@ -150,7 +154,11 @@ export async function createEmployeeAction(
     })
     .select("id")
     .single<{ id: string }>();
-  if (employeeError) throw new DatabaseError(employeeError);
+  if (employeeError) {
+    const conflict = employeeNumberConflictMessage(employeeError);
+    if (conflict) throw new ConflictError(conflict, "Employee number already exists.");
+    throw new DatabaseError(employeeError);
+  }
 
   if (parsed.data.department_id && employee) {
     await admin.from("employee_departments").insert({
