@@ -8,8 +8,10 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createEmployeeAction } from "@/server/use-cases/hr";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
-import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
-import type { EmploymentStatus, EmploymentType } from "@/types/enums";
+import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES, employmentTypeLabel } from "@/lib/hr/labels";
+import { deriveEmployeeDirectoryStats, directoryProfileName } from "@/lib/hr/directory-page";
+import { traceEmployeesPageOp } from "@/lib/hr/employees-page-trace";
+import type { EmploymentStatus } from "@/types/enums";
 
 type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 
@@ -29,19 +31,16 @@ export default async function EmployeesPage() {
 
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
-  const [employees, departments, roles] = await Promise.all([
+  const employees = await traceEmployeesPageOp("listEmployees", () =>
     repo.listEmployees(ctx.organization.id),
-    repo.listDepartments(ctx.organization.id),
-    canHrDirectory ? repo.listRoles() : Promise.resolve([]),
+  );
+  const [departments, roles] = await Promise.all([
+    traceEmployeesPageOp("listDepartments", () => repo.listDepartments(ctx.organization.id)),
+    canHrDirectory
+      ? traceEmployeesPageOp("listRoles", () => repo.listRoles())
+      : Promise.resolve([]),
   ]);
-
-  const stats = canHrDirectory
-    ? await repo.employeeDirectoryStats(ctx.organization.id)
-    : {
-        total: employees.length,
-        active: employees.filter((e) => e.is_active).length,
-        probation: employees.filter((e) => e.employment_status === "probation").length,
-      };
+  const stats = deriveEmployeeDirectoryStats(employees);
 
   const roleRows = roles as RoleRow[];
   const canCreate = hasPermission(ctx, "employee.create") || hasPermission(ctx, "user.create");
@@ -164,9 +163,8 @@ export default async function EmployeesPage() {
       ) : (
         <div className="space-y-3" data-testid="employees-list">
           {employees.map((employee) => {
-            const profile = employee.profiles;
             const status = employee.employment_status as EmploymentStatus;
-            const empType = employee.employment_type as EmploymentType | null;
+            const typeLabel = employmentTypeLabel(employee.employment_type);
             return (
               <Card key={employee.id} data-testid={`employee-row-${employee.id}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -176,12 +174,12 @@ export default async function EmployeesPage() {
                       className="text-base font-semibold text-navy underline-offset-2 hover:underline"
                       data-testid={`employee-link-${employee.id}`}
                     >
-                      {profile?.full_name_ar || "بدون اسم"}
+                      {directoryProfileName(employee.profiles)}
                     </Link>
                     <p className="text-sm text-muted">
                       {employee.employee_number ? `${employee.employee_number} · ` : ""}
                       {employee.job_title_ar || "بدون مسمى"}
-                      {empType ? ` · ${EMPLOYMENT_TYPE_LABELS[empType].ar}` : ""}
+                      {typeLabel !== "—" ? ` · ${typeLabel}` : ""}
                     </p>
                   </div>
                   <div className="flex gap-2">

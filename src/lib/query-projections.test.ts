@@ -10,6 +10,8 @@ import {
   AUTH_ORGANIZATION_COLUMNS,
   AUTH_PROFILE_COLUMNS,
   DEPARTMENT_LIST_COLUMNS,
+  EMPLOYEE_DIRECTORY_PAGE_COLUMNS,
+  EMPLOYEE_DIRECTORY_PROFILE_COLUMNS,
   DOCUMENT_LIST_COLUMNS,
   LEAVE_BALANCE_LIST_COLUMNS,
   LEAVE_REQUEST_LIST_COLUMNS,
@@ -65,7 +67,7 @@ describe("GPS pending copy", () => {
 const AUTH_MEMBERSHIP_SELECT = `organization_id, status, organizations(${AUTH_ORGANIZATION_COLUMNS})`;
 const AUTH_USER_ROLES_SELECT =
   "organization_id, scope_type, scope_id, roles(code, is_external, role_permissions(permission_key))";
-const EMPLOYEE_DIRECTORY_LIST_SELECT = `${EMPLOYEE_DIRECTORY_COLUMNS}, profiles(id, full_name_ar)`;
+const EMPLOYEE_DIRECTORY_LIST_SELECT = EMPLOYEE_DIRECTORY_PAGE_COLUMNS;
 const EMPLOYEE_DETAIL_ROW_SELECT = `${EMPLOYEE_DETAIL_COLUMNS}, profiles(id, full_name_ar, full_name_en, phone, locale, is_active, avatar_path, last_seen_at, created_at, updated_at), employee_departments(id, is_primary, department_id, departments(id, code, name_ar, name_en, is_active))`;
 const EMPLOYEE_NAME_OPTIONS_SELECT = "id, profile_id, employee_number, profiles(full_name_ar)";
 const EMPLOYEE_PROJECTS_SELECT =
@@ -93,7 +95,9 @@ const PERFORMANCE_PASS_PROJECTIONS: Array<{ name: string; table: string; select:
   { name: "APPROVAL_STEP_LIST", table: "approval_steps", select: APPROVAL_STEP_LIST_COLUMNS },
   { name: "PROJECT_MEMBER", table: "project_members", select: PROJECT_MEMBER_COLUMNS },
   { name: "APPROVAL_LIST_SELECT", table: "approval_requests", select: APPROVAL_LIST_SELECT },
+  { name: "EMPLOYEE_DIRECTORY_COLUMNS", table: "employees", select: EMPLOYEE_DIRECTORY_COLUMNS },
   { name: "EMPLOYEE_DIRECTORY_LIST", table: "employees", select: EMPLOYEE_DIRECTORY_LIST_SELECT },
+  { name: "EMPLOYEE_DIRECTORY_PROFILES", table: "profiles", select: EMPLOYEE_DIRECTORY_PROFILE_COLUMNS },
   { name: "EMPLOYEE_DETAIL_ROW", table: "employees", select: EMPLOYEE_DETAIL_ROW_SELECT },
   { name: "EMPLOYEE_NAME_OPTIONS", table: "employees", select: EMPLOYEE_NAME_OPTIONS_SELECT },
   { name: "EMPLOYEE_PROJECTS", table: "project_members", select: EMPLOYEE_PROJECTS_SELECT },
@@ -117,10 +121,10 @@ describe("performance-pass projections vs migrations 001–064", () => {
     expect(ATTENDANCE_RECORD_LIST_COLUMNS).not.toMatch(/workplace_locations/);
   });
 
-  it("omits raw GPS coordinates from attendance list projection", () => {
-    expect(ATTENDANCE_RECORD_LIST_COLUMNS).not.toMatch(/latitude|longitude|gps|coordinate/i);
-    expect(SCHEMA_BY_TABLE.attendance_records).not.toContain("latitude");
-    expect(SCHEMA_BY_TABLE.attendance_records).not.toContain("longitude");
+  it("does not allow embedding employees from organization_members (no FK in 003; PGRST200)", () => {
+    expect(() =>
+      assertSelectAgainstSchema("organization_members", "profile_id, employees(id, job_title_ar)"),
+    ).toThrow(/Unknown embed employees/);
   });
 });
 

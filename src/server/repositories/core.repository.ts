@@ -18,11 +18,16 @@ import type {
   Project,
   ProjectStage,
 } from "@/types/models";
-import { EMPLOYEE_DETAIL_COLUMNS, EMPLOYEE_DIRECTORY_COLUMNS } from "@/lib/hr/labels";
+import { EMPLOYEE_DETAIL_COLUMNS } from "@/lib/hr/labels";
+import { attachProfilesById } from "@/lib/hr/directory-page";
+import { failEmployeesQuery } from "@/lib/hr/employees-page-trace";
+import { logger } from "@/lib/logger";
 import {
   AUDIT_FEED_COLUMNS,
   DEPARTMENT_LIST_COLUMNS,
   DOCUMENT_LIST_COLUMNS,
+  EMPLOYEE_DIRECTORY_PAGE_COLUMNS,
+  EMPLOYEE_DIRECTORY_PROFILE_COLUMNS,
   NOTIFICATION_HEADER_COLUMNS,
   NOTIFICATION_LIST_COLUMNS,
   PROJECT_LIST_COLUMNS,
@@ -33,7 +38,8 @@ import {
 } from "@/lib/query-projections";
 import { notificationEntityHref } from "@/lib/notifications/href";
 
-function fail(error: { message?: string } | null): never {
+function fail(error: { message?: string; code?: string } | null): never {
+  logger.error("supabase query failed", { code: error?.code ?? null });
   throw new DatabaseError(error);
 }
 
@@ -53,12 +59,25 @@ export class CoreRepository {
   async listEmployees(organizationId: string): Promise<Array<Employee & { profiles: Profile | null }>> {
     const { data, error } = await this.supabase
       .from("employees")
-      .select(`${EMPLOYEE_DIRECTORY_COLUMNS}, profiles(id, full_name_ar)`)
+      .select(EMPLOYEE_DIRECTORY_PAGE_COLUMNS)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) fail(error);
-    return (data ?? []) as unknown as Array<Employee & { profiles: Profile | null }>;
+    if (error) failEmployeesQuery("listEmployees.employees", error);
+
+    const rows = (data ?? []) as Array<Employee & { profile_id: string }>;
+    const profileIds = [...new Set(rows.map((row) => row.profile_id).filter(Boolean))];
+    if (profileIds.length === 0) {
+      return rows.map((row) => ({ ...row, profiles: null }));
+    }
+
+    const { data: profiles, error: profileError } = await this.supabase
+      .from("profiles")
+      .select(EMPLOYEE_DIRECTORY_PROFILE_COLUMNS)
+      .in("id", profileIds);
+    if (profileError) failEmployeesQuery("listEmployees.profiles", profileError);
+
+    return attachProfilesById(rows, profiles ?? []) as Array<Employee & { profiles: Profile | null }>;
   }
 
   /** Name picker only — avoids the heavy directory embed that can hit statement timeout (57014). */
@@ -204,6 +223,7 @@ export class CoreRepository {
     return (data ?? []) as EmployeeBankAccount[];
   }
 
+  /** Extra employees COUNT scans — do not call from GET /employees (RLS pressure). */
   async employeeDirectoryStats(organizationId: string) {
     const base = () =>
       this.supabase.from("employees").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
