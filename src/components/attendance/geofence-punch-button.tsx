@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { GPS_STAGE_COPY } from "@/modules/attendance/gps-ux";
 import {
   checkInWithLocationAction,
   checkOutWithLocationAction,
@@ -66,7 +67,7 @@ export function GeofencePunchButton({
   return (
     <form action={onSubmit} className="w-full sm:w-auto">
       <Button type="submit" variant={variant} className="min-h-11 w-full sm:w-auto" data-testid={testId} disabled={busy}>
-        {waitingGps ? "جاري تحديد الموقع…" : pending ? "جاري التحقق…" : label}
+        {waitingGps ? GPS_STAGE_COPY.locating : pending ? GPS_STAGE_COPY.verifying : label}
       </Button>
       {message ? (
         <p className="mt-2 text-sm text-danger" data-testid="attendance-geofence-error">

@@ -51,6 +51,22 @@ describe("sidebar navigation hrefs", () => {
     }
   });
 
+  it("operational areas have loading.tsx skeletons", () => {
+    const loadingFiles = [
+      path.join(APP, "loading.tsx"),
+      path.join(APP, "projects", "[id]", "loading.tsx"),
+      path.join(APP, "employees", "[id]", "loading.tsx"),
+      path.join(APP, "payroll", "[id]", "loading.tsx"),
+      path.join(APP, "management", "loading.tsx"),
+      path.join(APP, "finance", "loading.tsx"),
+      path.join(APP, "procurement", "loading.tsx"),
+      path.join(APP, "hr", "attendance", "loading.tsx"),
+    ];
+    for (const file of loadingFiles) {
+      expect(existsSync(file), file).toBe(true);
+    }
+  });
+
   it("accepts UUID-shaped ids and rejects garbage", () => {
     expect(isUuid("11111111-1111-1111-1111-111111111111")).toBe(true);
     expect(isUuid("not-a-uuid")).toBe(false);

@@ -1,10 +1,16 @@
 import "server-only";
 
+import { cache } from "react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isPermissionKey, type PermissionKey } from "@/lib/permissions/catalog";
 import { listGrantedPermissions, type RoleGrant, type RoleScopeType } from "@/lib/permissions/evaluate";
 import type { AuthContext, Employee, Organization, Profile } from "@/types/models";
 import type { MembershipStatus } from "@/types/enums";
+import {
+  AUTH_EMPLOYEE_COLUMNS,
+  AUTH_ORGANIZATION_COLUMNS,
+  AUTH_PROFILE_COLUMNS,
+} from "@/lib/query-projections";
 
 type RoleRow = {
   organization_id: string;
@@ -17,7 +23,7 @@ type RoleRow = {
   } | null;
 };
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+async function loadAuthContext(): Promise<AuthContext | null> {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -27,29 +33,28 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     return null;
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle<Profile>();
+  const [profileResult, membershipResult] = await Promise.all([
+    supabase.from("profiles").select(AUTH_PROFILE_COLUMNS).eq("id", user.id).maybeSingle<Profile>(),
+    supabase
+      .from("organization_members")
+      .select(`organization_id, status, organizations(${AUTH_ORGANIZATION_COLUMNS})`)
+      .eq("profile_id", user.id)
+      .eq("status", "active")
+      .order("joined_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<{
+        organization_id: string;
+        status: MembershipStatus;
+        organizations: Organization | Organization[] | null;
+      }>(),
+  ]);
 
+  const profile = profileResult.data;
   if (!profile) {
     return null;
   }
 
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id, status, organizations(*)")
-    .eq("profile_id", user.id)
-    .eq("status", "active")
-    .order("joined_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<{
-      organization_id: string;
-      status: MembershipStatus;
-      organizations: Organization | Organization[] | null;
-    }>();
-
+  const membership = membershipResult.data;
   const organization = Array.isArray(membership?.organizations)
     ? membership.organizations[0]
     : membership?.organizations;
@@ -58,18 +63,22 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     return null;
   }
 
-  const { data: employee } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("organization_id", organization.id)
-    .eq("profile_id", user.id)
-    .maybeSingle<Employee>();
+  const [employeeResult, roleResult] = await Promise.all([
+    supabase
+      .from("employees")
+      .select(AUTH_EMPLOYEE_COLUMNS)
+      .eq("organization_id", organization.id)
+      .eq("profile_id", user.id)
+      .maybeSingle<Employee>(),
+    supabase
+      .from("user_roles")
+      .select("organization_id, scope_type, scope_id, roles(code, is_external, role_permissions(permission_key))")
+      .eq("profile_id", user.id)
+      .eq("organization_id", organization.id),
+  ]);
 
-  const { data: roleRows } = await supabase
-    .from("user_roles")
-    .select("organization_id, scope_type, scope_id, roles(code, is_external, role_permissions(permission_key))")
-    .eq("profile_id", user.id)
-    .eq("organization_id", organization.id);
+  const employee = employeeResult.data;
+  const roleRows = roleResult.data;
 
   const grants: RoleGrant[] = (roleRows ?? []).flatMap((raw) => {
     const row = raw as unknown as RoleRow & {
@@ -119,3 +128,6 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     permissions,
   };
 }
+
+/** Request-scoped only (React cache). Must never be a process-global store. */
+export const getAuthContext = cache(loadAuthContext);

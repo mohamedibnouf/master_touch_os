@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -15,7 +16,7 @@ export default async function DocumentsPage() {
   const repo = new CoreRepository(supabase);
   const [documents, projects] = await Promise.all([
     repo.listDocuments(ctx.organization.id),
-    repo.listProjects({ organizationId: ctx.organization.id, page: 1, pageSize: 100 }),
+    repo.listProjectPicker(ctx.organization.id),
   ]);
   const canUpload = hasPermission(ctx, "document.upload");
 
@@ -52,7 +53,7 @@ export default async function DocumentsPage() {
             <Field label="المشروع (اختياري)">
               <Select name="projectId" defaultValue="">
                 <option value="">بدون مشروع</option>
-                {projects.rows.map((project) => (
+                {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.project_code} — {project.name_ar}
                   </option>
@@ -98,13 +99,13 @@ export default async function DocumentsPage() {
                   </td>
                   <td className="px-4 py-3">
                     {doc.category === "business_case" ? (
-                      <a
+                      <Link
                         href={`/documents/${doc.id}/intelligence`}
                         className="text-navy underline"
                         data-testid={`doc-intel-link-${doc.id}`}
                       >
                         تحليل
-                      </a>
+                      </Link>
                     ) : (
                       <span className="text-muted">—</span>
                     )}

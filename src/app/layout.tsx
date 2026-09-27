@@ -7,12 +7,14 @@ const ibmArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-ibm-arabic",
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const ibmSans = IBM_Plex_Sans({
   variable: "--font-ibm",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

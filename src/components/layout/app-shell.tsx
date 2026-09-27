@@ -1,10 +1,28 @@
+import { Suspense } from "react";
 import type { AuthContext } from "@/types/models";
 import { can } from "@/lib/permissions/evaluate";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { notificationEntityHref } from "@/lib/notifications/href";
 import type { AppNavFlags } from "./nav-flags";
 import { AppShellFrame } from "./app-shell-frame";
+import { HeaderNotifications } from "./header-notifications";
+
+function HeaderBellFallback() {
+  return (
+    <div
+      className="h-11 w-11 animate-pulse rounded-md border border-line bg-paper"
+      aria-hidden
+      data-testid="header-notifications-loading"
+    />
+  );
+}
+
+async function HeaderNotificationsLoader({ userId }: { userId: string }) {
+  const supabase = await createServerSupabaseClient();
+  const repo = new CoreRepository(supabase);
+  const { unreadCount, notices } = await repo.listHeaderNotifications(userId);
+  return <HeaderNotifications unreadCount={unreadCount} items={notices} />;
+}
 
 export async function AppShell({
   ctx,
@@ -58,29 +76,6 @@ export async function AppShell({
     analyst: g("reports.management.read"),
   };
 
-  let unreadCount = 0;
-  let notices: Array<{
-    id: string;
-    title: string;
-    created_at: string;
-    read_at: string | null;
-    href: string | null;
-  }> = [];
-
-  if (flags.notifications) {
-    const supabase = await createServerSupabaseClient();
-    const repo = new CoreRepository(supabase);
-    const list = await repo.listNotifications(ctx.userId);
-    unreadCount = list.filter((n) => !n.read_at).length;
-    notices = list.slice(0, 6).map((n) => ({
-      id: n.id,
-      title: n.title,
-      created_at: n.created_at,
-      read_at: n.read_at,
-      href: notificationEntityHref(n.entity_type, n.entity_id),
-    }));
-  }
-
   return (
     <AppShellFrame
       organizationNameAr={ctx.organization.name_ar}
@@ -88,8 +83,13 @@ export async function AppShell({
       userName={ctx.profile.full_name_ar || ctx.profile.full_name_en || "مستخدم"}
       jobTitle={ctx.employee?.job_title_ar ?? "حساب تشغيلي"}
       flags={flags}
-      unreadCount={unreadCount}
-      notices={notices}
+      notificationsSlot={
+        flags.notifications ? (
+          <Suspense fallback={<HeaderBellFallback />}>
+            <HeaderNotificationsLoader userId={ctx.userId} />
+          </Suspense>
+        ) : null
+      }
     >
       {children}
     </AppShellFrame>

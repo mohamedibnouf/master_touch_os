@@ -51,6 +51,19 @@ summary::-webkit-details-marker {
   -webkit-overflow-scrolling: touch;
 }
 
+@keyframes nav-indeterminate {
+  0% {
+    transform: scaleX(0.12);
+  }
+  100% {
+    transform: scaleX(0.88);
+  }
+}
+
+.animate-nav-indeterminate {
+  animation: nav-indeterminate 10s ease-out forwards;
+}
+
 /* Dialog / modal safety when present */
 [role="dialog"],
 [data-dialog] {

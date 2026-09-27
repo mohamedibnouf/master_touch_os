@@ -19,6 +19,18 @@ import type {
   ProjectStage,
 } from "@/types/models";
 import { EMPLOYEE_DETAIL_COLUMNS, EMPLOYEE_DIRECTORY_COLUMNS } from "@/lib/hr/labels";
+import {
+  AUDIT_FEED_COLUMNS,
+  DEPARTMENT_LIST_COLUMNS,
+  DOCUMENT_LIST_COLUMNS,
+  NOTIFICATION_HEADER_COLUMNS,
+  NOTIFICATION_LIST_COLUMNS,
+  PROJECT_LIST_COLUMNS,
+  PROJECT_MEMBER_COLUMNS,
+  PROJECT_PICKER_COLUMNS,
+  ROLE_LIST_COLUMNS,
+} from "@/lib/query-projections";
+import { notificationEntityHref } from "@/lib/notifications/href";
 
 function fail(error: { message?: string } | null): never {
   throw new DatabaseError(error);
@@ -30,7 +42,7 @@ export class CoreRepository {
   async listDepartments(organizationId: string): Promise<Department[]> {
     const { data, error } = await this.supabase
       .from("departments")
-      .select("*")
+      .select(DEPARTMENT_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .order("name_ar");
     if (error) fail(error);
@@ -191,16 +203,20 @@ export class CoreRepository {
   }
 
   async employeeDirectoryStats(organizationId: string) {
-    const { data, error } = await this.supabase
-      .from("employees")
-      .select("id, is_active, employment_status")
-      .eq("organization_id", organizationId);
-    if (error) fail(error);
-    const rows = data ?? [];
+    const base = () =>
+      this.supabase.from("employees").select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+    const [totalRes, activeRes, probationRes] = await Promise.all([
+      base(),
+      base().eq("is_active", true),
+      base().eq("employment_status", "probation"),
+    ]);
+    if (totalRes.error) fail(totalRes.error);
+    if (activeRes.error) fail(activeRes.error);
+    if (probationRes.error) fail(probationRes.error);
     return {
-      total: rows.length,
-      active: rows.filter((r) => r.is_active).length,
-      probation: rows.filter((r) => r.employment_status === "probation").length,
+      total: totalRes.count ?? 0,
+      active: activeRes.count ?? 0,
+      probation: probationRes.count ?? 0,
     };
   }
 
@@ -215,7 +231,7 @@ export class CoreRepository {
   }): Promise<{ rows: Project[]; total: number }> {
     let query = this.supabase
       .from("projects")
-      .select("*", { count: "exact" })
+      .select(PROJECT_LIST_COLUMNS, { count: "exact" })
       .eq("organization_id", input.organizationId)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
@@ -263,7 +279,7 @@ export class CoreRepository {
   async listProjectMembers(projectId: string) {
     const { data, error } = await this.supabase
       .from("project_members")
-      .select("*, profiles(*)")
+      .select(PROJECT_MEMBER_COLUMNS)
       .eq("project_id", projectId)
       .eq("is_active", true);
     if (error) fail(error);
@@ -273,7 +289,7 @@ export class CoreRepository {
   async listDocuments(organizationId: string, projectId?: string): Promise<DocumentRecord[]> {
     let query = this.supabase
       .from("documents")
-      .select("*")
+      .select(DOCUMENT_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -298,7 +314,7 @@ export class CoreRepository {
   async listApprovals(organizationId: string) {
     const { data, error } = await this.supabase
       .from("approval_requests")
-      .select("*, approval_steps(*)")
+      .select("id, title, status, due_at, entity_type, entity_id, approval_steps(id, sequence, status, user_id, due_at, decision)")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -306,21 +322,70 @@ export class CoreRepository {
     return data ?? [];
   }
 
-  async listNotifications(profileId: string): Promise<NotificationRecord[]> {
+  async listNotifications(profileId: string, limit = 50): Promise<NotificationRecord[]> {
     const { data, error } = await this.supabase
       .from("notifications")
-      .select("*")
+      .select(NOTIFICATION_LIST_COLUMNS)
       .eq("recipient_profile_id", profileId)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(limit);
     if (error) fail(error);
     return (data ?? []) as NotificationRecord[];
+  }
+
+  async listHeaderNotifications(profileId: string): Promise<{
+    unreadCount: number;
+    notices: Array<{
+      id: string;
+      title: string;
+      created_at: string;
+      read_at: string | null;
+      href: string | null;
+    }>;
+  }> {
+    const [unread, recent] = await Promise.all([
+      this.supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_profile_id", profileId)
+        .is("read_at", null),
+      this.supabase
+        .from("notifications")
+        .select(NOTIFICATION_HEADER_COLUMNS)
+        .eq("recipient_profile_id", profileId)
+        .order("created_at", { ascending: false })
+        .limit(6),
+    ]);
+    if (unread.error) fail(unread.error);
+    if (recent.error) fail(recent.error);
+    return {
+      unreadCount: unread.count ?? 0,
+      notices: (recent.data ?? []).map((n) => ({
+        id: n.id as string,
+        title: n.title as string,
+        created_at: n.created_at as string,
+        read_at: (n.read_at as string | null) ?? null,
+        href: notificationEntityHref(n.entity_type as string | null, n.entity_id as string | null),
+      })),
+    };
+  }
+
+  async listProjectPicker(organizationId: string) {
+    const { data, error } = await this.supabase
+      .from("projects")
+      .select(PROJECT_PICKER_COLUMNS)
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) fail(error);
+    return (data ?? []) as Array<{ id: string; project_code: string; name_ar: string }>;
   }
 
   async listAudit(organizationId: string, limit = 20): Promise<AuditLogRecord[]> {
     const { data, error } = await this.supabase
       .from("audit_logs")
-      .select("*")
+      .select(AUDIT_FEED_COLUMNS)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -365,7 +430,7 @@ export class CoreRepository {
   async listRoles() {
     const { data, error } = await this.supabase
       .from("roles")
-      .select("*")
+      .select(ROLE_LIST_COLUMNS)
       .eq("is_system", true)
       .order("name_ar");
     if (error) fail(error);
@@ -488,7 +553,7 @@ export class CoreRepository {
       includeAudit
         ? this.supabase
             .from("audit_logs")
-            .select("*")
+            .select(AUDIT_FEED_COLUMNS)
             .eq("organization_id", organizationId)
             .order("created_at", { ascending: false })
             .limit(8)

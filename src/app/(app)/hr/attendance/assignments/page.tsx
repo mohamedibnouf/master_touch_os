@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -9,17 +8,17 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { assignEmployeeShiftAction } from "@/server/use-cases/attendance";
 
 export default async function HrAttendanceAssignmentsPage() {
-  authorize(await getAuthContext(), "attendance.manage_shifts");
-  const ctx = await getAuthContext();
-  if (!ctx) redirect("/login");
+  const ctx = authorize(await getAuthContext(), "attendance.manage_shifts");
 
   const today = new Date().toISOString().slice(0, 10);
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const core = new CoreRepository(supabase);
-  const assignments = await repo.listAssignments(ctx.organization.id);
-  const shifts = await repo.listShifts(ctx.organization.id, true);
-  const employees = await core.listEmployeeNameOptions(ctx.organization.id);
+  const [assignments, shifts, employees] = await Promise.all([
+    repo.listAssignments(ctx.organization.id),
+    repo.listShifts(ctx.organization.id, true),
+    core.listEmployeeNameOptions(ctx.organization.id),
+  ]);
 
   const shiftMap = new Map(shifts.map((s) => [s.id, s.name_ar]));
   const empMap = new Map(

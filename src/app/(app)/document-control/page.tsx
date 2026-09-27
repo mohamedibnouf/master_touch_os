@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Badge,
@@ -99,15 +100,15 @@ export default async function DocumentControlPage({
         description="سجل الوثائق الرسمي — التسجيل، الإصدار، الاعتماد، والمراجعات"
         actions={
           <div className="flex gap-3 text-sm">
-            <a href="/document-control" className="text-navy underline">
+            <Link href="/document-control" className="text-navy underline">
               الكل
-            </a>
-            <a href="/document-control?overdue=1" className="text-danger underline">
+            </Link>
+            <Link href="/document-control?overdue=1" className="text-danger underline">
               المتأخرة
-            </a>
-            <a href="/search" className="text-navy underline">
+            </Link>
+            <Link href="/search" className="text-navy underline">
               بحث متقدم
-            </a>
+            </Link>
           </div>
         }
       />

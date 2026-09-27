@@ -12,6 +12,7 @@ import type {
   WorkplaceLocation,
 } from "@/types/models";
 import { WORKPLACE_DIRECTORY_SAFE_COLUMNS } from "@/modules/attendance/geofence";
+import { ATTENDANCE_RECORD_LIST_COLUMNS } from "@/lib/query-projections";
 
 function fail(error: { message?: string } | null): never {
   throw new DatabaseError(error);
@@ -111,7 +112,7 @@ export class AttendanceRepository {
   ): Promise<AttendanceRecord[]> {
     let q = this.supabase
       .from("attendance_records")
-      .select("*")
+      .select(ATTENDANCE_RECORD_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
       .order("attendance_date", { ascending: false })
@@ -130,7 +131,7 @@ export class AttendanceRepository {
   ): Promise<AttendanceRecord[]> {
     let q = this.supabase
       .from("attendance_records")
-      .select("*")
+      .select(ATTENDANCE_RECORD_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("attendance_date", attendanceDate)
       .order("employee_id")
@@ -148,7 +149,7 @@ export class AttendanceRepository {
   ): Promise<AttendanceRecord[]> {
     const { data, error } = await this.supabase
       .from("attendance_records")
-      .select("*")
+      .select(ATTENDANCE_RECORD_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .gte("attendance_date", from)
       .lte("attendance_date", to)

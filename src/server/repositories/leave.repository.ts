@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DatabaseError } from "@/lib/errors";
 import type { EmployeeLeaveBalance, LeaveRequest, LeaveType } from "@/types/models";
+import { LEAVE_BALANCE_LIST_COLUMNS, LEAVE_REQUEST_LIST_COLUMNS } from "@/lib/query-projections";
 
 function fail(error: { message?: string } | null): never {
   throw new DatabaseError(error);
@@ -26,7 +27,7 @@ export class LeaveRepository {
   async listBalances(organizationId: string, employeeId: string, year?: number): Promise<EmployeeLeaveBalance[]> {
     let q = this.supabase
       .from("employee_leave_balances")
-      .select("*")
+      .select(LEAVE_BALANCE_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
       .order("year", { ascending: false });
@@ -51,7 +52,7 @@ export class LeaveRepository {
   async listRequestsForEmployee(organizationId: string, employeeId: string): Promise<LeaveRequest[]> {
     const { data, error } = await this.supabase
       .from("leave_requests")
-      .select("*")
+      .select(LEAVE_REQUEST_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
       .order("created_at", { ascending: false })
@@ -63,7 +64,7 @@ export class LeaveRepository {
   async listTeamPending(organizationId: string): Promise<LeaveRequest[]> {
     const { data, error } = await this.supabase
       .from("leave_requests")
-      .select("*")
+      .select(LEAVE_REQUEST_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("status", "submitted")
       .eq("approval_stage", "manager")
@@ -76,7 +77,7 @@ export class LeaveRepository {
   async listHrPending(organizationId: string): Promise<LeaveRequest[]> {
     const { data, error } = await this.supabase
       .from("leave_requests")
-      .select("*")
+      .select(LEAVE_REQUEST_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("status", "submitted")
       .eq("approval_stage", "hr")

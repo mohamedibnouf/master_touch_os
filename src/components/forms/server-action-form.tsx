@@ -7,7 +7,7 @@ import type { FormActionState } from "@/server/forms/form-state";
 function FormBusyNote() {
   const { pending } = useFormStatus();
   if (!pending) return null;
-  return <p className="text-sm text-muted">جاري التنفيذ… يرجى الانتظار.</p>;
+  return <p className="text-sm text-muted">جارٍ التنفيذ… يرجى الانتظار.</p>;
 }
 
 function FormError({ state }: { state: FormActionState }) {

@@ -6,9 +6,8 @@ import { Menu } from "lucide-react";
 import { signOutAction } from "@/modules/auth/actions";
 import { Button } from "@/components/ui/primitives";
 import type { AppNavFlags } from "./nav-flags";
-import type { HeaderNotice } from "./header-notifications";
-import { HeaderNotifications } from "./header-notifications";
 import { Sidebar } from "./sidebar";
+import { NavigationPendingBar } from "./navigation-pending";
 
 export function AppShellFrame({
   organizationNameAr,
@@ -16,8 +15,7 @@ export function AppShellFrame({
   userName,
   jobTitle,
   flags,
-  unreadCount,
-  notices,
+  notificationsSlot,
   children,
 }: {
   organizationNameAr: string;
@@ -25,8 +23,7 @@ export function AppShellFrame({
   userName: string;
   jobTitle: string;
   flags: AppNavFlags;
-  unreadCount: number;
-  notices: HeaderNotice[];
+  notificationsSlot: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -51,6 +48,7 @@ export function AppShellFrame({
 
   return (
     <div className="flex min-h-screen min-w-0 overflow-x-clip">
+      <NavigationPendingBar />
       {drawerOpen ? (
         <button
           type="button"
@@ -81,9 +79,7 @@ export function AppShellFrame({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {flags.notifications ? (
-              <HeaderNotifications unreadCount={unreadCount} items={notices} />
-            ) : null}
+            {flags.notifications ? notificationsSlot : null}
             <div className="hidden min-w-0 text-left text-sm sm:block">
               <p className="max-w-[10rem] truncate font-medium md:max-w-[14rem]">{userName}</p>
               <p className="max-w-[10rem] truncate text-xs text-muted md:max-w-[14rem]">{jobTitle}</p>

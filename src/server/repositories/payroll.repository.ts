@@ -32,7 +32,7 @@ export class PayrollRepository {
   async listPeriods(organizationId: string, limit = 36): Promise<PayrollPeriod[]> {
     const { data, error } = await this.supabase
       .from("payroll_periods")
-      .select("*")
+      .select("id, year, month, status, employee_count, total_gross, total_net")
       .eq("organization_id", organizationId)
       .order("year", { ascending: false })
       .order("month", { ascending: false })
