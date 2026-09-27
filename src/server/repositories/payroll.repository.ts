@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DatabaseError } from "@/lib/errors";
+import { PAYROLL_PERIOD_LIST_COLUMNS } from "@/lib/query-projections";
 import type {
   PayrollDeduction,
   PayrollEarning,
@@ -32,7 +33,7 @@ export class PayrollRepository {
   async listPeriods(organizationId: string, limit = 36): Promise<PayrollPeriod[]> {
     const { data, error } = await this.supabase
       .from("payroll_periods")
-      .select("id, year, month, status, employee_count, total_gross, total_net")
+      .select(PAYROLL_PERIOD_LIST_COLUMNS)
       .eq("organization_id", organizationId)
       .order("year", { ascending: false })
       .order("month", { ascending: false })

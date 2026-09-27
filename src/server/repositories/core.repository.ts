@@ -26,9 +26,10 @@ import {
   NOTIFICATION_HEADER_COLUMNS,
   NOTIFICATION_LIST_COLUMNS,
   PROJECT_LIST_COLUMNS,
-  PROJECT_MEMBER_COLUMNS,
   PROJECT_PICKER_COLUMNS,
+  PROJECT_MEMBER_COLUMNS,
   ROLE_LIST_COLUMNS,
+  APPROVAL_LIST_SELECT,
 } from "@/lib/query-projections";
 import { notificationEntityHref } from "@/lib/notifications/href";
 
@@ -314,7 +315,7 @@ export class CoreRepository {
   async listApprovals(organizationId: string) {
     const { data, error } = await this.supabase
       .from("approval_requests")
-      .select("id, title, status, due_at, entity_type, entity_id, approval_steps(id, sequence, status, user_id, due_at, decision)")
+      .select(APPROVAL_LIST_SELECT)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(50);

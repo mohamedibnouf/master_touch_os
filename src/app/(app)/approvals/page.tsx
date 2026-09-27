@@ -20,9 +20,9 @@ type ApprovalRow = {
     id: string;
     sequence: number;
     status: string;
-    user_id: string | null;
-    due_at: string | null;
-    decision: string | null;
+            user_id: string | null;
+            due_at: string | null;
+            decision?: string | null;
   }> | null;
 };
 

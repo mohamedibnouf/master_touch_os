@@ -43,3 +43,32 @@ export const AUDIT_FEED_COLUMNS = "id, action, entity_type, entity_id, created_a
 
 export const PROJECT_MEMBER_COLUMNS =
   "id, profile_id, role_label, is_active, assigned_at, unassigned_at, profiles(id, full_name_ar, full_name_en, is_active)" as const;
+
+/** Columns that exist on public.approval_steps in migration 007. Decision lives on approval_actions. */
+export const APPROVAL_STEPS_SCHEMA_COLUMNS = [
+  "id",
+  "organization_id",
+  "request_id",
+  "sequence",
+  "approver_type",
+  "role_id",
+  "department_id",
+  "user_id",
+  "delegated_to",
+  "status",
+  "due_at",
+  "warning_at",
+  "overdue_at",
+  "escalation_level",
+  "escalated_at",
+  "created_at",
+  "updated_at",
+] as const;
+
+export const APPROVAL_REQUEST_LIST_COLUMNS =
+  "id, title, status, due_at, entity_type, entity_id" as const;
+
+export const APPROVAL_STEP_LIST_COLUMNS = "id, sequence, status, user_id, due_at" as const;
+
+export const APPROVAL_LIST_SELECT =
+  `${APPROVAL_REQUEST_LIST_COLUMNS}, approval_steps(${APPROVAL_STEP_LIST_COLUMNS})` as const;
