@@ -8,7 +8,8 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { DatabaseError, ValidationError } from "@/lib/errors";
+import { DatabaseError, ValidationError, isAppError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/modules/attendance/schemas";
 import type { AttendanceRecord } from "@/types/models";
 import { canAddWorkplaceAssignment, geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
+import { workplaceUniqueViolationMessage } from "@/modules/attendance/workplace-write";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
   if (value == null || value === "") return fallback;
@@ -256,109 +258,127 @@ export async function assignEmployeeShiftAction(formData: FormData) {
   revalidatePath("/attendance");
 }
 
-export async function upsertWorkplaceLocationAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
-  const accRaw = String(formData.get("max_accuracy_meters") ?? "").trim();
-  const parsed = upsertWorkplaceLocationSchema.safeParse({
-    id: String(formData.get("id") ?? "").trim() || undefined,
-    name: formData.get("name"),
-    code: String(formData.get("code") ?? "").trim() || null,
-    address: String(formData.get("address") ?? "").trim() || null,
-    latitude: formData.get("latitude"),
-    longitude: formData.get("longitude"),
-    allowed_radius_meters: formData.get("allowed_radius_meters") || 150,
-    max_accuracy_meters: accRaw ? accRaw : null,
-    is_active: formBool(formData.get("is_active"), false),
-    is_primary: formBool(formData.get("is_primary"), false),
-    timezone: String(formData.get("timezone") ?? "").trim() || "Asia/Riyadh",
-  });
-  if (!parsed.success) {
-    throw new ValidationError("بيانات موقع العمل غير مكتملة.", "Workplace data is incomplete.");
+export type WorkplaceSaveState = { ok: boolean; message?: string } | null;
+
+function throwWorkplaceWriteError(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}): never {
+  const unique = workplaceUniqueViolationMessage(error);
+  if (unique) {
+    throw new ValidationError(unique.ar, unique.en);
   }
-  const supabase = await createServerSupabaseClient();
-  const row = {
-    organization_id: ctx.organization.id,
-    name: parsed.data.name,
-    code: parsed.data.code || null,
-    address: parsed.data.address,
-    latitude: parsed.data.latitude,
-    longitude: parsed.data.longitude,
-    allowed_radius_meters: parsed.data.allowed_radius_meters,
-    max_accuracy_meters: parsed.data.max_accuracy_meters ?? 100,
-    timezone: parsed.data.timezone || "Asia/Riyadh",
-    is_active: parsed.data.is_active,
-    is_primary: parsed.data.is_primary,
-    created_by: ctx.userId,
-  };
-  const audit = new AuditService(supabase);
-  const auditFields = {
-    name: row.name,
-    code: row.code,
-    address: row.address,
-    allowed_radius_meters: row.allowed_radius_meters,
-    max_accuracy_meters: row.max_accuracy_meters,
-    timezone: row.timezone,
-    is_active: row.is_active,
-    is_primary: row.is_primary,
-  };
-  if (parsed.data.id) {
-    const { data: previous } = await supabase
-      .from("workplace_locations")
-      .select("is_active")
-      .eq("id", parsed.data.id)
-      .eq("organization_id", ctx.organization.id)
-      .maybeSingle();
-    const { error } = await supabase
-      .from("workplace_locations")
-      .update(row)
-      .eq("id", parsed.data.id)
-      .eq("organization_id", ctx.organization.id);
-    if (error) {
-      if (error.code === "23505") {
-        throw new ValidationError(
-          "تعذر حفظ الموقع الأساسي: يجب أن يبقى موقع أساسي واحد فقط لكل منشأة.",
-          "Could not save primary workplace: only one primary is allowed per organization.",
-        );
-      }
-      throw new DatabaseError(error);
-    }
-    await audit.log({
-      organizationId: ctx.organization.id,
-      action: "workplace.updated",
-      entityType: "workplace_location",
-      entityId: parsed.data.id,
-      newValues: auditFields,
+  throw new DatabaseError(error);
+}
+
+export async function upsertWorkplaceLocationAction(
+  _prev: WorkplaceSaveState,
+  formData: FormData,
+): Promise<WorkplaceSaveState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+    const accRaw = String(formData.get("max_accuracy_meters") ?? "").trim();
+    const parsed = upsertWorkplaceLocationSchema.safeParse({
+      id: String(formData.get("id") ?? "").trim() || undefined,
+      name: formData.get("name"),
+      code: String(formData.get("code") ?? "").trim() || null,
+      address: String(formData.get("address") ?? "").trim() || null,
+      latitude: formData.get("latitude"),
+      longitude: formData.get("longitude"),
+      allowed_radius_meters: formData.get("allowed_radius_meters") || 150,
+      max_accuracy_meters: accRaw ? accRaw : null,
+      is_active: formBool(formData.get("is_active"), false),
+      is_primary: formBool(formData.get("is_primary"), false),
+      timezone: String(formData.get("timezone") ?? "").trim() || "Asia/Riyadh",
     });
-    if (previous && previous.is_active !== row.is_active) {
+    if (!parsed.success) {
+      throw new ValidationError("بيانات موقع العمل غير مكتملة.", "Workplace data is incomplete.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const row = {
+      organization_id: ctx.organization.id,
+      name: parsed.data.name,
+      code: parsed.data.code || null,
+      address: parsed.data.address,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      allowed_radius_meters: parsed.data.allowed_radius_meters,
+      max_accuracy_meters: parsed.data.max_accuracy_meters ?? 100,
+      timezone: parsed.data.timezone || "Asia/Riyadh",
+      is_active: parsed.data.is_active,
+      is_primary: parsed.data.is_primary,
+      created_by: ctx.userId,
+    };
+    const audit = new AuditService(supabase);
+    const auditFields = {
+      name: row.name,
+      code: row.code,
+      address: row.address,
+      allowed_radius_meters: row.allowed_radius_meters,
+      max_accuracy_meters: row.max_accuracy_meters,
+      timezone: row.timezone,
+      is_active: row.is_active,
+      is_primary: row.is_primary,
+    };
+    if (parsed.data.id) {
+      const { data: previous } = await supabase
+        .from("workplace_locations")
+        .select("is_active")
+        .eq("id", parsed.data.id)
+        .eq("organization_id", ctx.organization.id)
+        .maybeSingle();
+      const { error } = await supabase
+        .from("workplace_locations")
+        .update(row)
+        .eq("id", parsed.data.id)
+        .eq("organization_id", ctx.organization.id);
+      if (error) throwWorkplaceWriteError(error);
       await audit.log({
         organizationId: ctx.organization.id,
-        action: row.is_active ? "workplace.activated" : "workplace.deactivated",
+        action: "workplace.updated",
         entityType: "workplace_location",
         entityId: parsed.data.id,
-        newValues: { is_active: row.is_active, name: row.name },
+        newValues: auditFields,
+      });
+      if (previous && previous.is_active !== row.is_active) {
+        await audit.log({
+          organizationId: ctx.organization.id,
+          action: row.is_active ? "workplace.activated" : "workplace.deactivated",
+          entityType: "workplace_location",
+          entityId: parsed.data.id,
+          newValues: { is_active: row.is_active, name: row.name },
+        });
+      }
+    } else {
+      const { data, error } = await supabase.from("workplace_locations").insert(row).select("id").single();
+      if (error) throwWorkplaceWriteError(error);
+      if (!data?.id) throw new DatabaseError();
+      await audit.log({
+        organizationId: ctx.organization.id,
+        action: "workplace.created",
+        entityType: "workplace_location",
+        entityId: data.id,
+        newValues: auditFields,
       });
     }
-  } else {
-    const { data, error } = await supabase.from("workplace_locations").insert(row).select("id").single();
-    if (error) {
-      if (error.code === "23505") {
-        throw new ValidationError(
-          "تعذر حفظ الموقع الأساسي: يجب أن يبقى موقع أساسي واحد فقط لكل منشأة.",
-          "Could not save primary workplace: only one primary is allowed per organization.",
-        );
-      }
-      throw new DatabaseError(error);
+    revalidatePath("/hr/attendance/locations");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (err) {
+    if (isAppError(err) && (err.code === "VALIDATION" || err.code === "FORBIDDEN" || err.code === "UNAUTHORIZED")) {
+      return { ok: false, message: err.userMessageAr };
     }
-    await audit.log({
-      organizationId: ctx.organization.id,
-      action: "workplace.created",
-      entityType: "workplace_location",
-      entityId: data.id,
-      newValues: auditFields,
+    if (err instanceof DatabaseError) {
+      logger.error("workplace location save failed", { code: err.code, message: err.message });
+      return { ok: false, message: err.userMessageAr };
+    }
+    logger.error("workplace location save unexpected", {
+      message: err instanceof Error ? err.message : "unknown",
     });
+    return { ok: false, message: "تعذر حفظ الموقع. حاول مرة أخرى." };
   }
-  revalidatePath("/hr/attendance/locations");
-  revalidatePath("/attendance");
 }
 
 export async function assignEmployeeWorkplaceAction(formData: FormData) {

@@ -9,9 +9,9 @@ import {
   assignEmployeeWorkplaceAction,
   endEmployeeWorkplaceAssignmentAction,
   removeEmployeeWorkplaceAssignmentAction,
-  upsertWorkplaceLocationAction,
 } from "@/server/use-cases/attendance";
 import { FillCurrentLocationButton } from "@/components/attendance/fill-current-location-button";
+import { WorkplaceSaveForm } from "@/components/attendance/workplace-save-form";
 
 export default async function HrWorkplaceLocationsPage() {
   authorize(await getAuthContext(), "attendance.manage_locations");
@@ -55,7 +55,7 @@ export default async function HrWorkplaceLocationsPage() {
 
       <Card className="mb-6" data-testid="workplace-create-form">
         <h2 className="mb-4 font-semibold text-navy">إضافة موقع</h2>
-        <form action={upsertWorkplaceLocationAction} className="grid gap-3">
+        <WorkplaceSaveForm className="grid gap-3">
           <Field label="الاسم">
             <Input name="name" required maxLength={160} />
           </Field>
@@ -92,7 +92,7 @@ export default async function HrWorkplaceLocationsPage() {
             نشط
           </label>
           <Button type="submit">حفظ الموقع</Button>
-        </form>
+        </WorkplaceSaveForm>
       </Card>
 
       <Card className="mb-6 overflow-x-auto p-0">
@@ -120,7 +120,7 @@ export default async function HrWorkplaceLocationsPage() {
                   </p>
                 </td>
                 <td className="px-4 py-3">
-                  <form action={upsertWorkplaceLocationAction} className="grid gap-2 text-xs" data-testid={`workplace-edit-${p.id}`}>
+                  <WorkplaceSaveForm className="grid gap-2 text-xs" testId={`workplace-edit-${p.id}`}>
                     <input type="hidden" name="id" value={p.id} />
                     <Input name="name" defaultValue={p.name} required maxLength={160} />
                     <Input name="code" defaultValue={p.code ?? ""} maxLength={32} placeholder="الرمز" />
@@ -157,7 +157,7 @@ export default async function HrWorkplaceLocationsPage() {
                     <Button type="submit" variant="secondary" className="min-h-9 text-xs">
                       حفظ التعديل
                     </Button>
-                  </form>
+                  </WorkplaceSaveForm>
                 </td>
               </tr>
             ))}
