@@ -13,7 +13,10 @@ export default async function LoginPage({
       <div className="w-full max-w-md rounded-xl border border-line bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-8">
           <p className="text-xs font-semibold tracking-[0.2em] text-bronze">MASTER TOUCH</p>
-          <PageHeader title="تسجيل الدخول" description="نظام التشغيل الداخلي للشركة" />
+          <PageHeader
+            title="تسجيل الدخول"
+            description="ادخل الرقم الوظيفي وكلمة المرور. لا تحتاج إلى بريد إلكتروني."
+          />
         </div>
         {params.disabled ? (
           <p className="mb-4 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">

@@ -60,6 +60,20 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       url.searchParams.set("disabled", "1");
       return NextResponse.redirect(url);
     }
+
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("is_active")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+
+    if (employee && employee.is_active === false) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("disabled", "1");
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

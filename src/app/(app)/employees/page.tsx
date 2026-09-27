@@ -7,10 +7,11 @@ import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createEmployeeAction } from "@/server/use-cases/hr";
+import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
 import type { EmploymentStatus, EmploymentType } from "@/types/enums";
 
-type RoleRow = { id: string; name_ar: string; is_external?: boolean };
+type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 
 export default async function EmployeesPage() {
   const ctx = await getAuthContext();
@@ -45,6 +46,7 @@ export default async function EmployeesPage() {
   const roleRows = roles as RoleRow[];
   const canCreate = hasPermission(ctx, "employee.create") || hasPermission(ctx, "user.create");
   const canAssignRole = hasPermission(ctx, "role.assign");
+  const allowPrivilegedRoles = ctx.profile.is_platform_admin;
 
   return (
     <div data-testid="employees-page">
@@ -72,14 +74,23 @@ export default async function EmployeesPage() {
         <Card className="mb-6" data-testid="employee-create-card">
           <h2 className="mb-4 text-base font-semibold text-navy">توظيف موظف جديد</h2>
           <p className="mb-4 text-sm text-muted">
-            يتطلب صلاحية إنشاء موظف. تعيين الأدوار يتطلب صلاحية منفصلة.
+            يتطلب صلاحية إنشاء موظف. سجّل الدخول للموظف يتم بالرقم الوظيفي وكلمة المرور — ليس بالبريد.
+            تعيين الأدوار يتطلب صلاحية منفصلة.
           </p>
           <ServerActionForm action={createEmployeeAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="البريد">
-              <Input name="email" type="email" required data-testid="employee-create-email" />
+            <Field label="الرقم الوظيفي">
+              <Input name="employee_number" required data-testid="employee-create-number" />
             </Field>
-            <Field label="رقم الموظف">
-              <Input name="employee_number" data-testid="employee-create-number" />
+            <Field label="كلمة مرور الدخول (اختياري)">
+              <Input
+                name="initial_password"
+                type="password"
+                autoComplete="new-password"
+                data-testid="employee-create-password"
+              />
+            </Field>
+            <Field label="بريد داخلي اختياري — لا يُطلب من الموظف عند الدخول">
+              <Input name="email" type="email" data-testid="employee-create-email" />
             </Field>
             <Field label="الاسم بالعربية">
               <Input name="full_name_ar" required data-testid="employee-create-name-ar" />
@@ -115,7 +126,13 @@ export default async function EmployeesPage() {
                 <Select name="role_id" defaultValue="" data-testid="employee-create-role">
                   <option value="">بدون</option>
                   {roleRows
-                    .filter((role) => !role.is_external)
+                    .filter((role) =>
+                      isOperationalAssignableRole({
+                        code: role.code,
+                        is_external: role.is_external,
+                        allowPrivileged: allowPrivilegedRoles,
+                      }),
+                    )
                     .map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.name_ar}

@@ -5,9 +5,10 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignRoleAction, setUserActiveAction } from "@/server/use-cases/platform";
+import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 
-type RoleRow = { id: string; name_ar: string; is_external?: boolean };
+type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 type MemberRow = {
   profile_id: string;
   status: string;
@@ -108,7 +109,13 @@ export default async function SettingsPage() {
                                 اختر
                               </option>
                               {roleRows
-                                .filter((role) => !role.is_external)
+                                .filter((role) =>
+                                  isOperationalAssignableRole({
+                                    code: role.code,
+                                    is_external: role.is_external,
+                                    allowPrivileged: ctx.profile.is_platform_admin,
+                                  }),
+                                )
                                 .map((role) => (
                                   <option key={role.id} value={role.id}>
                                     {role.name_ar}

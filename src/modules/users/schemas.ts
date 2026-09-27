@@ -18,7 +18,16 @@ export const createUserSchema = z.object({
   joining_date: z.string().optional().or(z.literal("")),
 });
 
-export const createEmployeeSchema = createUserSchema;
+export const createEmployeeSchema = createUserSchema.extend({
+  employee_number: z.string().trim().min(1).max(64),
+  email: z.union([z.literal(""), z.string().email()]).optional(),
+  initial_password: z.union([z.literal(""), z.string().min(8).max(128)]).optional(),
+});
+
+export const provisionEmployeeLoginSchema = z.object({
+  employeeId: z.string().uuid(),
+  password: z.string().min(8).max(128),
+});
 
 export const updateEmployeeEmploymentSchema = z.object({
   employeeId: z.string().uuid(),

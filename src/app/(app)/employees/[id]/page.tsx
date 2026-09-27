@@ -14,6 +14,7 @@ import {
   createEmployeeContractAction,
   deactivateEmployeeBankAction,
   setEmployeeActiveAction,
+  provisionEmployeeLoginAction,
   updateEmployeeEmploymentAction,
   uploadEmployeeDocumentAction,
   upsertEmployeeBankAction,
@@ -37,6 +38,9 @@ import {
   maskIban,
   visibilityScopeLabel,
 } from "@/lib/hr/labels";
+import { readEmployeeLoginUiStatus } from "@/server/hr/employee-login-status";
+import { readEmployeeSetupRows } from "@/server/hr/employee-setup-status";
+import { EMPLOYEE_LOGIN_STATUS_LABEL_AR } from "@/lib/auth/employee-login";
 import type { EmployeeGender, EmploymentStatus, EmploymentType } from "@/types/enums";
 
 export default async function EmployeeDetailPage({
@@ -118,6 +122,7 @@ export default async function EmployeeDetailPage({
     compensationVersions,
     employeeDocs,
     bankAccounts,
+    loginStatus,
   ] = await Promise.all([
     repo.listDepartments(ctx.organization.id),
     repo.listEmployeeProjects(ctx.organization.id, employee.profile_id),
@@ -129,6 +134,15 @@ export default async function EmployeeDetailPage({
       : Promise.resolve([]),
     canDocuments ? repo.listEmployeeDocuments(ctx.organization.id, id) : Promise.resolve([]),
     canBanking ? repo.listEmployeeBankAccounts(ctx.organization.id, id) : Promise.resolve([]),
+    canManage || hasPermission(ctx, "employee.read") || hasPermission(ctx, "employee.create")
+      ? readEmployeeLoginUiStatus({
+          organizationId: ctx.organization.id,
+          employeeId: employee.id,
+          profileId: employee.profile_id,
+          employeeActive: employee.is_active,
+          employeeNumber: employee.employee_number,
+        })
+      : Promise.resolve(null),
   ]);
 
   const profile = Array.isArray(employee.profiles) ? employee.profiles[0] : employee.profiles;
@@ -139,6 +153,21 @@ export default async function EmployeeDetailPage({
 
   const currentCompensation = compensationVersions.find((v) => v.status === "active" && !v.effective_to);
   const currentContract = contracts.find((c) => c.is_current);
+
+  const canSeeSetup =
+    canManage || hasPermission(ctx, "employee.read") || hasPermission(ctx, "employee.create");
+  const setupRows = canSeeSetup
+    ? await readEmployeeSetupRows({
+        organizationId: ctx.organization.id,
+        employeeId: employee.id,
+        profileId: employee.profile_id,
+        employeeNumber: employee.employee_number,
+        hasProfileName: Boolean((profile as { full_name_ar?: string } | null)?.full_name_ar),
+        hasDepartment: deptLinks.length > 0,
+        loginStatus,
+        hasCompensation: compensationVersions.some((v) => v.status === "active"),
+      })
+    : [];
 
   const tabs = [
     { id: "overview", label: "نظرة عامة" },
@@ -174,6 +203,14 @@ export default async function EmployeeDetailPage({
         <Badge tone={employee.is_active ? "success" : "danger"}>
           {employee.is_active ? "نشط" : "موقوف"}
         </Badge>
+        {loginStatus ? (
+          <Badge
+            tone={loginStatus === "ready" ? "success" : loginStatus === "disabled" ? "danger" : "warning"}
+            data-testid="employee-login-status"
+          >
+            حالة حساب الدخول: {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
+          </Badge>
+        ) : null}
         <Badge tone="neutral">{EMPLOYMENT_STATUS_LABELS[status]?.ar ?? status}</Badge>
         {currentContract ? (
           <Badge tone="navy" data-testid="active-contract-badge">
@@ -181,6 +218,26 @@ export default async function EmployeeDetailPage({
           </Badge>
         ) : null}
       </div>
+
+      {setupRows.length > 0 ? (
+        <Card className="mb-6" data-testid="employee-setup-checklist">
+          <h2 className="mb-3 font-semibold text-navy">إعداد الموظف</h2>
+          <ul className="grid gap-2 text-sm sm:grid-cols-2">
+            {setupRows.map((row) => (
+              <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line pb-1">
+                <span>{row.label}</span>
+                {row.href ? (
+                  <Link href={row.href} className="text-navy underline" data-testid={`setup-${row.key}`}>
+                    {row.statusLabel}
+                  </Link>
+                ) : (
+                  <span data-testid={`setup-${row.key}`}>{row.statusLabel}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <div
         className="mb-6 flex gap-2 overflow-x-auto overscroll-x-contain border-b border-line pb-3 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -202,6 +259,40 @@ export default async function EmployeeDetailPage({
 
       {tab === "overview" ? (
         <div className="grid gap-6 lg:grid-cols-2">
+          {canManage && loginStatus ? (
+            <Card data-testid="employee-login-card" className="lg:col-span-2">
+              <h2 className="mb-2 font-semibold text-navy">حالة حساب الدخول</h2>
+              <p className="mb-3 text-sm text-muted">
+                يسجّل الموظف دخوله بالرقم الوظيفي وكلمة المرور فقط. لا تُعرض كلمة المرور هنا.
+              </p>
+              <p className="mb-4 text-sm">
+                الحالة:{" "}
+                <span data-testid="employee-login-status-text">
+                  {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
+                </span>
+              </p>
+              {employee.is_active && employee.employee_number ? (
+                <ServerActionForm action={provisionEmployeeLoginAction} className="grid max-w-md gap-3">
+                  <input type="hidden" name="employeeId" value={employee.id} />
+                  <Field label="كلمة مرور الدخول">
+                    <Input
+                      name="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      data-testid="employee-login-password"
+                    />
+                  </Field>
+                  <Button type="submit" data-testid="employee-login-provision">
+                    تفعيل حساب الدخول
+                  </Button>
+                </ServerActionForm>
+              ) : (
+                <p className="text-sm text-muted">فعّل الموظف وعيّن رقماً وظيفياً قبل تفعيل الدخول.</p>
+              )}
+            </Card>
+          ) : null}
           <Card data-testid="employee-overview-card">
             <h2 className="mb-3 font-semibold text-navy">البيانات الأساسية</h2>
             <dl className="grid gap-2 text-sm">

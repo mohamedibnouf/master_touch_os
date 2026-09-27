@@ -21,6 +21,7 @@ import {
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
+import { isPrivilegedRoleCode } from "@/lib/hr/roles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -576,6 +577,12 @@ export async function assignRoleAction(
     throw new ValidationError(
       "لا يمكن منح الأدوار الخارجية صلاحية داخلية.",
       "External roles cannot be granted internal access.",
+    );
+  }
+  if (isPrivilegedRoleCode(role?.code) && !ctx.profile.is_platform_admin) {
+    throw new ValidationError(
+      "لا يمكن منح هذا الدور من مسار الموارد البشرية.",
+      "That role cannot be assigned from the HR path.",
     );
   }
 

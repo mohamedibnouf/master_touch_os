@@ -3,6 +3,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -13,6 +14,8 @@ import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
+import { generateInternalAuthEmail } from "@/lib/auth/employee-login";
+import { isPrivilegedRoleCode } from "@/lib/hr/roles";
 import {
   activateEmployeeContractSchema,
   assignDepartmentSchema,
@@ -20,6 +23,7 @@ import {
   createEmployeeContractSchema,
   createEmployeeSchema,
   deactivateEmployeeBankSchema,
+  provisionEmployeeLoginSchema,
   setEmployeeActiveSchema,
   updateEmployeeEmploymentSchema,
   updateEmployeeProfileSchema,
@@ -66,18 +70,19 @@ export async function createEmployeeAction(
   if (!canCreate) throw new ForbiddenError({ permission: "employee.create" });
 
   const parsed = createEmployeeSchema.safeParse({
-    email: formData.get("email"),
+    email: formData.get("email") || undefined,
     full_name_ar: formData.get("full_name_ar"),
     full_name_en: formData.get("full_name_en"),
     job_title_ar: formData.get("job_title_ar") || undefined,
     job_title_en: formData.get("job_title_en") || undefined,
     department_id: formData.get("department_id") || undefined,
     role_id: formData.get("role_id") || undefined,
-    employee_number: formData.get("employee_number") || undefined,
+    employee_number: formData.get("employee_number"),
     employment_type: formData.get("employment_type") || undefined,
     nationality: formData.get("nationality") || undefined,
     work_location: formData.get("work_location") || undefined,
     joining_date: formData.get("joining_date") || undefined,
+    initial_password: formData.get("initial_password") || undefined,
   });
   if (!parsed.success) {
     throw new ValidationError("بيانات الموظف غير مكتملة.", "Employee data is incomplete.");
@@ -88,14 +93,36 @@ export async function createEmployeeAction(
   }
 
   const admin = createAdminSupabaseClient();
+  if (parsed.data.role_id) {
+    const { data: roleRow } = await admin
+      .from("roles")
+      .select("code, is_external")
+      .eq("id", parsed.data.role_id)
+      .maybeSingle<{ code: string; is_external: boolean }>();
+    if (roleRow?.is_external) {
+      throw new ValidationError("لا يمكن منح الأدوار الخارجية صلاحية داخلية.", "External roles cannot be granted internal access.");
+    }
+    if (isPrivilegedRoleCode(roleRow?.code) && !ctx.profile.is_platform_admin) {
+      throw new ValidationError("لا يمكن منح هذا الدور من مسار الموارد البشرية.", "That role cannot be assigned from the HR path.");
+    }
+  }
+
+  const employeeNumber = parsed.data.employee_number.trim();
+  const authEmail =
+    emptyToNull(parsed.data.email) ?? generateInternalAuthEmail(ctx.organization.id, employeeNumber);
+  const initialPassword = emptyToNull(parsed.data.initial_password);
+  const loginProvisioned = Boolean(initialPassword);
+
   const { data: created, error } = await admin.auth.admin.createUser({
-    email: parsed.data.email,
+    email: authEmail,
     email_confirm: true,
-    password: crypto.randomUUID() + "A1!",
+    password: initialPassword ?? crypto.randomUUID() + "A1!",
     user_metadata: {
       full_name_ar: parsed.data.full_name_ar,
       full_name_en: parsed.data.full_name_en,
       locale: "ar",
+      employee_number: employeeNumber,
+      login_provisioned: loginProvisioned,
     },
   });
   if (error || !created.user) throw new DatabaseError(error);
@@ -111,7 +138,7 @@ export async function createEmployeeAction(
     .insert({
       organization_id: ctx.organization.id,
       profile_id: created.user.id,
-      employee_number: emptyToNull(parsed.data.employee_number),
+      employee_number: employeeNumber,
       job_title_ar: parsed.data.job_title_ar ?? null,
       job_title_en: parsed.data.job_title_en ?? null,
       employment_type: emptyToNull(parsed.data.employment_type),
@@ -150,7 +177,7 @@ export async function createEmployeeAction(
     action: "employee.created",
     entityType: "employee",
     entityId: employee?.id ?? created.user.id,
-    newValues: { email: parsed.data.email },
+    newValues: { employee_number: employeeNumber },
   });
   await new EventService(supabase).publish({
     type: "employee.created",
@@ -158,7 +185,7 @@ export async function createEmployeeAction(
     actorId: ctx.userId,
     entityType: "employee",
     entityId: employee?.id ?? created.user.id,
-    payload: { email: parsed.data.email },
+    payload: { employee_number: employeeNumber },
     correlationId: generateCorrelationId(),
     occurredAt: new Date().toISOString(),
   });
@@ -172,7 +199,10 @@ export async function createEmployeeAction(
   }
 
   revalidatePath("/employees");
-  if (employee?.id) revalidatePath(`/employees/${employee.id}`);
+  if (employee?.id) {
+    revalidatePath(`/employees/${employee.id}`);
+    redirect(`/employees/${employee.id}`);
+  }
   });
 }
 
@@ -525,6 +555,66 @@ export async function setEmployeeActiveAction(
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${emp.id}`);
+  });
+}
+
+export async function provisionEmployeeLoginAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تفعيل حساب الدخول. حاول مرة أخرى.", async () => {
+    const ctx = await getAuthContext();
+    if (!ctx) throw new ForbiddenError();
+    const can =
+      hasPermission(ctx, "employee.manage") || hasPermission(ctx, "employee.create");
+    if (!can) throw new ForbiddenError({ permission: "employee.manage" });
+
+    const parsed = provisionEmployeeLoginSchema.safeParse({
+      employeeId: formData.get("employeeId"),
+      password: formData.get("password"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("كلمة المرور يجب ألا تقل عن 8 أحرف.", "Password must be at least 8 characters.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: emp, error: empErr } = await supabase
+      .from("employees")
+      .select("id, profile_id, employee_number, is_active")
+      .eq("id", parsed.data.employeeId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle();
+    if (empErr) throw new DatabaseError(empErr);
+    if (!emp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
+    if (!emp.is_active) {
+      throw new ValidationError("لا يمكن تفعيل الدخول لموظف موقوف.", "Cannot provision login for an inactive employee.");
+    }
+    if (!emp.employee_number) {
+      throw new ValidationError("أضف الرقم الوظيفي أولاً.", "Set an employee number first.");
+    }
+
+    const admin = createAdminSupabaseClient();
+    const { data: userData, error: getErr } = await admin.auth.admin.getUserById(emp.profile_id);
+    if (getErr || !userData.user) throw new DatabaseError(getErr);
+
+    const { error: updErr } = await admin.auth.admin.updateUserById(emp.profile_id, {
+      password: parsed.data.password,
+      user_metadata: {
+        ...(userData.user.user_metadata ?? {}),
+        employee_number: emp.employee_number,
+        login_provisioned: true,
+      },
+    });
+    if (updErr) throw new DatabaseError(updErr);
+
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "employee.login_provisioned",
+      entityType: "employee",
+      entityId: emp.id,
+    });
+
+    revalidatePath(`/employees/${emp.id}`);
   });
 }
 

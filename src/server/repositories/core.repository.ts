@@ -69,6 +69,7 @@ export class CoreRepository {
       .from("employees")
       .select("id, profile_id, employee_number, profiles(full_name_ar)")
       .eq("organization_id", organizationId)
+      .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) fail(error);

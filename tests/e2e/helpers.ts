@@ -379,7 +379,7 @@ export async function signInViaUI(page: Page, email: string, password: string, e
   }
 
   await page.waitForSelector('form button[type="submit"]', { state: "visible" });
-  await page.locator('[name="email"]').fill(email);
+  await page.locator('[name="identifier"]').fill(email);
   await page.locator('[name="password"]').fill(password);
 
   const submit = page.locator('form button[type="submit"]');
