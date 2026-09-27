@@ -30,11 +30,11 @@ export default async function HrWorkplaceLocationsPage() {
     );
   }
   const core = new CoreRepository(supabase);
-  const [places, employees, assignments] = await Promise.all([
+  const [places, assignments] = await Promise.all([
     repo.listWorkplaces(ctx.organization.id),
-    core.listEmployees(ctx.organization.id),
     repo.listWorkplaceAssignments(ctx.organization.id),
   ]);
+  const employees = await core.listEmployeeNameOptions(ctx.organization.id);
   const nameByWorkplace = new Map(places.map((p) => [p.id, p.name]));
   const nameByEmployee = new Map(
     employees.map((e) => [e.id, e.profiles?.full_name_ar || e.employee_number || e.id]),

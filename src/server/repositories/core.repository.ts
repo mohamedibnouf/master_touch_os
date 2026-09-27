@@ -48,6 +48,24 @@ export class CoreRepository {
     return (data ?? []) as unknown as Array<Employee & { profiles: Profile | null }>;
   }
 
+  /** Name picker only — avoids the heavy directory embed that can hit statement timeout (57014). */
+  async listEmployeeNameOptions(
+    organizationId: string,
+  ): Promise<Array<{ id: string; employee_number: string | null; profiles: { full_name_ar: string | null } | null }>> {
+    const { data, error } = await this.supabase
+      .from("employees")
+      .select("id, employee_number, profiles(full_name_ar)")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) fail(error);
+    return (data ?? []) as unknown as Array<{
+      id: string;
+      employee_number: string | null;
+      profiles: { full_name_ar: string | null } | null;
+    }>;
+  }
+
   async getEmployeeDirectoryRow(organizationId: string, employeeId: string) {
     const { data, error } = await this.supabase
       .from("employees")
