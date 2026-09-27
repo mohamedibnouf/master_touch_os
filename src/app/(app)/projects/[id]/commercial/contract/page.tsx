@@ -8,6 +8,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   activateProjectContractAction,
   createProjectContractAction,
@@ -129,20 +130,20 @@ export default async function ProjectContractPage({ params }: { params: Promise<
               <p className="mb-4 text-sm text-muted">
                 بعد التفعيل لا يمكن تعديل قيمة العقد الأصلية — استخدم أوامر التغيير للزيادات.
               </p>
-              <form action={activateProjectContractAction} data-testid="contract-activate-form">
+              <ServerActionForm action={activateProjectContractAction} data-testid="contract-activate-form">
                 <input type="hidden" name="contractId" value={contract.id} />
                 <input type="hidden" name="projectId" value={projectId} />
                 <Button type="submit" data-testid="contract-activate-submit">
                   تفعيل العقد ✓
                 </Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </>
       ) : canManage ? (
         <Card>
           <h2 className="mb-4 font-semibold text-navy">إنشاء عقد جديد</h2>
-          <form action={createProjectContractAction} className="grid gap-4" data-testid="contract-create-form">
+          <ServerActionForm action={createProjectContractAction} className="grid gap-4" data-testid="contract-create-form">
             <input type="hidden" name="projectId" value={projectId} />
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="اسم العميل">
@@ -193,7 +194,7 @@ export default async function ProjectContractPage({ params }: { params: Promise<
                 حفظ العقد
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : (
         <Card>

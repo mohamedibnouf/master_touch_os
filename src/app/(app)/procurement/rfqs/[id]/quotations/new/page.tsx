@@ -4,6 +4,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createQuotationAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewQuotationPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = authorize(await getAuthContext(), "quotation.create");
@@ -31,9 +32,10 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
     })
     .filter(Boolean);
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createQuotationAction(formData);
+    const state = await createQuotationAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect(`/procurement/rfqs/${rfqId}`);
   }
 
@@ -44,7 +46,7 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
         description={rfq.title}
       />
       <Card>
-        <form action={action} className="grid gap-5" data-testid="quotation-create-form">
+        <ServerActionForm action={action} className="grid gap-5" data-testid="quotation-create-form">
           <input type="hidden" name="rfqId" value={rfq.id} />
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -167,7 +169,7 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
             </a>
             <Button type="submit" data-testid="quotation-submit">حفظ عرض السعر</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

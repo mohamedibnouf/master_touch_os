@@ -1,5 +1,6 @@
 import { Field, Input, Button } from "@/components/ui/primitives";
 import { attachEntityDocumentAction } from "@/server/use-cases/commercial";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 type Props = {
   entityType: string;
@@ -19,7 +20,7 @@ export function EntityAttachmentForm({
   testId = "entity-attachment-form",
 }: Props) {
   return (
-    <form
+    <ServerActionForm
       action={attachEntityDocumentAction}
       className="flex flex-wrap items-end gap-3"
       data-testid={testId}
@@ -34,6 +35,6 @@ export function EntityAttachmentForm({
       <Button type="submit" data-testid="attachment-submit">
         رفع
       </Button>
-    </form>
+    </ServerActionForm>
   );
 }

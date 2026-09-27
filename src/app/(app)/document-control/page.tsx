@@ -13,6 +13,7 @@ import {
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   applyDocumentDecisionAction,
   createTransmittalAction,
@@ -166,7 +167,7 @@ export default async function DocumentControlPage({
       {canCreateTrn && defaultProject ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء إرسالية مستندات (Transmittal)</h2>
-          <form action={createTransmittalAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createTransmittalAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects ?? []).map((p) => (
@@ -203,7 +204,7 @@ export default async function DocumentControlPage({
               <Input name="description" />
             </Field>
             <Button type="submit">إنشاء مسودة إرسالية</Button>
-          </form>
+          </ServerActionForm>
           {attachableDocs.length > 0 ? (
             <p className="mt-2 text-xs text-muted">
               وثائق حديثة:{" "}
@@ -231,12 +232,12 @@ export default async function DocumentControlPage({
                 <div className="flex items-center gap-2">
                   <Badge tone={t.status === "issued" ? "success" : "navy"}>{t.status}</Badge>
                   {t.status === "draft" && canIssueTrn ? (
-                    <form action={issueTransmittalAction}>
+                    <ServerActionForm action={issueTransmittalAction}>
                       <input type="hidden" name="transmittalId" value={t.id} />
                       <Button type="submit" variant="secondary">
                         إصدار (تجميد المحتوى)
                       </Button>
-                    </form>
+                    </ServerActionForm>
                   ) : null}
                 </div>
               </li>
@@ -289,7 +290,7 @@ export default async function DocumentControlPage({
                 {(canApprove || canRevise) && (
                   <div className="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-2">
                     {canApprove ? (
-                      <form action={applyDocumentDecisionAction} className="space-y-2">
+                      <ServerActionForm action={applyDocumentDecisionAction} className="space-y-2">
                         <input type="hidden" name="documentId" value={doc.id} />
                         <Field label="قرار الاعتماد A–E">
                           <Select name="officialCode" defaultValue="A">
@@ -304,10 +305,10 @@ export default async function DocumentControlPage({
                           <Textarea name="comments" placeholder="مطلوب عند الرفض D" />
                         </Field>
                         <Button type="submit">تسجيل القرار</Button>
-                      </form>
+                      </ServerActionForm>
                     ) : null}
                     {canRevise && (doc.official_decision === "C" || doc.official_decision === "D") ? (
-                      <form action={reviseDocumentAction} className="space-y-2">
+                      <ServerActionForm action={reviseDocumentAction} className="space-y-2">
                         <input type="hidden" name="documentId" value={doc.id} />
                         <Field label="وصف التغيير للمراجعة التالية">
                           <Textarea name="changeDescription" />
@@ -315,7 +316,7 @@ export default async function DocumentControlPage({
                         <Button type="submit" variant="secondary">
                           إنشاء مراجعة جديدة
                         </Button>
-                      </form>
+                      </ServerActionForm>
                     ) : null}
                   </div>
                 )}

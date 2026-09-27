@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CHANNELS } from "@/modules/notifications/catalog";
 import { saveNotificationPreferenceAction } from "@/server/use-cases/notification-preferences";
 import { PushOptInButton } from "@/components/notifications/push-opt-in";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NotificationPreferencesPage() {
   const ctx = await getAuthContext();
@@ -53,14 +54,14 @@ export default async function NotificationPreferencesPage() {
                     const enabled = prefs.get(`${category}:${channel}`) ?? (channel === "in_app" || (channel === "email" && (category === "APPROVALS" || category === "WORK")));
                     return (
                       <td key={channel} className="px-2 py-3">
-                        <form action={saveNotificationPreferenceAction}>
+                        <ServerActionForm action={saveNotificationPreferenceAction}>
                           <input type="hidden" name="category" value={category} />
                           <input type="hidden" name="channel" value={channel} />
                           <input type="hidden" name="enabled" value={enabled ? "false" : "true"} />
                           <Button type="submit" variant={enabled ? "primary" : "secondary"} className="min-h-9 px-2 text-xs">
                             {enabled ? "تشغيل" : "إيقاف"}
                           </Button>
-                        </form>
+                        </ServerActionForm>
                       </td>
                     );
                   })}

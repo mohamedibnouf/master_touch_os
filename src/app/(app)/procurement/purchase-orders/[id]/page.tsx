@@ -12,6 +12,7 @@ import {
   issuePurchaseOrderAction,
 } from "@/server/use-cases/procurement";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function PurchaseOrderDetailPage({
   params,
@@ -203,7 +204,7 @@ export default async function PurchaseOrderDetailPage({
       {canSubmitApproval ? (
         <Card className="mb-6">
           <h2 className="mb-3 font-semibold text-navy">تقديم للاعتماد</h2>
-          <form action={submitPurchaseOrderForApprovalAction} className="flex flex-wrap gap-3">
+          <ServerActionForm action={submitPurchaseOrderForApprovalAction} className="flex flex-wrap gap-3">
             <input type="hidden" name="poId" value={po.id} />
             <select name="approverProfileId" required className="h-10 rounded-md border px-3 text-sm">
               <option value="">اختر المعتمد</option>
@@ -219,7 +220,7 @@ export default async function PurchaseOrderDetailPage({
               })}
             </select>
             <Button type="submit">تقديم للاعتماد</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -228,18 +229,18 @@ export default async function PurchaseOrderDetailPage({
         <Card className="mb-6">
           <h2 className="mb-3 font-semibold text-navy">قرار اعتماد أمر الشراء</h2>
           <div className="flex gap-3">
-            <form action={decideEntityApprovalAction}>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="A" />
               <Button type="submit">اعتماد ✓</Button>
-            </form>
-            <form action={decideEntityApprovalAction}>
+            </ServerActionForm>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="D" />
               <Button type="submit" variant="danger">رفض</Button>
-            </form>
+            </ServerActionForm>
           </div>
         </Card>
       ) : null}
@@ -249,10 +250,10 @@ export default async function PurchaseOrderDetailPage({
         <Card className="mb-6" data-testid="po-issue-card">
           <h2 className="mb-3 font-semibold text-navy">إصدار أمر الشراء</h2>
           <p className="mb-3 text-sm text-muted">بعد الإصدار، تُقفل البيانات التجارية بشكل نهائي.</p>
-          <form action={issuePurchaseOrderAction} data-testid="po-issue-form">
+          <ServerActionForm action={issuePurchaseOrderAction} data-testid="po-issue-form">
             <input type="hidden" name="poId" value={po.id} />
             <Button type="submit" data-testid="po-issue-submit">إصدار PO</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

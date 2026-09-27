@@ -5,6 +5,7 @@ import { authorize, hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { adjustLeaveBalanceAction } from "@/server/use-cases/leave";
 
 export default async function HrLeaveBalancesPage() {
@@ -20,11 +21,9 @@ export default async function HrLeaveBalancesPage() {
   const supabase = await createServerSupabaseClient();
   const leaveRepo = new LeaveRepository(supabase);
   const core = new CoreRepository(supabase);
-  const [balances, types, employees] = await Promise.all([
-    leaveRepo.listOrgBalances(ctx.organization.id, year),
-    leaveRepo.listLeaveTypes(ctx.organization.id, true),
-    core.listEmployees(ctx.organization.id),
-  ]);
+  const balances = await leaveRepo.listOrgBalances(ctx.organization.id, year);
+  const types = await leaveRepo.listLeaveTypes(ctx.organization.id, true);
+  const employees = await core.listEmployeeNameOptions(ctx.organization.id);
 
   const typeMap = new Map(types.map((t) => [t.id, t.name_ar]));
   const empMap = new Map(
@@ -38,7 +37,7 @@ export default async function HrLeaveBalancesPage() {
       {canAdjust ? (
         <Card className="mb-6" data-testid="leave-balance-adjust">
           <h2 className="mb-4 font-semibold text-navy">تعديل رصيد</h2>
-          <form action={adjustLeaveBalanceAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={adjustLeaveBalanceAction} className="grid gap-3 md:grid-cols-2">
             <Field label="الموظف">
               <Select name="employeeId" required>
                 <option value="">اختر</option>
@@ -70,7 +69,7 @@ export default async function HrLeaveBalancesPage() {
             <div className="md:col-span-2">
               <Button type="submit">حفظ التعديل</Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
@@ -12,6 +12,7 @@ import {
 } from "@/server/use-cases/attendance";
 import { FillCurrentLocationButton } from "@/components/attendance/fill-current-location-button";
 import { WorkplaceSaveForm } from "@/components/attendance/workplace-save-form";
+import { WorkplaceActionForm } from "@/components/attendance/workplace-action-form";
 
 export default async function HrWorkplaceLocationsPage() {
   authorize(await getAuthContext(), "attendance.manage_locations");
@@ -95,8 +96,9 @@ export default async function HrWorkplaceLocationsPage() {
         </WorkplaceSaveForm>
       </Card>
 
-      <Card className="mb-6 overflow-x-auto p-0">
+      <Card className="mb-6 p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">المواقع — تعديل / تفعيل / إيقاف</div>
+        <TableScroll>
         <table className="w-full min-w-[880px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
@@ -105,7 +107,14 @@ export default async function HrWorkplaceLocationsPage() {
             </tr>
           </thead>
           <tbody>
-            {places.map((p) => (
+            {places.length === 0 ? (
+              <tr>
+                <td className="px-4 py-4 text-muted" colSpan={2}>
+                  لا توجد مواقع بعد.
+                </td>
+              </tr>
+            ) : (
+            places.map((p) => (
               <tr key={p.id} className="border-t border-line align-top">
                 <td className="px-4 py-3">
                   <p className="font-medium text-navy">
@@ -160,15 +169,17 @@ export default async function HrWorkplaceLocationsPage() {
                   </WorkplaceSaveForm>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
+        </TableScroll>
       </Card>
 
       <Card className="mb-6" data-testid="workplace-assign-form">
         <h2 className="mb-4 font-semibold text-navy">تعيين موقع لموظف</h2>
         <p className="mb-3 text-xs text-muted">يمكن تعيين مواقع متعددة في نفس الفترة ما دامت المواقع مختلفة.</p>
-        <form action={assignEmployeeWorkplaceAction} className="grid gap-3">
+        <WorkplaceActionForm action={assignEmployeeWorkplaceAction} className="grid gap-3">
           <Field label="الموظف">
             <Select name="employeeId" required>
               <option value="">اختر</option>
@@ -196,11 +207,12 @@ export default async function HrWorkplaceLocationsPage() {
             <Input type="date" name="effectiveTo" />
           </Field>
           <Button type="submit">إضافة تعيين</Button>
-        </form>
+        </WorkplaceActionForm>
       </Card>
 
-      <Card className="overflow-x-auto p-0" data-testid="workplace-assignment-list">
+      <Card className="mb-6 p-0" data-testid="workplace-assignment-list">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">تعيينات الموظفين</div>
+        <TableScroll>
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
@@ -233,21 +245,21 @@ export default async function HrWorkplaceLocationsPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-2">
                         {status === "سارٍ" ? (
-                          <form action={endEmployeeWorkplaceAssignmentAction}>
+                          <WorkplaceActionForm action={endEmployeeWorkplaceAssignmentAction}>
                             <input type="hidden" name="assignmentId" value={a.id} />
                             <input type="hidden" name="effectiveTo" value={today} />
                             <Button type="submit" variant="secondary" className="min-h-8 text-xs">
                               إنهاء التعيين
                             </Button>
-                          </form>
+                          </WorkplaceActionForm>
                         ) : null}
                         {canRemove ? (
-                          <form action={removeEmployeeWorkplaceAssignmentAction}>
+                          <WorkplaceActionForm action={removeEmployeeWorkplaceAssignmentAction}>
                             <input type="hidden" name="assignmentId" value={a.id} />
                             <Button type="submit" variant="secondary" className="min-h-8 text-xs">
                               حذف التعيين
                             </Button>
-                          </form>
+                          </WorkplaceActionForm>
                         ) : null}
                       </div>
                     </td>
@@ -257,6 +269,7 @@ export default async function HrWorkplaceLocationsPage() {
             )}
           </tbody>
         </table>
+        </TableScroll>
       </Card>
     </div>
   );

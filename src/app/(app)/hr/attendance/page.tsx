@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { formatEvidenceCoordinates } from "@/modules/attendance/geofence";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { reconcileAttendanceAction } from "@/server/use-cases/attendance";
 
 async function employeeNameMap(
@@ -183,7 +184,7 @@ export default async function HrAttendancePage({
       {canManage ? (
         <Card className="mb-6" data-testid="attendance-reconcile-form">
           <h2 className="mb-3 font-semibold text-navy">تسوية يوم</h2>
-          <form action={reconcileAttendanceAction} className="grid gap-3 sm:grid-cols-2">
+          <ServerActionForm action={reconcileAttendanceAction} className="grid gap-3 sm:grid-cols-2">
             <Field label="تاريخ التسوية">
               <Input type="date" name="attendanceDate" defaultValue={date} required />
             </Field>
@@ -192,7 +193,7 @@ export default async function HrAttendancePage({
                 تشغيل التسوية
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

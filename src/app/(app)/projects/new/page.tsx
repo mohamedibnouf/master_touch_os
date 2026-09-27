@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createProjectAction } from "@/server/use-cases/platform";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -16,14 +16,7 @@ export default async function NewProjectPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="إنشاء مشروع" description="يتم توليد رمز المشروع تلقائياً وبشكل آمن من قاعدة البيانات" />
       <Card>
-        <form
-          action={async (formData) => {
-            "use server";
-            const project = await createProjectAction(formData);
-            redirect(`/projects/${project.id}`);
-          }}
-          className="space-y-4"
-        >
+        <ServerActionForm action={createProjectAction} className="space-y-4">
           <Field label="اسم المشروع بالعربية">
             <Input name="name_ar" required />
           </Field>
@@ -68,7 +61,7 @@ export default async function NewProjectPage() {
           <Button type="submit" className="w-full sm:w-auto">
             حفظ المشروع
           </Button>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

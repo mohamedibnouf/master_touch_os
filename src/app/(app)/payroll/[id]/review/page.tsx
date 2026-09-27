@@ -11,6 +11,7 @@ import {
   markPayrollReviewedAction,
 } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 function formatSar(amount: number) {
   return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
@@ -90,28 +91,28 @@ export default async function PayrollReviewPage({
         <h2 className="mb-3 font-semibold text-navy">إجراءات المراجعة</h2>
         <div className="flex flex-wrap gap-2">
           {canReview ? (
-            <form action={markPayrollReviewedAction}>
+            <ServerActionForm action={markPayrollReviewedAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-review-action">
                 تأكيد المراجعة
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canApprove ? (
-            <form action={approvePayrollPeriodAction}>
+            <ServerActionForm action={approvePayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-approve-action">
                 اعتماد المسير
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canLock ? (
-            <form action={lockPayrollPeriodAction}>
+            <ServerActionForm action={lockPayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-lock-action">
                 قفل المسير
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {!canReview && !canApprove && !canLock ? (
             <p className="text-sm text-muted">لا توجد إجراءات متاحة للحالة الحالية أو صلاحياتك.</p>

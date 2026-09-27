@@ -8,6 +8,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   approveClientValuationInternalAction,
   markValuationUnderClientReviewAction,
@@ -191,7 +192,7 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
       {canSubmit ? (
         <Card className="mb-6" data-testid="valuation-submit-card">
           <h2 className="mb-3 font-semibold text-navy">تقديم للمراجعة الداخلية</h2>
-          <form action={submitClientValuationForReviewAction} className="flex flex-wrap gap-3" data-testid="valuation-submit-form">
+          <ServerActionForm action={submitClientValuationForReviewAction} className="flex flex-wrap gap-3" data-testid="valuation-submit-form">
             <input type="hidden" name="valuationId" value={valuation.id} />
             <Select name="approverId" required className="min-w-[200px]" data-testid="valuation-approver">
               <option value="">اختر المراجع</option>
@@ -209,38 +210,38 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
             <Button type="submit" data-testid="valuation-submit-button">
               تقديم للمراجعة
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {canApproveInternal ? (
         <Card className="mb-6" data-testid="valuation-approve-internal-card">
           <h2 className="mb-3 font-semibold text-navy">اعتماد داخلي</h2>
-          <form action={approveClientValuationInternalAction} data-testid="valuation-approve-internal-form">
+          <ServerActionForm action={approveClientValuationInternalAction} data-testid="valuation-approve-internal-form">
             <input type="hidden" name="valuationId" value={valuation.id} />
             <Button type="submit" data-testid="valuation-approve-internal-button">
               اعتماد داخلي ✓
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {canMarkClientReview ? (
         <Card className="mb-6" data-testid="valuation-client-review-card">
           <h2 className="mb-3 font-semibold text-navy">إرسال للعميل</h2>
-          <form action={markValuationUnderClientReviewAction} data-testid="valuation-client-review-form">
+          <ServerActionForm action={markValuationUnderClientReviewAction} data-testid="valuation-client-review-form">
             <input type="hidden" name="valuationId" value={valuation.id} />
             <Button type="submit" data-testid="valuation-client-review-button">
               تحديد: قيد مراجعة العميل
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {canCertify ? (
         <Card className="mb-6" data-testid="valuation-certification-card">
           <h2 className="mb-4 font-semibold text-navy">تسجيل تصديق العميل</h2>
-          <form action={recordClientValuationCertificationAction} className="grid gap-4" data-testid="valuation-certification-form">
+          <ServerActionForm action={recordClientValuationCertificationAction} className="grid gap-4" data-testid="valuation-certification-form">
             <input type="hidden" name="valuationId" value={valuation.id} />
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="مرجع العميل">
@@ -274,7 +275,7 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
                 تسجيل التصديق
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

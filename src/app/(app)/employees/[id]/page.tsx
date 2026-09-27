@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
+import { ServerActionForm } from "@/components/forms/server-action-form";
+import { isUuid } from "@/lib/utils";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -48,6 +50,7 @@ export default async function EmployeeDetailPage({
   if (!ctx) redirect("/login");
 
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const { tab = "overview" } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
@@ -248,7 +251,7 @@ export default async function EmployeeDetailPage({
           {canManage ? (
             <Card data-testid="employee-edit-employment-card">
               <h2 className="mb-3 font-semibold text-navy">تحديث بيانات التوظيف</h2>
-              <form action={updateEmployeeEmploymentAction} className="grid gap-3">
+              <ServerActionForm action={updateEmployeeEmploymentAction} className="grid gap-3">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="الرقم الوظيفي">
                   <Input
@@ -359,7 +362,7 @@ export default async function EmployeeDetailPage({
                 <Button type="submit" data-testid="employee-edit-employment-submit">
                   حفظ بيانات التوظيف
                 </Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </div>
@@ -389,7 +392,7 @@ export default async function EmployeeDetailPage({
           {canManage ? (
             <Card data-testid="employee-assign-dept-card">
               <h2 className="mb-3 font-semibold text-navy">تعيين القسم</h2>
-              <form action={assignEmployeeDepartmentAction} className="grid gap-3">
+              <ServerActionForm action={assignEmployeeDepartmentAction} className="grid gap-3">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="القسم">
                   <Select name="departmentId" data-testid="employee-assign-department">
@@ -407,7 +410,7 @@ export default async function EmployeeDetailPage({
                 <Button type="submit" data-testid="employee-assign-department-submit">
                   تحديث القسم
                 </Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </div>
@@ -451,7 +454,7 @@ export default async function EmployeeDetailPage({
               </div>
             </dl>
           ) : (
-            <form action={upsertEmployeeComplianceAction} className="grid gap-3 md:grid-cols-2">
+            <ServerActionForm action={upsertEmployeeComplianceAction} className="grid gap-3 md:grid-cols-2">
               <input type="hidden" name="employeeId" value={employee.id} />
               <Field label="رقم الإقامة">
                 <Input
@@ -515,7 +518,7 @@ export default async function EmployeeDetailPage({
                   حفظ الامتثال
                 </Button>
               </div>
-            </form>
+            </ServerActionForm>
           )}
         </Card>
       ) : null}
@@ -526,7 +529,7 @@ export default async function EmployeeDetailPage({
           {canManageContracts ? (
             <Card data-testid="employee-create-contract-card">
               <h2 className="mb-3 font-semibold text-navy">إنشاء عقد عمل جديد</h2>
-              <form action={createEmployeeContractAction} className="grid gap-3 md:grid-cols-2">
+              <ServerActionForm action={createEmployeeContractAction} className="grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="رقم العقد">
                   <Input
@@ -586,7 +589,7 @@ export default async function EmployeeDetailPage({
                     حفظ العقد كمسودة
                   </Button>
                 </div>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
 
@@ -638,7 +641,7 @@ export default async function EmployeeDetailPage({
                         {canManageContracts ? (
                           <td className="p-2">
                             {!c.is_current ? (
-                              <form action={activateEmployeeContractAction} className="inline">
+                              <ServerActionForm action={activateEmployeeContractAction} className="inline">
                                 <input type="hidden" name="contractId" value={c.id} />
                                 <input type="hidden" name="employeeId" value={employee.id} />
                                 <Button
@@ -648,7 +651,7 @@ export default async function EmployeeDetailPage({
                                 >
                                   تفعيل العقد
                                 </Button>
-                              </form>
+                              </ServerActionForm>
                             ) : (
                               <span className="text-xs text-muted">مفعّل</span>
                             )}
@@ -712,7 +715,7 @@ export default async function EmployeeDetailPage({
           {canManageCompensation ? (
             <Card data-testid="employee-create-comp-version-card">
               <h2 className="mb-3 font-semibold text-navy">إصدار نسخة راتب جديدة (تعديل الراتب والبدلات)</h2>
-              <form action={createCompensationVersionAction} className="grid gap-3 md:grid-cols-2">
+              <ServerActionForm action={createCompensationVersionAction} className="grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="تاريخ السريان (Effective From)">
                   <Input
@@ -770,7 +773,7 @@ export default async function EmployeeDetailPage({
                     حفظ وإصدار نسخة الراتب
                   </Button>
                 </div>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
 
@@ -843,7 +846,7 @@ export default async function EmployeeDetailPage({
           {canManageDocuments ? (
             <Card data-testid="employee-upload-doc-card">
               <h2 className="mb-3 font-semibold text-navy">رفع وثيقة خاصة للموظف</h2>
-              <form action={uploadEmployeeDocumentAction} className="grid gap-3 md:grid-cols-2">
+              <ServerActionForm action={uploadEmployeeDocumentAction} className="grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="عنوان الوثيقة">
                   <Input name="title" required placeholder="عقد العمل الموقع / صورة الجواز" data-testid="hr-doc-title" />
@@ -896,7 +899,7 @@ export default async function EmployeeDetailPage({
                     رفع وحفظ الوثيقة
                   </Button>
                 </div>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
 
@@ -950,7 +953,7 @@ export default async function EmployeeDetailPage({
           {canManageBanking ? (
             <Card data-testid="employee-add-bank-card">
               <h2 className="mb-3 font-semibold text-navy">إضافة حساب بنكي جديد للموظف</h2>
-              <form action={upsertEmployeeBankAction} className="grid gap-3 md:grid-cols-2">
+              <ServerActionForm action={upsertEmployeeBankAction} className="grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="اسم البنك">
                   <Input
@@ -990,7 +993,7 @@ export default async function EmployeeDetailPage({
                     حفظ الحساب البنكي
                   </Button>
                 </div>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
 
@@ -1040,7 +1043,7 @@ export default async function EmployeeDetailPage({
                         {canManageBanking ? (
                           <td className="p-2">
                             {b.is_active ? (
-                              <form action={deactivateEmployeeBankAction} className="inline">
+                              <ServerActionForm action={deactivateEmployeeBankAction} className="inline">
                                 <input type="hidden" name="employeeId" value={employee.id} />
                                 <input type="hidden" name="accountId" value={b.id} />
                                 <Button
@@ -1050,7 +1053,7 @@ export default async function EmployeeDetailPage({
                                 >
                                   إيقاف الحساب
                                 </Button>
-                              </form>
+                              </ServerActionForm>
                             ) : (
                               <span className="text-xs text-muted">موقوف</span>
                             )}
@@ -1123,7 +1126,7 @@ export default async function EmployeeDetailPage({
 
       {canManage ? (
         <div className="mt-6 flex justify-end">
-          <form action={setEmployeeActiveAction}>
+          <ServerActionForm action={setEmployeeActiveAction}>
             <input type="hidden" name="employeeId" value={employee.id} />
             <input type="hidden" name="isActive" value={(!employee.is_active).toString()} />
             <Button
@@ -1133,7 +1136,7 @@ export default async function EmployeeDetailPage({
             >
               {employee.is_active ? "إيقاف الموظف (Deactivate)" : "تنشيط الموظف (Reactivate)"}
             </Button>
-          </form>
+          </ServerActionForm>
         </div>
       ) : null}
     </div>

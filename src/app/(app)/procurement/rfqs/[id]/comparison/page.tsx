@@ -8,6 +8,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { recommendAwardAction } from "@/server/use-cases/procurement";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function ComparisonPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -113,18 +114,18 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
         <Card className="mb-6">
           <h2 className="mb-3 font-semibold text-navy">قرار اعتماد الترسية</h2>
           <div className="flex gap-3">
-            <form action={decideEntityApprovalAction}>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval.data.id} />
               <input type="hidden" name="stepId" value={String(pendingApprovalStep.id)} />
               <input type="hidden" name="officialCode" value="A" />
               <Button type="submit">اعتماد ✓</Button>
-            </form>
-            <form action={decideEntityApprovalAction}>
+            </ServerActionForm>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval.data.id} />
               <input type="hidden" name="stepId" value={String(pendingApprovalStep.id)} />
               <input type="hidden" name="officialCode" value="D" />
               <Button type="submit" variant="danger">رفض</Button>
-            </form>
+            </ServerActionForm>
           </div>
         </Card>
       ) : null}
@@ -243,7 +244,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
           <p className="mb-4 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
             ⚠️ لا يتم الترسية التلقائية للمورد الأرخص. اختر العرض المناسب وبرّر توصيتك.
           </p>
-          <form action={recommendAwardAction} className="grid gap-4" data-testid="award-recommend-form">
+          <ServerActionForm action={recommendAwardAction} className="grid gap-4" data-testid="award-recommend-form">
             <input type="hidden" name="rfqId" value={rfqId} />
             <Field label="العرض الموصى به">
               <Select name="quotationId" required defaultValue="" data-testid="award-quotation">
@@ -299,7 +300,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
             <div className="flex justify-end">
               <Button type="submit" data-testid="award-submit">تقديم التوصية للاعتماد</Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

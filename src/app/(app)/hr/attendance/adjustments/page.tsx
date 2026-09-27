@@ -4,6 +4,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize, hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { adjustAttendanceRecordAction } from "@/server/use-cases/attendance";
 
 async function employeeNameMap(
@@ -57,7 +58,7 @@ export default async function HrAttendanceAdjustmentsPage() {
       {canAdjust ? (
         <Card className="mb-6" data-testid="attendance-adjust-form">
           <h2 className="mb-4 font-semibold text-navy">تعديل سجل</h2>
-          <form action={adjustAttendanceRecordAction} className="grid gap-3">
+          <ServerActionForm action={adjustAttendanceRecordAction} className="grid gap-3">
             <Field label="سجل اليوم">
               <Select name="recordId" required>
                 <option value="">اختر سجلًا</option>
@@ -95,7 +96,7 @@ export default async function HrAttendanceAdjustmentsPage() {
               <Input name="reason" required minLength={3} />
             </Field>
             <Button type="submit">حفظ التعديل</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createVariationAction } from "@/server/use-cases/commercial";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewVariationPage({
   searchParams,
@@ -33,9 +34,10 @@ export default async function NewVariationPage({
       .in("status", ["active", "draft"]),
   ]);
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createVariationAction(formData);
+    const state = await createVariationAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/finance/variations");
   }
 
@@ -51,7 +53,7 @@ export default async function NewVariationPage({
         }
       />
       <Card>
-        <form action={action} className="grid gap-4" data-testid="variation-create-form">
+        <ServerActionForm action={action} className="grid gap-4" data-testid="variation-create-form">
           <Field label="المشروع">
             <Select name="projectId" required defaultValue={preselectedProjectId ?? ""} data-testid="variation-project">
               <option value="" disabled>
@@ -112,7 +114,7 @@ export default async function NewVariationPage({
               حفظ أمر التغيير
             </Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

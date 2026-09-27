@@ -5,6 +5,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ConflictError, DatabaseError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -25,7 +26,11 @@ const createRfiSchema = z.object({
   location: z.string().optional(),
 });
 
-export async function createRfiAction(formData: FormData) {
+export async function createRfiAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "rfi.create");
   const parsed = createRfiSchema.safeParse({
     projectId: formData.get("projectId"),
@@ -97,9 +102,14 @@ export async function createRfiAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${parsed.data.projectId}`);
+  });
 }
 
-export async function respondRfiAction(formData: FormData) {
+export async function respondRfiAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "rfi.respond");
   const rfiId = String(formData.get("rfiId") ?? "");
   const response = String(formData.get("response") ?? "").trim();
@@ -140,9 +150,14 @@ export async function respondRfiAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function createNcrAction(formData: FormData) {
+export async function createNcrAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "ncr.create");
   const projectId = String(formData.get("projectId") ?? "");
   const disciplineCode = String(formData.get("disciplineCode") ?? "GENERAL");
@@ -220,9 +235,14 @@ export async function createNcrAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function applyDocumentDecisionAction(formData: FormData) {
+export async function applyDocumentDecisionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "document.approve");
   const documentId = String(formData.get("documentId") ?? "");
   const officialCode = String(formData.get("officialCode") ?? "");
@@ -249,9 +269,14 @@ export async function applyDocumentDecisionAction(formData: FormData) {
 
   revalidatePath("/document-control");
   revalidatePath("/engineering");
+  });
 }
 
-export async function reviseDocumentAction(formData: FormData) {
+export async function reviseDocumentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "document_control.revise");
   const documentId = String(formData.get("documentId") ?? "");
   const changeDescription = String(formData.get("changeDescription") ?? "") || null;
@@ -268,6 +293,7 @@ export async function reviseDocumentAction(formData: FormData) {
 
   revalidatePath("/document-control");
   revalidatePath("/engineering");
+  });
 }
 
 async function registerDoc(params: {
@@ -294,7 +320,11 @@ async function registerDoc(params: {
   return { supabase, doc };
 }
 
-export async function submitRfiAction(formData: FormData) {
+export async function submitRfiAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "rfi.submit");
   const rfiId = String(formData.get("rfiId") ?? "");
   if (!rfiId) throw new ValidationError("طلب الاستفسار غير محدد.", "RFI is required.");
@@ -340,9 +370,14 @@ export async function submitRfiAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function closeRfiAction(formData: FormData) {
+export async function closeRfiAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "rfi.close");
   const rfiId = String(formData.get("rfiId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -359,9 +394,14 @@ export async function closeRfiAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function createMaterialSubmittalAction(formData: FormData) {
+export async function createMaterialSubmittalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "submittal.create");
   const projectId = String(formData.get("projectId") ?? "");
   const disciplineCode = String(formData.get("disciplineCode") ?? "GENERAL");
@@ -401,9 +441,14 @@ export async function createMaterialSubmittalAction(formData: FormData) {
   revalidatePath("/engineering");
   revalidatePath("/document-control");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function createShopDrawingAction(formData: FormData) {
+export async function createShopDrawingAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "shop_drawing.create");
   const projectId = String(formData.get("projectId") ?? "");
   const disciplineCode = String(formData.get("disciplineCode") ?? "GENERAL");
@@ -442,9 +487,14 @@ export async function createShopDrawingAction(formData: FormData) {
   revalidatePath("/engineering");
   revalidatePath("/document-control");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function createMethodStatementAction(formData: FormData) {
+export async function createMethodStatementAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "method_statement.create");
   const projectId = String(formData.get("projectId") ?? "");
   const disciplineCode = String(formData.get("disciplineCode") ?? "GENERAL");
@@ -482,9 +532,14 @@ export async function createMethodStatementAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function createInspectionRequestAction(formData: FormData) {
+export async function createInspectionRequestAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "inspection.create");
   const projectId = String(formData.get("projectId") ?? "");
   const disciplineCode = String(formData.get("disciplineCode") ?? "GENERAL");
@@ -523,9 +578,14 @@ export async function createInspectionRequestAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function recordInspectionResultAction(formData: FormData) {
+export async function recordInspectionResultAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "inspection.perform");
   const inspectionId = String(formData.get("inspectionId") ?? "");
   const result = String(formData.get("result") ?? "") as
@@ -590,9 +650,14 @@ export async function recordInspectionResultAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function createReinspectionAction(formData: FormData) {
+export async function createReinspectionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "inspection.create");
   const parentId = String(formData.get("parentInspectionId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -646,9 +711,14 @@ export async function createReinspectionAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${parent.project_id}`);
+  });
 }
 
-export async function closeNcrAction(formData: FormData) {
+export async function closeNcrAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "ncr.close");
   const ncrId = String(formData.get("ncrId") ?? "");
   const verification = String(formData.get("verification") ?? "").trim();
@@ -689,9 +759,14 @@ export async function closeNcrAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function reopenNcrAction(formData: FormData) {
+export async function reopenNcrAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "ncr.manage");
   const ncrId = String(formData.get("ncrId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -728,9 +803,14 @@ export async function reopenNcrAction(formData: FormData) {
 
   revalidatePath("/engineering");
   revalidatePath(`/projects/${existing.project_id}`);
+  });
 }
 
-export async function createProjectReportAction(formData: FormData) {
+export async function createProjectReportAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "report.create");
   const projectId = String(formData.get("projectId") ?? "");
   const reportType = String(formData.get("reportType") ?? "daily") as "daily" | "weekly" | "monthly";
@@ -758,9 +838,14 @@ export async function createProjectReportAction(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/engineering");
+  });
 }
 
-export async function createCorrespondenceAction(formData: FormData) {
+export async function createCorrespondenceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "correspondence.create");
   const projectId = String(formData.get("projectId") ?? "");
   const direction = String(formData.get("direction") ?? "outgoing") as
@@ -807,9 +892,14 @@ export async function createCorrespondenceAction(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/document-control");
+  });
 }
 
-export async function createTransmittalAction(formData: FormData) {
+export async function createTransmittalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "transmittal.create");
   const projectId = String(formData.get("projectId") ?? "");
   const recipient = String(formData.get("recipient") ?? "").trim();
@@ -901,9 +991,14 @@ export async function createTransmittalAction(formData: FormData) {
 
   revalidatePath("/document-control");
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function issueTransmittalAction(formData: FormData) {
+export async function issueTransmittalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية الهندسية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "transmittal.issue");
   const transmittalId = String(formData.get("transmittalId") ?? "");
   if (!transmittalId) {
@@ -925,4 +1020,5 @@ export async function issueTransmittalAction(formData: FormData) {
   }
 
   revalidatePath("/document-control");
+  });
 }

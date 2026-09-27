@@ -5,6 +5,7 @@ import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { createRfqFromPrAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewRfqPage() {
   const ctx = authorize(await getAuthContext(), "rfq.create");
@@ -28,9 +29,10 @@ export default async function NewRfqPage() {
   const prs = prsResult.data ?? [];
   const suppliers = suppliersResult.data ?? [];
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createRfqFromPrAction(formData);
+    const state = await createRfqFromPrAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/procurement/rfqs");
   }
 
@@ -38,7 +40,7 @@ export default async function NewRfqPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="طلب عرض أسعار جديد" description="أنشئ RFQ من طلب شراء معتمد" />
       <Card>
-        <form action={action} className="grid gap-4">
+        <ServerActionForm action={action} className="grid gap-4">
           <Field label="طلب الشراء (PR)">
             <Select name="prId" required defaultValue="">
               <option value="" disabled>اختر طلب شراء معتمداً</option>
@@ -85,7 +87,7 @@ export default async function NewRfqPage() {
             </Link>
             <Button type="submit" disabled={prs.length === 0}>إنشاء RFQ</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

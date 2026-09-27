@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -124,8 +124,9 @@ export default async function HrLeavePage() {
         )}
       </Card>
 
-      <Card className="overflow-x-auto p-0">
+      <Card className="p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">تقويم المؤسسة (بدون الأسباب)</div>
+        <TableScroll>
         <table className="w-full min-w-[520px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
@@ -150,6 +151,7 @@ export default async function HrLeavePage() {
             ))}
           </tbody>
         </table>
+        </TableScroll>
       </Card>
     </div>
   );

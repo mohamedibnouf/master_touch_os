@@ -14,6 +14,7 @@ import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function DashboardPage() {
   const ctx = await getAuthContext();
@@ -330,11 +331,11 @@ export default async function DashboardPage() {
                 geofenceReady ? (
                   <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="home-check-in" />
                 ) : (
-                  <form action={checkInAction}>
+                  <ServerActionForm action={checkInAction}>
                     <Button type="submit" className="w-full" data-testid="home-check-in">
                       تسجيل الحضور
                     </Button>
-                  </form>
+                  </ServerActionForm>
                 )
               ) : null}
               {canCheckOut ? (
@@ -346,11 +347,11 @@ export default async function DashboardPage() {
                     variant="secondary"
                   />
                 ) : (
-                  <form action={checkOutAction}>
+                  <ServerActionForm action={checkOutAction}>
                     <Button type="submit" variant="secondary" className="w-full" data-testid="home-check-out">
                       تسجيل الانصراف
                     </Button>
-                  </form>
+                  </ServerActionForm>
                 )
               ) : null}
               <Link href="/attendance" className="text-sm text-navy underline">

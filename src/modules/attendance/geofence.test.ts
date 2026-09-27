@@ -277,9 +277,9 @@ describe("accuracy, directory privacy, and assignment resolution", () => {
   });
 
   it("maps RPC exception text to Arabic user copy", () => {
-    expect(geofenceUserMessage("GEOFENCE_OUTSIDE").ar).toContain("خارج نطاق");
-    expect(geofenceUserMessage("GEOFENCE_POOR_ACCURACY").ar).toContain("دقة الموقع");
-    expect(geofenceUserMessage("GEOFENCE_NO_WORKPLACE").ar).toContain("لم يتم تحديد موقع عمل");
+    expect(geofenceUserMessage("GEOFENCE_OUTSIDE").ar).toContain("خارج النطاق");
+    expect(geofenceUserMessage("GEOFENCE_POOR_ACCURACY").ar).toContain("دقة تحديد الموقع");
+    expect(geofenceUserMessage("GEOFENCE_NO_WORKPLACE").ar).toContain("لا يوجد موقع حضور مخصص");
   });
 
   it("maps structured punch RPC rejection without treating it as success", () => {
@@ -290,7 +290,7 @@ describe("accuracy, directory privacy, and assignment resolution", () => {
       attendance_record: null,
     });
     expect(parsed?.accepted).toBe(false);
-    expect(geofenceUserMessage(parsed!.reason_code).ar).toContain("خارج نطاق");
+    expect(geofenceUserMessage(parsed!.reason_code).ar).toContain("خارج النطاق");
   });
 
   it("strips exact coordinates from payloads", () => {

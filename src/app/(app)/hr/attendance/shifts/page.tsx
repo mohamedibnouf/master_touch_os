@@ -4,6 +4,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertAttendanceShiftAction } from "@/server/use-cases/attendance";
 
 export default async function HrAttendanceShiftsPage() {
@@ -25,7 +26,7 @@ export default async function HrAttendanceShiftsPage() {
 
       <Card className="mb-6" data-testid="attendance-shift-form">
         <h2 className="mb-4 font-semibold text-navy">إضافة / تحديث وردية</h2>
-        <form action={upsertAttendanceShiftAction} className="grid gap-3">
+        <ServerActionForm action={upsertAttendanceShiftAction} className="grid gap-3">
           <Field label="السياسة">
             <Select name="policy_id" required>
               <option value="">اختر</option>
@@ -70,7 +71,7 @@ export default async function HrAttendanceShiftsPage() {
             </Select>
           </Field>
           <Button type="submit">حفظ الوردية</Button>
-        </form>
+        </ServerActionForm>
       </Card>
 
       <Card className="overflow-x-auto p-0">

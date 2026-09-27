@@ -8,6 +8,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isEntityApprovalTypeSupported } from "@/lib/approvals/entity-approval-types";
 import { decideApprovalAction } from "@/server/use-cases/platform";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 type ApprovalRow = {
   id: string;
@@ -114,7 +115,7 @@ export default async function ApprovalsPage({
                 </ul>
 
                 {canDecide && myStep ? (
-                  <form action={formAction} className="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-3">
+                  <ServerActionForm action={formAction} className="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-3">
                     <input type="hidden" name="approvalRequestId" value={request.id} />
                     <input type="hidden" name="stepId" value={myStep.id} />
                     <Field label="رمز القرار">
@@ -132,7 +133,7 @@ export default async function ApprovalsPage({
                     <div className="flex items-end">
                       <Button type="submit">تسجيل القرار</Button>
                     </div>
-                  </form>
+                  </ServerActionForm>
                 ) : null}
               </Card>
             );

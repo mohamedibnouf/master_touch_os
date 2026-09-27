@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -72,7 +72,8 @@ export default async function ProjectsPage({
       {rows.length === 0 ? (
         <EmptyState title="لا توجد مشاريع مطابقة." />
       ) : (
-        <Card className="overflow-x-auto p-0">
+        <Card className="p-0">
+          <TableScroll>
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-paper text-right text-muted">
               <tr>
@@ -108,6 +109,7 @@ export default async function ProjectsPage({
               ))}
             </tbody>
           </table>
+          </TableScroll>
         </Card>
       )}
 

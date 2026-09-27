@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertDepartmentAction } from "@/server/use-cases/hr";
 
 export default async function DepartmentsPage() {
@@ -13,12 +14,11 @@ export default async function DepartmentsPage() {
 
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
-  const [departments, employees] = await Promise.all([
-    repo.listDepartments(ctx.organization.id),
+  const departments = await repo.listDepartments(ctx.organization.id);
+  const employees =
     hasPermission(ctx, "employee.read") || hasPermission(ctx, "department.update")
-      ? repo.listEmployees(ctx.organization.id)
-      : Promise.resolve([]),
-  ]);
+      ? await repo.listEmployeeNameOptions(ctx.organization.id)
+      : [];
 
   const canCreate = hasPermission(ctx, "department.create");
   const canUpdate = hasPermission(ctx, "department.update");
@@ -47,7 +47,7 @@ export default async function DepartmentsPage() {
             </Badge>
           </div>
           {canUpdate ? (
-            <form action={upsertDepartmentAction} className="mt-4 grid gap-2 border-t border-line pt-3 md:grid-cols-2">
+            <ServerActionForm action={upsertDepartmentAction} className="mt-4 grid gap-2 border-t border-line pt-3 md:grid-cols-2">
               <input type="hidden" name="departmentId" value={department.id} />
               <Field label="الرمز">
                 <Input name="code" required defaultValue={department.code} />
@@ -96,7 +96,7 @@ export default async function DepartmentsPage() {
                   حفظ التعديلات
                 </Button>
               </div>
-            </form>
+            </ServerActionForm>
           ) : null}
         </Card>
         {renderTree(childrenOf(department.id), depth + 1)}
@@ -111,7 +111,7 @@ export default async function DepartmentsPage() {
       {canCreate ? (
         <Card className="mb-6" data-testid="department-create-card">
           <h2 className="mb-3 font-semibold text-navy">إنشاء إدارة</h2>
-          <form action={upsertDepartmentAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={upsertDepartmentAction} className="grid gap-3 md:grid-cols-2">
             <Field label="الرمز">
               <Input name="code" required data-testid="department-create-code" />
             </Field>
@@ -152,7 +152,7 @@ export default async function DepartmentsPage() {
                 إنشاء
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

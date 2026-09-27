@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createSupplierInvoiceAction } from "@/server/use-cases/finance";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewSupplierInvoicePage({
   searchParams,
@@ -48,9 +49,10 @@ export default async function NewSupplierInvoicePage({
     prefilledPo = pos.find((p) => p.id === preselectedPoId) ?? null;
   }
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createSupplierInvoiceAction(formData);
+    const state = await createSupplierInvoiceAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/finance/supplier-invoices");
   }
 
@@ -58,7 +60,7 @@ export default async function NewSupplierInvoicePage({
     <div className="mx-auto max-w-2xl" data-testid="invoice-create-page">
       <PageHeader title="فاتورة مورد جديدة" description="ستُنفَّذ المطابقة تلقائياً عند الحفظ" />
       <Card>
-        <form action={action} className="grid gap-4" data-testid="invoice-create-form">
+        <ServerActionForm action={action} className="grid gap-4" data-testid="invoice-create-form">
           <Field label="المشروع">
             <Select name="projectId" required defaultValue={prefilledPo ? "" : ""} data-testid="invoice-project">
               <option value="" disabled>اختر مشروعاً</option>
@@ -108,7 +110,7 @@ export default async function NewSupplierInvoicePage({
             </Link>
             <Button type="submit" data-testid="invoice-submit">حفظ وتنفيذ المطابقة</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

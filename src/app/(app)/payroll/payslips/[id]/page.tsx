@@ -6,6 +6,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PayrollRepository } from "@/server/repositories/payroll.repository";
 import { recordPayrollPaymentAction } from "@/server/use-cases/payroll";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 function formatSar(amount: number) {
   return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
@@ -136,7 +137,7 @@ export default async function PayrollPayslipPage({
       {canPay ? (
         <Card data-testid="payroll-payment-form">
           <h2 className="mb-3 font-semibold text-navy">تسجيل صرف</h2>
-          <form action={recordPayrollPaymentAction} className="grid gap-3 sm:grid-cols-2">
+          <ServerActionForm action={recordPayrollPaymentAction} className="grid gap-3 sm:grid-cols-2">
             <input type="hidden" name="entryId" value={entry.id} />
             <Field label="تاريخ الصرف">
               <Input type="date" name="paymentDate" defaultValue={new Date().toISOString().slice(0, 10)} required />
@@ -170,7 +171,7 @@ export default async function PayrollPayslipPage({
                 تسجيل الصرف
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
     </div>

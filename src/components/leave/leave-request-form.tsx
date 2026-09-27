@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { calculateLeaveDays, type LeaveDayBasis } from "@/lib/leave/days";
 import { submitLeaveRequestAction } from "@/server/use-cases/leave";
-import { useRouter } from "next/navigation";
+import type { FormActionState } from "@/server/forms/form-state";
 
 type LeaveTypeOption = {
   id: string;
@@ -23,13 +23,15 @@ export function LeaveRequestForm({
   balances: Array<{ leave_type_id: string; available_days: number }>;
   dayBasis: LeaveDayBasis;
 }) {
-  const router = useRouter();
   const [leaveTypeId, setLeaveTypeId] = useState(types[0]?.id ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [attachmentDocumentId, setAttachmentDocumentId] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [state, formAction, pending] = useActionState<FormActionState, FormData>(
+    submitLeaveRequestAction,
+    null,
+  );
 
   const available = useMemo(() => {
     const b = balances.find((x) => x.leave_type_id === leaveTypeId);
@@ -48,26 +50,20 @@ export function LeaveRequestForm({
   const selectedType = types.find((t) => t.id === leaveTypeId);
   const attachmentRequired = Boolean(selectedType?.requires_attachment);
 
-  async function onSubmit(formData: FormData) {
-    setPending(true);
-    setError(null);
+  function onSubmit(formData: FormData) {
+    setClientError(null);
     if (attachmentRequired && !String(formData.get("attachmentDocumentId") ?? "").trim()) {
-      setError("هذا النوع يتطلب معرّف مستند مرفق.");
-      setPending(false);
+      setClientError("هذا النوع يتطلب معرّف مستند مرفق.");
       return;
     }
-    try {
-      const req = await submitLeaveRequestAction(formData);
-      router.push(`/leave/${req.id}`);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر إرسال الطلب");
-      setPending(false);
-    }
+    formAction(formData);
   }
+
+  const error = clientError || (state && !state.ok ? state.message : null);
 
   return (
     <form action={onSubmit} className="grid gap-4" data-testid="leave-request-form">
+      <fieldset disabled={pending} className="grid min-w-0 gap-4 border-0 p-0">
       <Field label="نوع الإجازة">
         <Select
           name="leaveTypeId"
@@ -133,6 +129,7 @@ export function LeaveRequestForm({
       <Button type="submit" className="w-full sm:w-auto" disabled={pending} data-testid="leave-submit">
         {pending ? "جارٍ الإرسال..." : "إرسال الطلب"}
       </Button>
+      </fieldset>
     </form>
   );
 }

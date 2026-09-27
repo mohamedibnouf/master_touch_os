@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createSupplierAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewSupplierPage() {
   authorize(await getAuthContext(), "supplier.manage");
@@ -15,9 +16,10 @@ export default async function NewSupplierPage() {
     .select("id, code, name_ar")
     .order("name_ar");
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createSupplierAction(formData);
+    const state = await createSupplierAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/procurement/suppliers");
   }
 
@@ -25,7 +27,7 @@ export default async function NewSupplierPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="تسجيل مورد جديد" description="سيتم توليد رمز المورد تلقائياً" />
       <Card>
-        <form action={action} className="grid gap-4">
+        <ServerActionForm action={action} className="grid gap-4">
           <Field label="الاسم القانوني (مطلوب)">
             <Input name="legalName" required minLength={2} />
           </Field>
@@ -69,7 +71,7 @@ export default async function NewSupplierPage() {
             </Link>
             <Button type="submit">حفظ المورد</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

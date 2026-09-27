@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAndPostGoodsReceiptAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewGoodsReceiptPage({
   searchParams,
@@ -45,9 +46,10 @@ export default async function NewGoodsReceiptPage({
   const items = (poForForm.purchase_order_items as Array<Record<string, unknown>>) ?? [];
   const supplier = Array.isArray(poForForm.suppliers) ? poForForm.suppliers[0] : poForForm.suppliers;
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createAndPostGoodsReceiptAction(formData);
+    const state = await createAndPostGoodsReceiptAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/procurement/goods-receipts");
   }
 
@@ -55,7 +57,7 @@ export default async function NewGoodsReceiptPage({
     <div className="mx-auto max-w-4xl" data-testid="grn-create-page">
       <PageHeader title="تسجيل استلام بضاعة" description="GRN — يُنشر فور الحفظ" />
       <Card>
-        <form action={action} className="grid gap-5" data-testid="grn-create-form">
+        <ServerActionForm action={action} className="grid gap-5" data-testid="grn-create-form">
           {/* PO selector */}
           {(eligiblePos ?? []).length > 1 ? (
             <Field label="أمر الشراء">
@@ -183,7 +185,7 @@ export default async function NewGoodsReceiptPage({
             </Link>
             <Button type="submit" data-testid="grn-submit">حفظ ونشر الاستلام</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

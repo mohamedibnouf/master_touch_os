@@ -5,6 +5,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadDocumentAction } from "@/server/use-cases/platform";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function DocumentsPage() {
   const ctx = await getAuthContext();
@@ -25,7 +26,7 @@ export default async function DocumentsPage() {
       {canUpload ? (
         <Card className="mb-6">
           <h2 className="mb-4 text-base font-semibold text-navy">رفع مستند</h2>
-          <form action={uploadDocumentAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={uploadDocumentAction} className="grid gap-3 md:grid-cols-2">
             <Field label="العنوان">
               <Input name="title" required />
             </Field>
@@ -64,7 +65,7 @@ export default async function DocumentsPage() {
             <div className="md:col-span-2">
               <Button type="submit">رفع</Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

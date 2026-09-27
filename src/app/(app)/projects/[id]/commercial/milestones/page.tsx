@@ -8,6 +8,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   createContractMilestoneAction,
   markMilestoneEligibleAction,
@@ -97,7 +98,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
                         </td>
                         <td className="py-2">
                           {canManage && m.status === "planned" ? (
-                            <form action={markMilestoneEligibleAction} className="flex flex-wrap gap-2">
+                            <ServerActionForm action={markMilestoneEligibleAction} className="flex flex-wrap gap-2">
                               <input type="hidden" name="milestoneId" value={m.id} />
                               <input type="hidden" name="projectId" value={projectId} />
                               <Input
@@ -108,7 +109,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
                               <Button type="submit" variant="secondary" data-testid={`milestone-eligible-${m.id}`}>
                                 تأهيل
                               </Button>
-                            </form>
+                            </ServerActionForm>
                           ) : (
                             "—"
                           )}
@@ -124,7 +125,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
           {canManage ? (
             <Card data-testid="milestone-create-card">
               <h2 className="mb-4 font-semibold text-navy">إضافة مرحلة</h2>
-              <form action={createContractMilestoneAction} className="grid gap-4" data-testid="milestone-create-form">
+              <ServerActionForm action={createContractMilestoneAction} className="grid gap-4" data-testid="milestone-create-form">
                 <input type="hidden" name="projectId" value={projectId} />
                 <input type="hidden" name="contractId" value={contract.id} />
                 <div className="grid gap-4 md:grid-cols-2">
@@ -162,7 +163,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
                     إضافة المرحلة
                   </Button>
                 </div>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </>

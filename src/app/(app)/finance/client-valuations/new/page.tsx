@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClientValuationAction } from "@/server/use-cases/commercial";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewClientValuationPage({
   searchParams,
@@ -39,7 +40,10 @@ export default async function NewClientValuationPage({
         .order("milestone_number")
     : { data: [] };
 
-  async function action(formData: FormData) {
+  async function action(
+    _prev: import("@/server/forms/form-state").FormActionState,
+    formData: FormData,
+  ): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
     const contractId = String(formData.get("contractId") ?? "");
     const supabaseInner = await createServerSupabaseClient();
@@ -49,7 +53,8 @@ export default async function NewClientValuationPage({
       .eq("id", contractId)
       .maybeSingle();
     if (contract) formData.set("projectId", contract.project_id);
-    await createClientValuationAction(formData);
+    const state = await createClientValuationAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/finance/client-valuations");
   }
 
@@ -68,7 +73,7 @@ export default async function NewClientValuationPage({
         {contractRows.length === 0 ? (
           <p className="text-sm text-muted">لا توجد عقود مشاريع نشطة — أنشئ عقداً من صفحة المشروع أولاً.</p>
         ) : (
-          <form action={action} className="grid gap-4" data-testid="valuation-create-form">
+          <ServerActionForm action={action} className="grid gap-4" data-testid="valuation-create-form">
             <Field label="العقد / المشروع">
               <Select name="contractId" required defaultValue={selectedContract?.id ?? ""} data-testid="valuation-contract">
                 {contractRows.map((c) => {
@@ -132,7 +137,7 @@ export default async function NewClientValuationPage({
                 حفظ المستخلص
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         )}
       </Card>
     </div>

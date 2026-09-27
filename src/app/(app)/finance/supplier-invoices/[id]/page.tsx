@@ -10,6 +10,7 @@ import { CommercialRepository } from "@/server/repositories/commercial.repositor
 import { approveSupplierInvoiceForPaymentAction, recordSupplierPaymentAction } from "@/server/use-cases/finance";
 import { roundMoney, remainingBalance } from "@/server/domain/commercial";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function SupplierInvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -190,10 +191,10 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
       {canApprovePayment ? (
         <Card className="mb-6" data-testid="invoice-approve-card">
           <h2 className="mb-3 font-semibold text-navy">اعتماد للصرف</h2>
-          <form action={approveSupplierInvoiceForPaymentAction} data-testid="invoice-approve-form">
+          <ServerActionForm action={approveSupplierInvoiceForPaymentAction} data-testid="invoice-approve-form">
             <input type="hidden" name="invoiceId" value={invoice.id} />
             <Button type="submit" data-testid="invoice-approve-submit">اعتماد للصرف ✓</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -205,7 +206,7 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
             المبلغ المتبقي: <MoneyDisplay amount={outstanding} currency={invoice.currency} />
             {" "}— لن يُقبل مبلغ يتجاوز المتبقي (محمي في قاعدة البيانات).
           </p>
-          <form action={recordSupplierPaymentAction} className="grid gap-4" data-testid="invoice-payment-form">
+          <ServerActionForm action={recordSupplierPaymentAction} className="grid gap-4" data-testid="invoice-payment-form">
             <input type="hidden" name="invoiceId" value={invoice.id} />
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="المبلغ (SAR)">
@@ -245,7 +246,7 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
             <div className="flex justify-end">
               <Button type="submit" data-testid="payment-submit">تسجيل الدفعة</Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

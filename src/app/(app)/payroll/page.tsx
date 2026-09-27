@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PayrollRepository } from "@/server/repositories/payroll.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createPayrollPeriodAction } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
 
@@ -75,7 +76,7 @@ export default async function PayrollDashboardPage() {
       {canPrepare ? (
         <Card className="mb-6" data-testid="payroll-create-form">
           <h2 className="mb-3 font-semibold text-navy">إنشاء فترة رواتب</h2>
-          <form action={createPayrollPeriodAction} className="grid gap-3 sm:grid-cols-3">
+          <ServerActionForm action={createPayrollPeriodAction} className="grid gap-3 sm:grid-cols-3">
             <Field label="السنة">
               <Input type="number" name="year" defaultValue={defaultYear} min={2000} max={2100} required />
             </Field>
@@ -93,17 +94,18 @@ export default async function PayrollDashboardPage() {
                 إنشاء
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
-      <Card className="overflow-x-auto p-0">
+      <Card className="p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">الفترات</div>
         {periods.length === 0 ? (
           <div className="p-4">
             <EmptyState title="لا توجد فترات رواتب بعد." />
           </div>
         ) : (
+          <TableScroll>
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
@@ -132,6 +134,7 @@ export default async function PayrollDashboardPage() {
               ))}
             </tbody>
           </table>
+          </TableScroll>
         )}
       </Card>
     </div>

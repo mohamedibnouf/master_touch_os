@@ -5,6 +5,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -12,7 +13,11 @@ import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { grossWithVat, vatAmount } from "@/server/domain/commercial";
 
-export async function createSupplierInvoiceAction(formData: FormData) {
+export async function createSupplierInvoiceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية المالية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "supplier_invoice.create");
   const parsed = z
     .object({
@@ -65,9 +70,14 @@ export async function createSupplierInvoiceAction(formData: FormData) {
 
   revalidatePath("/finance/supplier-invoices");
   revalidatePath(`/finance/supplier-invoices/${inv.id}`);
+  });
 }
 
-export async function approveSupplierInvoiceForPaymentAction(formData: FormData) {
+export async function approveSupplierInvoiceForPaymentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية المالية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "supplier_invoice.approve");
   const invoiceId = String(formData.get("invoiceId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -150,9 +160,14 @@ export async function approveSupplierInvoiceForPaymentAction(formData: FormData)
   revalidatePath(`/finance/supplier-invoices/${invoiceId}`);
   revalidatePath("/finance/supplier-invoices");
   revalidatePath("/approvals");
+  });
 }
 
-export async function recordSupplierPaymentAction(formData: FormData) {
+export async function recordSupplierPaymentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية المالية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "supplier_payment.record");
   const parsed = z
     .object({
@@ -196,9 +211,14 @@ export async function recordSupplierPaymentAction(formData: FormData) {
   });
 
   revalidatePath(`/finance/supplier-invoices/${parsed.data.invoiceId}`);
+  });
 }
 
-export async function approveVariationAction(formData: FormData) {
+export async function approveVariationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية المالية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "variation.approve");
   const variationId = String(formData.get("variationId") ?? "");
   const approvedAmount = Number(formData.get("approvedAmount") ?? 0);
@@ -209,9 +229,14 @@ export async function approveVariationAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/variations/${variationId}`);
+  });
 }
 
-export async function recordClientPaymentAction(formData: FormData) {
+export async function recordClientPaymentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية المالية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "client_payment.record");
   const parsed = z
     .object({
@@ -242,4 +267,5 @@ export async function recordClientPaymentAction(formData: FormData) {
 
   revalidatePath(`/finance/client-invoices/${parsed.data.invoiceId}`);
   revalidatePath("/finance/receivables");
+  });
 }

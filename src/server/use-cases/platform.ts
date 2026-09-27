@@ -3,6 +3,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createProjectSchema } from "@/modules/projects/schemas";
 import {
   assignDepartmentSchema,
@@ -18,6 +19,7 @@ import {
   startWorkflowSchema,
 } from "@/modules/approvals/schemas";
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -38,7 +40,11 @@ function nextRevision(current: string): string {
   return String.fromCharCode(letters.charCodeAt(0) + 1);
 }
 
-export async function createProjectAction(formData: FormData) {
+export async function createProjectAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إنشاء المشروع. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "project.create");
   const parsed = createProjectSchema.safeParse({
     name_ar: formData.get("name_ar"),
@@ -77,10 +83,15 @@ export async function createProjectAction(formData: FormData) {
 
   const project = data as Project;
   revalidatePath("/projects");
-  return project;
+  redirect(`/projects/${project.id}`);
+  });
 }
 
-export async function assignProjectMemberAction(formData: FormData) {
+export async function assignProjectMemberAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "project.manage_team");
   const projectId = String(formData.get("projectId") ?? "");
   const profileId = String(formData.get("profileId") ?? "");
@@ -132,9 +143,14 @@ export async function assignProjectMemberAction(formData: FormData) {
   });
 
   revalidatePath(`/projects/${projectId}`);
+  });
 }
 
-export async function updateProjectStageAction(formData: FormData) {
+export async function updateProjectStageAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "project.update");
   const stageId = String(formData.get("stageId") ?? "");
   const status = String(formData.get("status") ?? "");
@@ -156,9 +172,14 @@ export async function updateProjectStageAction(formData: FormData) {
     .eq("organization_id", ctx.organization.id);
   if (error) throw new DatabaseError(error);
   revalidatePath("/projects");
+  });
 }
 
-export async function startWorkflowAction(formData: FormData) {
+export async function startWorkflowAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "workflow.start");
   const parsed = startWorkflowSchema.safeParse({
     definitionId: formData.get("definitionId"),
@@ -183,9 +204,14 @@ export async function startWorkflowAction(formData: FormData) {
     throw new DatabaseError(error);
   }
   revalidatePath("/approvals");
+  });
 }
 
-export async function completeWorkflowStepAction(formData: FormData) {
+export async function completeWorkflowStepAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "workflow.advance");
   const parsed = completeWorkflowStepSchema.safeParse({
     instanceStepId: formData.get("instanceStepId"),
@@ -206,9 +232,14 @@ export async function completeWorkflowStepAction(formData: FormData) {
     throw new DatabaseError(error);
   }
   revalidatePath("/");
+  });
 }
 
-export async function createApprovalAction(formData: FormData) {
+export async function createApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "approval.create");
   const parsed = createApprovalSchema.safeParse({
     title: formData.get("title"),
@@ -267,9 +298,14 @@ export async function createApprovalAction(formData: FormData) {
   });
 
   revalidatePath("/approvals");
+  });
 }
 
-export async function decideApprovalAction(formData: FormData) {
+export async function decideApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const parsed = decideApprovalSchema.safeParse({
     stepId: formData.get("stepId"),
     officialCode: formData.get("officialCode"),
@@ -299,9 +335,14 @@ export async function decideApprovalAction(formData: FormData) {
   }
   revalidatePath("/approvals");
   revalidatePath("/");
+  });
 }
 
-export async function uploadDocumentAction(formData: FormData) {
+export async function uploadDocumentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "document.upload");
   const parsed = uploadDocumentSchema.safeParse({
     title: formData.get("title"),
@@ -400,9 +441,14 @@ export async function uploadDocumentAction(formData: FormData) {
   if (parsed.data.projectId) {
     revalidatePath(`/projects/${parsed.data.projectId}`);
   }
+  });
 }
 
-export async function markNotificationReadAction(formData: FormData) {
+export async function markNotificationReadAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "notification.read");
   const id = String(formData.get("id") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -414,9 +460,14 @@ export async function markNotificationReadAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
   revalidatePath("/notifications");
   revalidatePath("/");
+  });
 }
 
-export async function createUserAction(formData: FormData) {
+export async function createUserAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "user.create");
   const parsed = createUserSchema.safeParse({
     email: formData.get("email"),
@@ -497,9 +548,14 @@ export async function createUserAction(formData: FormData) {
 
   revalidatePath("/employees");
   revalidatePath("/settings");
+  });
 }
 
-export async function assignRoleAction(formData: FormData) {
+export async function assignRoleAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "role.assign");
   const parsed = assignRoleSchema.safeParse({
     profileId: formData.get("profileId"),
@@ -541,9 +597,14 @@ export async function assignRoleAction(formData: FormData) {
     newValues: { roleId: parsed.data.roleId },
   });
   revalidatePath("/settings");
+  });
 }
 
-export async function assignDepartmentAction(formData: FormData) {
+export async function assignDepartmentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "employee.manage");
   const parsed = assignDepartmentSchema.safeParse({
     employeeId: formData.get("employeeId"),
@@ -561,9 +622,14 @@ export async function assignDepartmentAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath("/employees");
+  });
 }
 
-export async function setUserActiveAction(formData: FormData) {
+export async function setUserActiveAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "user.disable");
   const parsed = setUserActiveSchema.safeParse({
     profileId: formData.get("profileId"),
@@ -608,6 +674,7 @@ export async function setUserActiveAction(formData: FormData) {
   });
   revalidatePath("/settings");
   revalidatePath("/employees");
+  });
 }
 
 export async function bootstrapAdminIfNeeded(email: string): Promise<void> {

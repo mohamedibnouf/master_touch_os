@@ -6,6 +6,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PayrollRepository } from "@/server/repositories/payroll.repository";
 import { updatePayrollSettingsAction } from "@/server/use-cases/payroll";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function PayrollSettingsPage() {
   const ctx = await getAuthContext();
@@ -28,7 +29,7 @@ export default async function PayrollSettingsPage() {
       />
 
       <Card data-testid="payroll-settings-form">
-        <form action={updatePayrollSettingsAction} className="grid gap-3 sm:grid-cols-2">
+        <ServerActionForm action={updatePayrollSettingsAction} className="grid gap-3 sm:grid-cols-2">
           <Field label="العملة">
             <Input name="currency" defaultValue={settings?.currency ?? "SAR"} required />
           </Field>
@@ -83,7 +84,7 @@ export default async function PayrollSettingsPage() {
               حفظ الإعدادات
             </Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

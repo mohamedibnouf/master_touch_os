@@ -13,6 +13,7 @@ import {
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   closeNcrAction,
   createInspectionRequestAction,
@@ -200,7 +201,7 @@ export default async function EngineeringPage({
       {defaultProject && moduleFilter === "rfi" && hasPermission(ctx, "rfi.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب استفسار فني (RFI)</h2>
-          <form action={createRfiAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createRfiAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -236,14 +237,14 @@ export default async function EngineeringPage({
               </Field>
             </div>
             <Button type="submit">إنشاء RFI</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {defaultProject && moduleFilter === "mat" && hasPermission(ctx, "submittal.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب اعتماد مواد (MAT)</h2>
-          <form action={createMaterialSubmittalAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createMaterialSubmittalAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -274,14 +275,14 @@ export default async function EngineeringPage({
               </Field>
             </div>
             <Button type="submit">تسجيل اعتماد مواد</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {defaultProject && moduleFilter === "shd" && hasPermission(ctx, "shop_drawing.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء مخطط تنفيذي (SHD)</h2>
-          <form action={createShopDrawingAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createShopDrawingAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -310,14 +311,14 @@ export default async function EngineeringPage({
               <Input name="floorZone" />
             </Field>
             <Button type="submit">تسجيل مخطط</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {defaultProject && moduleFilter === "ms" && hasPermission(ctx, "method_statement.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طريقة تنفيذ (MS)</h2>
-          <form action={createMethodStatementAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createMethodStatementAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -348,14 +349,14 @@ export default async function EngineeringPage({
               </Field>
             </div>
             <Button type="submit">تسجيل طريقة تنفيذ</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {defaultProject && moduleFilter === "ir" && hasPermission(ctx, "inspection.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب فحص (IR)</h2>
-          <form action={createInspectionRequestAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createInspectionRequestAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -384,14 +385,14 @@ export default async function EngineeringPage({
               <Input name="inspectionDate" type="date" />
             </Field>
             <Button type="submit">تسجيل طلب فحص</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {defaultProject && moduleFilter === "ncr" && hasPermission(ctx, "ncr.create") ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-base font-semibold text-navy">إنشاء تقرير عدم مطابقة (NCR)</h2>
-          <form action={createNcrAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createNcrAction} className="grid gap-3 md:grid-cols-2">
             <Field label="المشروع">
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects.data ?? []).map((p) => (
@@ -426,7 +427,7 @@ export default async function EngineeringPage({
             <Button type="submit" variant="danger">
               تسجيل NCR
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -463,20 +464,20 @@ export default async function EngineeringPage({
                           <div className="flex flex-col gap-2">
                             {["draft", "internal_review"].includes(rfi.status) &&
                             hasPermission(ctx, "rfi.submit") ? (
-                              <form action={submitRfiAction}>
+                              <ServerActionForm action={submitRfiAction}>
                                 <input type="hidden" name="rfiId" value={rfi.id} />
                                 <Button type="submit" variant="secondary">
                                   تقديم
                                 </Button>
-                              </form>
+                              </ServerActionForm>
                             ) : null}
                             {["submitted", "under_review"].includes(rfi.status) &&
                             hasPermission(ctx, "rfi.respond") ? (
-                              <form action={respondRfiAction} className="flex gap-2">
+                              <ServerActionForm action={respondRfiAction} className="flex gap-2">
                                 <input type="hidden" name="rfiId" value={rfi.id} />
                                 <Input name="response" placeholder="الرد" required />
                                 <Button type="submit">رد</Button>
-                              </form>
+                              </ServerActionForm>
                             ) : null}
                             {rfi.response ? (
                               <p className="text-xs text-muted">الرد محفوظ · السؤال الأصلي لا يُستبدل</p>
@@ -562,7 +563,7 @@ export default async function EngineeringPage({
                       <td className="px-3 py-2">
                         {hasPermission(ctx, "inspection.perform") &&
                         ["ready", "submitted", "scheduled", "inspected"].includes(ir.status) ? (
-                          <form action={recordInspectionResultAction} className="flex gap-2">
+                          <ServerActionForm action={recordInspectionResultAction} className="flex gap-2">
                             <input type="hidden" name="inspectionId" value={ir.id} />
                             <Select name="result" defaultValue="passed">
                               <option value="passed">ناجح</option>
@@ -573,7 +574,7 @@ export default async function EngineeringPage({
                             <Button type="submit" variant="secondary">
                               تسجيل
                             </Button>
-                          </form>
+                          </ServerActionForm>
                         ) : (
                           "—"
                         )}
@@ -605,13 +606,13 @@ export default async function EngineeringPage({
                       {ncr.severity} · {ncr.status}
                     </Badge>
                     {ncr.status !== "closed" && hasPermission(ctx, "ncr.close") ? (
-                      <form action={closeNcrAction} className="flex gap-2">
+                      <ServerActionForm action={closeNcrAction} className="flex gap-2">
                         <input type="hidden" name="ncrId" value={ncr.id} />
                         <Input name="verification" placeholder="التحقق" required />
                         <Button type="submit" variant="secondary">
                           إغلاق
                         </Button>
-                      </form>
+                      </ServerActionForm>
                     ) : null}
                   </div>
                 </li>

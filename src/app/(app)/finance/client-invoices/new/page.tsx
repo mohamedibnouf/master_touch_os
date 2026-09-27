@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClientInvoiceAction } from "@/server/use-cases/commercial";
 import { grossWithVat } from "@/server/domain/commercial";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewClientInvoicePage({
   searchParams,
@@ -59,7 +60,10 @@ export default async function NewClientInvoicePage({
       )
     : 0;
 
-  async function action(formData: FormData) {
+  async function action(
+    _prev: import("@/server/forms/form-state").FormActionState,
+    formData: FormData,
+  ): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
     const contractId = String(formData.get("contractId") ?? "");
     const valuationIdForm = String(formData.get("valuationId") ?? "");
@@ -84,8 +88,7 @@ export default async function NewClientInvoicePage({
       if (contract) formData.set("projectId", contract.project_id);
     }
 
-    const invoiceId = await createClientInvoiceAction(formData);
-    redirect(`/finance/client-invoices/${invoiceId}`);
+    return createClientInvoiceAction(_prev, formData);
   }
 
   return (
@@ -100,7 +103,7 @@ export default async function NewClientInvoicePage({
         }
       />
       <Card>
-        <form action={action} className="grid gap-4" data-testid="client-invoice-create-form">
+        <ServerActionForm action={action} className="grid gap-4" data-testid="client-invoice-create-form">
           <Field label="المستخلص (مُفضّل)">
             <Select name="valuationId" defaultValue={selected ? String((selected as Record<string, unknown>).id) : ""} data-testid="invoice-valuation">
               <option value="">بدون مستخلص</option>
@@ -202,7 +205,7 @@ export default async function NewClientInvoicePage({
               حفظ الفاتورة
             </Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

@@ -8,8 +8,8 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { DatabaseError, ValidationError, isAppError } from "@/lib/errors";
-import { logger } from "@/lib/logger";
+import { DatabaseError, ValidationError } from "@/lib/errors";
+import { formActionFailure, runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import {
@@ -101,7 +101,11 @@ function mapAttendanceRpcError(error: { message?: string } | null): never {
   throw new DatabaseError(error);
 }
 
-export async function checkInAction() {
+export async function checkInAction(
+  _prev: FormActionState,
+  _formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تسجيل الحضور. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "attendance.check_in");
   if (!ctx.employee) {
     throw new ValidationError("لا يوجد سجل موظف مرتبط بحسابك.", "No employee record linked to your account.");
@@ -110,9 +114,14 @@ export async function checkInAction() {
   const { error } = await supabase.rpc("attendance_check_in");
   if (error) mapAttendanceRpcError(error);
   revalidateAttendancePaths();
+  });
 }
 
-export async function checkOutAction() {
+export async function checkOutAction(
+  _prev: FormActionState,
+  _formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تسجيل الانصراف. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "attendance.check_out");
   if (!ctx.employee) {
     throw new ValidationError("لا يوجد سجل موظف مرتبط بحسابك.", "No employee record linked to your account.");
@@ -121,6 +130,7 @@ export async function checkOutAction() {
   const { error } = await supabase.rpc("attendance_check_out");
   if (error) mapAttendanceRpcError(error);
   revalidateAttendancePaths();
+  });
 }
 
 export type AttendancePunchState = { ok: boolean; message?: string };
@@ -152,9 +162,7 @@ export async function checkInWithLocationAction(
     revalidateAttendancePaths();
     return { ok: true };
   } catch (err) {
-    if (err instanceof ValidationError) return { ok: false, message: err.userMessageAr };
-    if (err instanceof DatabaseError) return { ok: false, message: err.userMessageAr };
-    return { ok: false, message: "تعذر تسجيل الحضور. حاول مرة أخرى." };
+    return formActionFailure(err, "تعذر تسجيل الحضور. حاول مرة أخرى.") ?? { ok: false, message: "تعذر تسجيل الحضور. حاول مرة أخرى." };
   }
 }
 
@@ -185,80 +193,98 @@ export async function checkOutWithLocationAction(
     revalidateAttendancePaths();
     return { ok: true };
   } catch (err) {
-    if (err instanceof ValidationError) return { ok: false, message: err.userMessageAr };
-    if (err instanceof DatabaseError) return { ok: false, message: err.userMessageAr };
-    return { ok: false, message: "تعذر تسجيل الانصراف. حاول مرة أخرى." };
+    return formActionFailure(err, "تعذر تسجيل الانصراف. حاول مرة أخرى.") ?? { ok: false, message: "تعذر تسجيل الانصراف. حاول مرة أخرى." };
   }
 }
 
-export async function adjustAttendanceRecordAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.adjust");
-  const checkInRaw = String(formData.get("checkInAt") ?? "").trim();
-  const checkOutRaw = String(formData.get("checkOutAt") ?? "").trim();
-  const statusRaw = String(formData.get("attendanceStatus") ?? "").trim();
+export async function adjustAttendanceRecordAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.adjust");
+    const checkInRaw = String(formData.get("checkInAt") ?? "").trim();
+    const checkOutRaw = String(formData.get("checkOutAt") ?? "").trim();
+    const statusRaw = String(formData.get("attendanceStatus") ?? "").trim();
 
-  const parsed = adjustAttendanceSchema.safeParse({
-    recordId: formData.get("recordId"),
-    checkInAt: checkInRaw ? new Date(checkInRaw).toISOString() : null,
-    checkOutAt: checkOutRaw ? new Date(checkOutRaw).toISOString() : null,
-    attendanceStatus: statusRaw || undefined,
-    notes: String(formData.get("notes") ?? "").trim() || undefined,
-    reason: formData.get("reason"),
-  });
-  if (!parsed.success) {
-    throw new ValidationError("بيانات التعديل غير مكتملة.", "Adjustment data is incomplete.");
+    const parsed = adjustAttendanceSchema.safeParse({
+      recordId: formData.get("recordId"),
+      checkInAt: checkInRaw ? new Date(checkInRaw).toISOString() : null,
+      checkOutAt: checkOutRaw ? new Date(checkOutRaw).toISOString() : null,
+      attendanceStatus: statusRaw || undefined,
+      notes: String(formData.get("notes") ?? "").trim() || undefined,
+      reason: formData.get("reason"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات التعديل غير مكتملة.", "Adjustment data is incomplete.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.rpc("adjust_attendance_record", {
+      p_record_id: parsed.data.recordId,
+      p_check_in_at: parsed.data.checkInAt ?? null,
+      p_check_out_at: parsed.data.checkOutAt ?? null,
+      p_attendance_status: parsed.data.attendanceStatus ?? null,
+      p_notes: parsed.data.notes ?? null,
+      p_reason: parsed.data.reason,
+    });
+    if (error) throw new DatabaseError(error);
+
+    const record = data as AttendanceRecord;
+    await notifyEmployeeProfile(supabase, ctx.organization.id, record.employee_id, {
+      type: "attendance.adjusted",
+      title: "تم تعديل سجل الحضور",
+      message: "عدّلت الموارد البشرية سجل حضورك. راجع التفاصيل من صفحة الحضور.",
+      entityId: record.id,
+      priority: "high",
+    });
+
+    revalidateAttendancePaths();
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر تعديل سجل الحضور. حاول مرة أخرى.");
   }
-
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("adjust_attendance_record", {
-    p_record_id: parsed.data.recordId,
-    p_check_in_at: parsed.data.checkInAt ?? null,
-    p_check_out_at: parsed.data.checkOutAt ?? null,
-    p_attendance_status: parsed.data.attendanceStatus ?? null,
-    p_notes: parsed.data.notes ?? null,
-    p_reason: parsed.data.reason,
-  });
-  if (error) throw new DatabaseError(error);
-
-  const record = data as AttendanceRecord;
-  await notifyEmployeeProfile(supabase, ctx.organization.id, record.employee_id, {
-    type: "attendance.adjusted",
-    title: "تم تعديل سجل الحضور",
-    message: "عدّلت الموارد البشرية سجل حضورك. راجع التفاصيل من صفحة الحضور.",
-    entityId: record.id,
-    priority: "high",
-  });
-
-  revalidateAttendancePaths();
 }
 
-export async function assignEmployeeShiftAction(formData: FormData) {
-  authorize(await getAuthContext(), "attendance.manage_shifts");
-  const toRaw = String(formData.get("effectiveTo") ?? "").trim();
-  const parsed = assignEmployeeShiftSchema.safeParse({
-    employeeId: formData.get("employeeId"),
-    shiftId: formData.get("shiftId"),
-    effectiveFrom: formData.get("effectiveFrom"),
-    effectiveTo: toRaw || null,
-  });
-  if (!parsed.success) {
-    throw new ValidationError("بيانات تعيين الوردية غير مكتملة.", "Shift assignment data is incomplete.");
+export async function assignEmployeeShiftAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    authorize(await getAuthContext(), "attendance.manage_shifts");
+    const toRaw = String(formData.get("effectiveTo") ?? "").trim();
+    const parsed = assignEmployeeShiftSchema.safeParse({
+      employeeId: formData.get("employeeId"),
+      shiftId: formData.get("shiftId"),
+      effectiveFrom: formData.get("effectiveFrom"),
+      effectiveTo: toRaw || null,
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات تعيين الوردية غير مكتملة.", "Shift assignment data is incomplete.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("assign_employee_shift", {
+      p_employee_id: parsed.data.employeeId,
+      p_shift_id: parsed.data.shiftId,
+      p_effective_from: parsed.data.effectiveFrom,
+      p_effective_to: parsed.data.effectiveTo ?? null,
+    });
+    if (error) throw new DatabaseError(error);
+
+    revalidatePath("/hr/attendance/assignments");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر تعيين الوردية. حاول مرة أخرى.");
   }
-
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.rpc("assign_employee_shift", {
-    p_employee_id: parsed.data.employeeId,
-    p_shift_id: parsed.data.shiftId,
-    p_effective_from: parsed.data.effectiveFrom,
-    p_effective_to: parsed.data.effectiveTo ?? null,
-  });
-  if (error) throw new DatabaseError(error);
-
-  revalidatePath("/hr/attendance/assignments");
-  revalidatePath("/attendance");
 }
 
-export type WorkplaceSaveState = { ok: boolean; message?: string } | null;
+export type WorkplaceSaveState = FormActionState;
+
+function workplaceFormFailure(err: unknown, unexpectedAr: string): WorkplaceSaveState {
+  return formActionFailure(err, unexpectedAr);
+}
 
 function throwWorkplaceWriteError(error: {
   code?: string;
@@ -367,258 +393,292 @@ export async function upsertWorkplaceLocationAction(
     revalidatePath("/attendance");
     return { ok: true };
   } catch (err) {
-    if (isAppError(err) && (err.code === "VALIDATION" || err.code === "FORBIDDEN" || err.code === "UNAUTHORIZED")) {
-      return { ok: false, message: err.userMessageAr };
-    }
-    if (err instanceof DatabaseError) {
-      logger.error("workplace location save failed", { code: err.code, message: err.message });
-      return { ok: false, message: err.userMessageAr };
-    }
-    logger.error("workplace location save unexpected", {
-      message: err instanceof Error ? err.message : "unknown",
-    });
-    return { ok: false, message: "تعذر حفظ الموقع. حاول مرة أخرى." };
+    return workplaceFormFailure(err, "تعذر حفظ الموقع. حاول مرة أخرى.");
   }
 }
 
-export async function assignEmployeeWorkplaceAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
-  const toRaw = String(formData.get("effectiveTo") ?? "").trim();
-  const parsed = assignEmployeeWorkplaceSchema.safeParse({
-    employeeId: formData.get("employeeId"),
-    workplaceId: formData.get("workplaceId"),
-    effectiveFrom: formData.get("effectiveFrom"),
-    effectiveTo: toRaw || null,
-  });
-  if (!parsed.success) {
-    throw new ValidationError("بيانات تعيين الموقع غير مكتملة.", "Workplace assignment data is incomplete.");
-  }
-  const supabase = await createServerSupabaseClient();
-  const { data: existingRows } = await supabase
-    .from("employee_workplace_assignments")
-    .select("workplace_location_id, effective_from, effective_to")
-    .eq("organization_id", ctx.organization.id)
-    .eq("employee_id", parsed.data.employeeId);
-  const overlap = canAddWorkplaceAssignment(
-    (existingRows ?? []).map((r) => ({
-      workplaceId: r.workplace_location_id as string,
-      effectiveFrom: r.effective_from as string,
-      effectiveTo: (r.effective_to as string | null) ?? null,
-    })),
-    {
-      workplaceId: parsed.data.workplaceId,
-      effectiveFrom: parsed.data.effectiveFrom,
-      effectiveTo: parsed.data.effectiveTo ?? null,
-    },
-  );
-  if (!overlap.ok) {
-    throw new ValidationError(
-      "هذا الموظف معيَّن بالفعل لهذا الموقع في فترة متداخلة.",
-      "This employee already has an overlapping assignment for the same workplace.",
+export async function assignEmployeeWorkplaceAction(
+  _prev: WorkplaceSaveState,
+  formData: FormData,
+): Promise<WorkplaceSaveState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+    const toRaw = String(formData.get("effectiveTo") ?? "").trim();
+    const parsed = assignEmployeeWorkplaceSchema.safeParse({
+      employeeId: formData.get("employeeId"),
+      workplaceId: formData.get("workplaceId"),
+      effectiveFrom: formData.get("effectiveFrom"),
+      effectiveTo: toRaw || null,
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات تعيين الموقع غير مكتملة.", "Workplace assignment data is incomplete.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: existingRows } = await supabase
+      .from("employee_workplace_assignments")
+      .select("workplace_location_id, effective_from, effective_to")
+      .eq("organization_id", ctx.organization.id)
+      .eq("employee_id", parsed.data.employeeId);
+    const overlap = canAddWorkplaceAssignment(
+      (existingRows ?? []).map((r) => ({
+        workplaceId: r.workplace_location_id as string,
+        effectiveFrom: r.effective_from as string,
+        effectiveTo: (r.effective_to as string | null) ?? null,
+      })),
+      {
+        workplaceId: parsed.data.workplaceId,
+        effectiveFrom: parsed.data.effectiveFrom,
+        effectiveTo: parsed.data.effectiveTo ?? null,
+      },
     );
-  }
-  const { error } = await supabase.from("employee_workplace_assignments").insert({
-    organization_id: ctx.organization.id,
-    employee_id: parsed.data.employeeId,
-    workplace_location_id: parsed.data.workplaceId,
-    effective_from: parsed.data.effectiveFrom,
-    effective_to: parsed.data.effectiveTo,
-    created_by: ctx.userId,
-  });
-  if (error) {
-    if (error.code === "23P01" || /no_overlap|exclusion/i.test(error.message ?? "")) {
+    if (!overlap.ok) {
       throw new ValidationError(
         "هذا الموظف معيَّن بالفعل لهذا الموقع في فترة متداخلة.",
         "This employee already has an overlapping assignment for the same workplace.",
       );
     }
-    if (/WORKPLACE_ORG_MISMATCH/i.test(error.message ?? "")) {
-      throw new ValidationError("لا يمكن ربط موظف بموقع عمل خارج المنشأة.", "Workplace and employee must belong to the same organization.");
+    const { error } = await supabase.from("employee_workplace_assignments").insert({
+      organization_id: ctx.organization.id,
+      employee_id: parsed.data.employeeId,
+      workplace_location_id: parsed.data.workplaceId,
+      effective_from: parsed.data.effectiveFrom,
+      effective_to: parsed.data.effectiveTo,
+      created_by: ctx.userId,
+    });
+    if (error) {
+      if (error.code === "23P01" || /no_overlap|exclusion/i.test(error.message ?? "")) {
+        throw new ValidationError(
+          "هذا الموظف معيَّن بالفعل لهذا الموقع في فترة متداخلة.",
+          "This employee already has an overlapping assignment for the same workplace.",
+        );
+      }
+      if (/WORKPLACE_ORG_MISMATCH/i.test(error.message ?? "")) {
+        throw new ValidationError("لا يمكن ربط موظف بموقع عمل خارج المنشأة.", "Workplace and employee must belong to the same organization.");
+      }
+      throw new DatabaseError(error);
     }
-    throw new DatabaseError(error);
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "workplace.assigned",
+      entityType: "employee_workplace_assignment",
+      entityId: parsed.data.employeeId,
+      newValues: { workplace_id: parsed.data.workplaceId, effective_from: parsed.data.effectiveFrom, effective_to: parsed.data.effectiveTo },
+    });
+    revalidatePath("/hr/attendance/locations");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (err) {
+    return workplaceFormFailure(err, "تعذر حفظ التعيين. حاول مرة أخرى.");
   }
-  await new AuditService(supabase).log({
-    organizationId: ctx.organization.id,
-    action: "workplace.assigned",
-    entityType: "employee_workplace_assignment",
-    entityId: parsed.data.employeeId,
-    newValues: { workplace_id: parsed.data.workplaceId, effective_from: parsed.data.effectiveFrom, effective_to: parsed.data.effectiveTo },
-  });
-  revalidatePath("/hr/attendance/locations");
-  revalidatePath("/attendance");
 }
 
-export async function endEmployeeWorkplaceAssignmentAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
-  const id = String(formData.get("assignmentId") ?? "").trim();
-  const endedOn = String(formData.get("effectiveTo") ?? "").trim() || new Date().toISOString().slice(0, 10);
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
-  }
-  const supabase = await createServerSupabaseClient();
-  const { data: row, error: fetchErr } = await supabase
-    .from("employee_workplace_assignments")
-    .select("id, employee_id, workplace_location_id, effective_from")
-    .eq("id", id)
-    .eq("organization_id", ctx.organization.id)
-    .maybeSingle();
-  if (fetchErr) throw new DatabaseError(fetchErr);
-  if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
-  if (endedOn < String(row.effective_from)) {
-    throw new ValidationError("تاريخ الانتهاء لا يمكن أن يسبق تاريخ البداية.", "End date cannot precede start date.");
-  }
-  const { error } = await supabase
-    .from("employee_workplace_assignments")
-    .update({ effective_to: endedOn })
-    .eq("id", id)
-    .eq("organization_id", ctx.organization.id);
-  if (error) throw new DatabaseError(error);
-  await new AuditService(supabase).log({
-    organizationId: ctx.organization.id,
-    action: "workplace.assignment_ended",
-    entityType: "employee_workplace_assignment",
-    entityId: id,
-    newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id, effective_to: endedOn },
-  });
-  revalidatePath("/hr/attendance/locations");
-  revalidatePath("/attendance");
-}
-
-export async function removeEmployeeWorkplaceAssignmentAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
-  const id = String(formData.get("assignmentId") ?? "").trim();
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  const supabase = await createServerSupabaseClient();
-  const { data: row, error: fetchErr } = await supabase
-    .from("employee_workplace_assignments")
-    .select("id, employee_id, workplace_location_id, effective_from, effective_to")
-    .eq("id", id)
-    .eq("organization_id", ctx.organization.id)
-    .maybeSingle();
-  if (fetchErr) throw new DatabaseError(fetchErr);
-  if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
-  const started = String(row.effective_from) <= today;
-  const stillOpen = row.effective_to == null || String(row.effective_to) >= today;
-  if (started && stillOpen) {
-    throw new ValidationError(
-      "لا يمكن حذف تعيين سارٍ. أنهِ الفترة أولاً للحفاظ على السجل.",
-      "Cannot delete an active assignment. End the period first.",
-    );
-  }
-  const { error } = await supabase
-    .from("employee_workplace_assignments")
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", ctx.organization.id);
-  if (error) throw new DatabaseError(error);
-  await new AuditService(supabase).log({
-    organizationId: ctx.organization.id,
-    action: "workplace.assignment_removed",
-    entityType: "employee_workplace_assignment",
-    entityId: id,
-    newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id },
-  });
-  revalidatePath("/hr/attendance/locations");
-  revalidatePath("/attendance");
-}
-
-export async function reconcileAttendanceAction(formData: FormData) {
-  authorize(await getAuthContext(), "attendance.manage");
-  const empRaw = String(formData.get("employeeId") ?? "").trim();
-  const parsed = reconcileAttendanceSchema.safeParse({
-    attendanceDate: formData.get("attendanceDate"),
-    employeeId: empRaw || undefined,
-  });
-  if (!parsed.success) {
-    throw new ValidationError("تاريخ التسوية غير صالح.", "Invalid reconcile date.");
-  }
-
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.rpc("reconcile_attendance_for_date", {
-    p_attendance_date: parsed.data.attendanceDate,
-    p_employee_id: parsed.data.employeeId ?? null,
-  });
-  if (error) throw new DatabaseError(error);
-
-  revalidateAttendancePaths();
-}
-
-export async function upsertAttendancePolicyAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_policies");
-  const parsed = upsertAttendancePolicySchema.safeParse({
-    id: String(formData.get("id") ?? "").trim() || undefined,
-    code: formData.get("code"),
-    name_ar: formData.get("name_ar"),
-    name_en: formData.get("name_en"),
-    description_ar: String(formData.get("description_ar") ?? "").trim() || undefined,
-    description_en: String(formData.get("description_en") ?? "").trim() || undefined,
-    late_grace_minutes: formData.get("late_grace_minutes") || 15,
-    early_leave_grace_minutes: formData.get("early_leave_grace_minutes") || 15,
-    minimum_work_minutes: formData.get("minimum_work_minutes") || 240,
-    allow_manual_check_in: formBool(formData.get("allow_manual_check_in"), true),
-    allow_manual_check_out: formBool(formData.get("allow_manual_check_out"), true),
-    require_hr_approval_for_adjustment: formBool(formData.get("require_hr_approval_for_adjustment"), false),
-    reconciliation_delay_hours: formData.get("reconciliation_delay_hours") || 8,
-    is_active: formBool(formData.get("is_active"), true),
-  });
-  if (!parsed.success) {
-    throw new ValidationError("بيانات السياسة غير مكتملة.", "Policy data is incomplete.");
-  }
-
-  const supabase = await createServerSupabaseClient();
-  const row = {
-    organization_id: ctx.organization.id,
-    code: parsed.data.code.toUpperCase(),
-    name_ar: parsed.data.name_ar,
-    name_en: parsed.data.name_en,
-    description_ar: parsed.data.description_ar ?? null,
-    description_en: parsed.data.description_en ?? null,
-    late_grace_minutes: parsed.data.late_grace_minutes,
-    early_leave_grace_minutes: parsed.data.early_leave_grace_minutes,
-    minimum_work_minutes: parsed.data.minimum_work_minutes,
-    allow_manual_check_in: parsed.data.allow_manual_check_in,
-    allow_manual_check_out: parsed.data.allow_manual_check_out,
-    require_hr_approval_for_adjustment: parsed.data.require_hr_approval_for_adjustment,
-    reconciliation_delay_hours: parsed.data.reconciliation_delay_hours,
-    is_active: parsed.data.is_active,
-  };
-
-  const audit = new AuditService(supabase);
-  if (parsed.data.id) {
+export async function endEmployeeWorkplaceAssignmentAction(
+  _prev: WorkplaceSaveState,
+  formData: FormData,
+): Promise<WorkplaceSaveState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+    const id = String(formData.get("assignmentId") ?? "").trim();
+    const endedOn = String(formData.get("effectiveTo") ?? "").trim() || new Date().toISOString().slice(0, 10);
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: row, error: fetchErr } = await supabase
+      .from("employee_workplace_assignments")
+      .select("id, employee_id, workplace_location_id, effective_from")
+      .eq("id", id)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle();
+    if (fetchErr) throw new DatabaseError(fetchErr);
+    if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
+    if (endedOn < String(row.effective_from)) {
+      throw new ValidationError("تاريخ الانتهاء لا يمكن أن يسبق تاريخ البداية.", "End date cannot precede start date.");
+    }
     const { error } = await supabase
-      .from("attendance_policies")
-      .update(row)
-      .eq("id", parsed.data.id)
+      .from("employee_workplace_assignments")
+      .update({ effective_to: endedOn })
+      .eq("id", id)
       .eq("organization_id", ctx.organization.id);
     if (error) throw new DatabaseError(error);
-    await audit.log({
+    await new AuditService(supabase).log({
       organizationId: ctx.organization.id,
-      action: "attendance_policy.updated",
-      entityType: "attendance_policy",
-      entityId: parsed.data.id,
-      newValues: { code: row.code, is_active: row.is_active },
+      action: "workplace.assignment_ended",
+      entityType: "employee_workplace_assignment",
+      entityId: id,
+      newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id, effective_to: endedOn },
     });
-  } else {
-    const { data, error } = await supabase.from("attendance_policies").insert(row).select("id").single();
-    if (error) throw new DatabaseError(error);
-    await audit.log({
-      organizationId: ctx.organization.id,
-      action: "attendance_policy.created",
-      entityType: "attendance_policy",
-      entityId: data.id,
-      newValues: { code: row.code },
-    });
+    revalidatePath("/hr/attendance/locations");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (err) {
+    return workplaceFormFailure(err, "تعذر إنهاء التعيين. حاول مرة أخرى.");
   }
-
-  revalidatePath("/hr/attendance/policies");
-  revalidatePath("/hr/attendance/shifts");
 }
 
-export async function upsertAttendanceShiftAction(formData: FormData) {
-  const ctx = authorize(await getAuthContext(), "attendance.manage_shifts");
+export async function removeEmployeeWorkplaceAssignmentAction(
+  _prev: WorkplaceSaveState,
+  formData: FormData,
+): Promise<WorkplaceSaveState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
+    const id = String(formData.get("assignmentId") ?? "").trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const supabase = await createServerSupabaseClient();
+    const { data: row, error: fetchErr } = await supabase
+      .from("employee_workplace_assignments")
+      .select("id, employee_id, workplace_location_id, effective_from, effective_to")
+      .eq("id", id)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle();
+    if (fetchErr) throw new DatabaseError(fetchErr);
+    if (!row) throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
+    const started = String(row.effective_from) <= today;
+    const stillOpen = row.effective_to == null || String(row.effective_to) >= today;
+    if (started && stillOpen) {
+      throw new ValidationError(
+        "لا يمكن حذف تعيين سارٍ. أنهِ الفترة أولاً للحفاظ على السجل.",
+        "Cannot delete an active assignment. End the period first.",
+      );
+    }
+    const { error } = await supabase
+      .from("employee_workplace_assignments")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", ctx.organization.id);
+    if (error) throw new DatabaseError(error);
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "workplace.assignment_removed",
+      entityType: "employee_workplace_assignment",
+      entityId: id,
+      newValues: { employee_id: row.employee_id, workplace_id: row.workplace_location_id },
+    });
+    revalidatePath("/hr/attendance/locations");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (err) {
+    return workplaceFormFailure(err, "تعذر حذف التعيين. حاول مرة أخرى.");
+  }
+}
+
+export async function reconcileAttendanceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    authorize(await getAuthContext(), "attendance.manage");
+    const empRaw = String(formData.get("employeeId") ?? "").trim();
+    const parsed = reconcileAttendanceSchema.safeParse({
+      attendanceDate: formData.get("attendanceDate"),
+      employeeId: empRaw || undefined,
+    });
+    if (!parsed.success) {
+      throw new ValidationError("تاريخ التسوية غير صالح.", "Invalid reconcile date.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("reconcile_attendance_for_date", {
+      p_attendance_date: parsed.data.attendanceDate,
+      p_employee_id: parsed.data.employeeId ?? null,
+    });
+    if (error) throw new DatabaseError(error);
+
+    revalidateAttendancePaths();
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر تشغيل التسوية. حاول مرة أخرى.");
+  }
+}
+
+export async function upsertAttendancePolicyAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_policies");
+    const parsed = upsertAttendancePolicySchema.safeParse({
+      id: String(formData.get("id") ?? "").trim() || undefined,
+      code: formData.get("code"),
+      name_ar: formData.get("name_ar"),
+      name_en: formData.get("name_en"),
+      description_ar: String(formData.get("description_ar") ?? "").trim() || undefined,
+      description_en: String(formData.get("description_en") ?? "").trim() || undefined,
+      late_grace_minutes: formData.get("late_grace_minutes") || 15,
+      early_leave_grace_minutes: formData.get("early_leave_grace_minutes") || 15,
+      minimum_work_minutes: formData.get("minimum_work_minutes") || 240,
+      allow_manual_check_in: formBool(formData.get("allow_manual_check_in"), true),
+      allow_manual_check_out: formBool(formData.get("allow_manual_check_out"), true),
+      require_hr_approval_for_adjustment: formBool(formData.get("require_hr_approval_for_adjustment"), false),
+      reconciliation_delay_hours: formData.get("reconciliation_delay_hours") || 8,
+      is_active: formBool(formData.get("is_active"), true),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات السياسة غير مكتملة.", "Policy data is incomplete.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const row = {
+      organization_id: ctx.organization.id,
+      code: parsed.data.code.toUpperCase(),
+      name_ar: parsed.data.name_ar,
+      name_en: parsed.data.name_en,
+      description_ar: parsed.data.description_ar ?? null,
+      description_en: parsed.data.description_en ?? null,
+      late_grace_minutes: parsed.data.late_grace_minutes,
+      early_leave_grace_minutes: parsed.data.early_leave_grace_minutes,
+      minimum_work_minutes: parsed.data.minimum_work_minutes,
+      allow_manual_check_in: parsed.data.allow_manual_check_in,
+      allow_manual_check_out: parsed.data.allow_manual_check_out,
+      require_hr_approval_for_adjustment: parsed.data.require_hr_approval_for_adjustment,
+      reconciliation_delay_hours: parsed.data.reconciliation_delay_hours,
+      is_active: parsed.data.is_active,
+    };
+
+    const audit = new AuditService(supabase);
+    if (parsed.data.id) {
+      const { error } = await supabase
+        .from("attendance_policies")
+        .update(row)
+        .eq("id", parsed.data.id)
+        .eq("organization_id", ctx.organization.id);
+      if (error) throw new DatabaseError(error);
+      await audit.log({
+        organizationId: ctx.organization.id,
+        action: "attendance_policy.updated",
+        entityType: "attendance_policy",
+        entityId: parsed.data.id,
+        newValues: { code: row.code, is_active: row.is_active },
+      });
+    } else {
+      const { data, error } = await supabase.from("attendance_policies").insert(row).select("id").single();
+      if (error) throw new DatabaseError(error);
+      await audit.log({
+        organizationId: ctx.organization.id,
+        action: "attendance_policy.created",
+        entityType: "attendance_policy",
+        entityId: data.id,
+        newValues: { code: row.code },
+      });
+    }
+
+    revalidatePath("/hr/attendance/policies");
+    revalidatePath("/hr/attendance/shifts");
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر حفظ سياسة الحضور. حاول مرة أخرى.");
+  }
+}
+
+export async function upsertAttendanceShiftAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    const ctx = authorize(await getAuthContext(), "attendance.manage_shifts");
   const parsed = upsertAttendanceShiftSchema.safeParse({
     id: String(formData.get("id") ?? "").trim() || undefined,
     policy_id: formData.get("policy_id"),
@@ -680,4 +740,8 @@ export async function upsertAttendanceShiftAction(formData: FormData) {
 
   revalidatePath("/hr/attendance/shifts");
   revalidatePath("/hr/attendance/assignments");
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر حفظ الوردية. حاول مرة أخرى.");
+  }
 }

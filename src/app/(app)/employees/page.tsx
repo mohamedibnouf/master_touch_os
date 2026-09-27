@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createEmployeeAction } from "@/server/use-cases/hr";
 import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
 import type { EmploymentStatus, EmploymentType } from "@/types/enums";
@@ -73,7 +74,7 @@ export default async function EmployeesPage() {
           <p className="mb-4 text-sm text-muted">
             يتطلب صلاحية إنشاء موظف. تعيين الأدوار يتطلب صلاحية منفصلة.
           </p>
-          <form action={createEmployeeAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createEmployeeAction} className="grid gap-3 md:grid-cols-2">
             <Field label="البريد">
               <Input name="email" type="email" required data-testid="employee-create-email" />
             </Field>
@@ -137,7 +138,7 @@ export default async function EmployeesPage() {
                 إنشاء الموظف
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

@@ -5,6 +5,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { isEntityApprovalTypeSupported, type SupportedEntityType } from "@/lib/approvals/entity-approval-types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -84,7 +85,11 @@ async function revalidateEntityPaths(entityType: SupportedEntityType, entityId: 
   }
 }
 
-export async function decideEntityApprovalAction(formData: FormData) {
+export async function decideEntityApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تسجيل قرار الاعتماد. حاول مرة أخرى.", async () => {
   const parsed = decideEntityApprovalSchema.safeParse({
     approvalRequestId: formData.get("approvalRequestId"),
     stepId: formData.get("stepId") || undefined,
@@ -195,4 +200,5 @@ export async function decideEntityApprovalAction(formData: FormData) {
   }
 
   await revalidateEntityPaths(result.entity_type, result.entity_id);
+  });
 }

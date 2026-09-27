@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -88,7 +89,11 @@ async function ensureApprovalAndDecide(
   if (error) throw new DatabaseError(error);
 }
 
-export async function attachEntityDocumentAction(formData: FormData) {
+export async function attachEntityDocumentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "document.upload");
   const entityType = String(formData.get("entityType") ?? "");
   const entityId = String(formData.get("entityId") ?? "");
@@ -158,9 +163,14 @@ export async function attachEntityDocumentAction(formData: FormData) {
   });
 
   if (revalidate) revalidatePath(revalidate);
+  });
 }
 
-export async function createProjectContractAction(formData: FormData) {
+export async function createProjectContractAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "finance.manage");
   const parsed = z
     .object({
@@ -233,9 +243,14 @@ export async function createProjectContractAction(formData: FormData) {
 
   revalidatePath(`/projects/${parsed.data.projectId}`);
   revalidatePath(`/projects/${parsed.data.projectId}/commercial/contract`);
+  });
 }
 
-export async function activateProjectContractAction(formData: FormData) {
+export async function activateProjectContractAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "finance.manage");
   const contractId = String(formData.get("contractId") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
@@ -243,9 +258,14 @@ export async function activateProjectContractAction(formData: FormData) {
   const { error } = await supabase.rpc("activate_project_contract", { p_contract_id: contractId });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/projects/${projectId}/commercial/contract`);
+  });
 }
 
-export async function createContractMilestoneAction(formData: FormData) {
+export async function createContractMilestoneAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "finance.manage");
   const parsed = z
     .object({
@@ -288,9 +308,14 @@ export async function createContractMilestoneAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/projects/${parsed.data.projectId}/commercial/milestones`);
+  });
 }
 
-export async function markMilestoneEligibleAction(formData: FormData) {
+export async function markMilestoneEligibleAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "finance.manage");
   const milestoneId = String(formData.get("milestoneId") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
@@ -302,9 +327,14 @@ export async function markMilestoneEligibleAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/projects/${projectId}/commercial/milestones`);
+  });
 }
 
-export async function createClientValuationAction(formData: FormData) {
+export async function createClientValuationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "client_valuation.create");
   const parsed = z
     .object({
@@ -374,9 +404,14 @@ export async function createClientValuationAction(formData: FormData) {
 
   revalidatePath("/finance/client-valuations");
   revalidatePath(`/finance/client-valuations/${val.id}`);
+  });
 }
 
-export async function submitClientValuationForReviewAction(formData: FormData) {
+export async function submitClientValuationForReviewAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "client_valuation.submit");
   const valuationId = String(formData.get("valuationId") ?? "");
   const approverId = String(formData.get("approverId") ?? "");
@@ -439,9 +474,14 @@ export async function submitClientValuationForReviewAction(formData: FormData) {
 
   revalidatePath(`/finance/client-valuations/${valuationId}`);
   revalidatePath("/approvals");
+  });
 }
 
-export async function approveClientValuationInternalAction(formData: FormData) {
+export async function approveClientValuationInternalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "client_valuation.approve");
   const valuationId = String(formData.get("valuationId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -460,9 +500,14 @@ export async function approveClientValuationInternalAction(formData: FormData) {
   });
 
   revalidatePath(`/finance/client-valuations/${valuationId}`);
+  });
 }
 
-export async function markValuationUnderClientReviewAction(formData: FormData) {
+export async function markValuationUnderClientReviewAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "client_valuation.submit");
   const valuationId = String(formData.get("valuationId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -473,9 +518,14 @@ export async function markValuationUnderClientReviewAction(formData: FormData) {
     .eq("status", "submitted");
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/client-valuations/${valuationId}`);
+  });
 }
 
-export async function recordClientValuationCertificationAction(formData: FormData) {
+export async function recordClientValuationCertificationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "client_valuation.approve");
   const parsed = z
     .object({
@@ -504,9 +554,14 @@ export async function recordClientValuationCertificationAction(formData: FormDat
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/client-valuations/${parsed.data.valuationId}`);
+  });
 }
 
-export async function createClientInvoiceAction(formData: FormData) {
+export async function createClientInvoiceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "client_invoice.create");
   const parsed = z
     .object({
@@ -577,10 +632,15 @@ export async function createClientInvoiceAction(formData: FormData) {
 
   revalidatePath("/finance/client-invoices");
   revalidatePath(`/finance/client-invoices/${inv.id}`);
-  return inv.id as string;
+  redirect(`/finance/client-invoices/${inv.id}`);
+  });
 }
 
-export async function issueClientInvoiceAction(formData: FormData) {
+export async function issueClientInvoiceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "client_invoice.issue");
   const invoiceId = String(formData.get("invoiceId") ?? "");
   if (!z.string().uuid().safeParse(invoiceId).success) {
@@ -592,9 +652,14 @@ export async function issueClientInvoiceAction(formData: FormData) {
   revalidatePath(`/finance/client-invoices/${invoiceId}`);
   revalidatePath("/finance/client-invoices");
   redirect(`/finance/client-invoices/${invoiceId}`);
+  });
 }
 
-export async function createVariationAction(formData: FormData) {
+export async function createVariationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "variation.create");
   const parsed = z
     .object({
@@ -657,9 +722,14 @@ export async function createVariationAction(formData: FormData) {
 
   revalidatePath("/finance/variations");
   revalidatePath(`/finance/variations/${vo.id}`);
+  });
 }
 
-export async function submitVariationAction(formData: FormData) {
+export async function submitVariationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "variation.submit");
   const variationId = String(formData.get("variationId") ?? "");
   const approverId = String(formData.get("approverId") ?? "");
@@ -711,9 +781,14 @@ export async function submitVariationAction(formData: FormData) {
   });
 
   revalidatePath(`/finance/variations/${variationId}`);
+  });
 }
 
-export async function approveVariationWithAmountAction(formData: FormData) {
+export async function approveVariationWithAmountAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية التجارية. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "variation.approve");
   const variationId = String(formData.get("variationId") ?? "");
   const approvedAmount = Number(formData.get("approvedAmount") ?? 0);
@@ -724,4 +799,5 @@ export async function approveVariationWithAmountAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/variations/${variationId}`);
+  });
 }

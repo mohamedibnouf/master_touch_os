@@ -1,5 +1,7 @@
 "use client";
 
+import { appErrorBoundaryCopy } from "@/lib/errors/boundary-copy";
+
 export default function Error({
   error,
   reset,
@@ -7,10 +9,11 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const copy = appErrorBoundaryCopy(error);
   return (
     <div className="rounded-lg border border-line bg-white p-6">
-      <h1 className="text-lg font-semibold text-navy">تعذّر تحميل هذه الشاشة</h1>
-      <p className="mt-2 text-sm text-muted">البيانات لم تُعرض. أعد المحاولة أو انتقل لشاشة أخرى.</p>
+      <h1 className="text-lg font-semibold text-navy">{copy.title}</h1>
+      <p className="mt-2 text-sm text-muted">{copy.body}</p>
       {error.digest ? <p className="mt-2 text-xs text-muted">مرجع: {error.digest}</p> : null}
       <button
         type="button"

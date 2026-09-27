@@ -5,6 +5,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignRoleAction, setUserActiveAction } from "@/server/use-cases/platform";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 type RoleRow = { id: string; name_ar: string; is_external?: boolean };
 type MemberRow = {
@@ -37,7 +38,7 @@ export default async function SettingsPage() {
   ]);
 
   const roleRows = roles as RoleRow[];
-  const members = users as MemberRow[];
+  const members = users as unknown as MemberRow[];
 
   return (
     <div>
@@ -99,7 +100,7 @@ export default async function SettingsPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3">
                       {hasPermission(ctx, "role.assign") ? (
-                        <form action={assignRoleAction} className="flex items-end gap-2">
+                        <ServerActionForm action={assignRoleAction} className="flex items-end gap-2">
                           <input type="hidden" name="profileId" value={profile.id} />
                           <Field label="دور">
                             <Select name="roleId" required defaultValue="">
@@ -118,10 +119,10 @@ export default async function SettingsPage() {
                           <Button type="submit" variant="secondary">
                             تعيين
                           </Button>
-                        </form>
+                        </ServerActionForm>
                       ) : null}
                       {hasPermission(ctx, "user.disable") && profile.id !== ctx.userId ? (
-                        <form action={setUserActiveAction}>
+                        <ServerActionForm action={setUserActiveAction}>
                           <input type="hidden" name="profileId" value={profile.id} />
                           <input
                             type="hidden"
@@ -131,7 +132,7 @@ export default async function SettingsPage() {
                           <Button type="submit" variant={profile.is_active ? "danger" : "primary"}>
                             {profile.is_active ? "إيقاف" : "تفعيل"}
                           </Button>
-                        </form>
+                        </ServerActionForm>
                       ) : null}
                     </div>
                   </div>

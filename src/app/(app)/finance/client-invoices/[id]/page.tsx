@@ -11,6 +11,7 @@ import { issueClientInvoiceAction } from "@/server/use-cases/commercial";
 import { recordClientPaymentAction } from "@/server/use-cases/finance";
 import { remainingBalance, roundMoney } from "@/server/domain/commercial";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function ClientInvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -175,12 +176,12 @@ export default async function ClientInvoiceDetailPage({ params }: { params: Prom
       {canIssue ? (
         <Card className="mb-6" data-testid="client-invoice-issue-card">
           <h2 className="mb-3 font-semibold text-navy">إصدار الفاتورة</h2>
-          <form action={issueClientInvoiceAction} data-testid="client-invoice-issue-form">
+          <ServerActionForm action={issueClientInvoiceAction} data-testid="client-invoice-issue-form">
             <input type="hidden" name="invoiceId" value={invoice.id} />
             <Button type="submit" data-testid="client-invoice-issue-submit">
               إصدار الفاتورة ✓
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -190,7 +191,7 @@ export default async function ClientInvoiceDetailPage({ params }: { params: Prom
           <p className="mb-4 text-sm text-muted">
             المبلغ المتبقي: <MoneyDisplay amount={outstanding} currency={invoice.currency} />
           </p>
-          <form action={recordClientPaymentAction} className="grid gap-4" data-testid="client-invoice-payment-form">
+          <ServerActionForm action={recordClientPaymentAction} className="grid gap-4" data-testid="client-invoice-payment-form">
             <input type="hidden" name="invoiceId" value={invoice.id} />
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="المبلغ (SAR)">
@@ -232,7 +233,7 @@ export default async function ClientInvoiceDetailPage({ params }: { params: Prom
                 تسجيل التحصيل
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { issueRfqAction, updateRfqSupplierResponseAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -93,10 +94,10 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           <p className="mb-3 text-sm text-muted">
             بعد الإصدار، لن يمكن تعديل البيانات التجارية.
           </p>
-          <form action={issueRfqAction}>
+          <ServerActionForm action={issueRfqAction}>
             <input type="hidden" name="rfqId" value={rfq.id} />
             <Button type="submit">إصدار RFQ</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -185,16 +186,16 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                         <td className="py-2">
                           {String(inv.response_status) === "invited" ? (
                             <div className="flex gap-2">
-                              <form action={updateRfqSupplierResponseAction}>
+                              <ServerActionForm action={updateRfqSupplierResponseAction}>
                                 <input type="hidden" name="invitationId" value={String(inv.id)} />
                                 <input type="hidden" name="responseStatus" value="acknowledged" />
                                 <Button type="submit" variant="secondary">أقرّ</Button>
-                              </form>
-                              <form action={updateRfqSupplierResponseAction}>
+                              </ServerActionForm>
+                              <ServerActionForm action={updateRfqSupplierResponseAction}>
                                 <input type="hidden" name="invitationId" value={String(inv.id)} />
                                 <input type="hidden" name="responseStatus" value="declined" />
                                 <Button type="submit" variant="danger">رفض</Button>
-                              </form>
+                              </ServerActionForm>
                             </div>
                           ) : (
                             <span className="text-muted">—</span>

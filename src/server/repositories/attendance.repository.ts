@@ -94,6 +94,7 @@ export class AttendanceRepository {
   ): Promise<AttendanceRecord | null> {
     const { data, error } = await this.supabase
       .from("attendance_records")
+      // Dual FKs to workplace_locations (check_in/out). Never embed workplace_locations without a FK hint (PGRST201).
       .select("*")
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)

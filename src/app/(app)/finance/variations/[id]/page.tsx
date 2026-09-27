@@ -12,6 +12,7 @@ import {
   submitVariationAction,
 } from "@/server/use-cases/commercial";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function VariationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -122,7 +123,7 @@ export default async function VariationDetailPage({ params }: { params: Promise<
       {canSubmit ? (
         <Card className="mb-6" data-testid="variation-submit-card">
           <h2 className="mb-3 font-semibold text-navy">تقديم للاعتماد</h2>
-          <form action={submitVariationAction} className="flex flex-wrap gap-3" data-testid="variation-submit-form">
+          <ServerActionForm action={submitVariationAction} className="flex flex-wrap gap-3" data-testid="variation-submit-form">
             <input type="hidden" name="variationId" value={variation.id} />
             <Select name="approverId" required data-testid="variation-approver">
               <option value="">اختر المعتمد</option>
@@ -140,14 +141,14 @@ export default async function VariationDetailPage({ params }: { params: Promise<
             <Button type="submit" data-testid="variation-submit-button">
               تقديم للاعتماد
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {canApprove ? (
         <Card className="mb-6" data-testid="variation-approve-card">
           <h2 className="mb-4 font-semibold text-navy">اعتماد بمبلغ</h2>
-          <form action={approveVariationWithAmountAction} className="flex flex-wrap items-end gap-3" data-testid="variation-approve-form">
+          <ServerActionForm action={approveVariationWithAmountAction} className="flex flex-wrap items-end gap-3" data-testid="variation-approve-form">
             <input type="hidden" name="variationId" value={variation.id} />
             <Field label="المبلغ المعتمد (SAR)">
               <Input
@@ -165,7 +166,7 @@ export default async function VariationDetailPage({ params }: { params: Promise<
             <Button type="submit" data-testid="variation-approve-submit">
               اعتماد ✓
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
     </div>

@@ -40,7 +40,7 @@ export class CoreRepository {
   async listEmployees(organizationId: string): Promise<Array<Employee & { profiles: Profile | null }>> {
     const { data, error } = await this.supabase
       .from("employees")
-      .select(`${EMPLOYEE_DIRECTORY_COLUMNS}, profiles(id, full_name_ar, full_name_en, phone, locale, is_active, avatar_path, last_seen_at, created_at, updated_at)`)
+      .select(`${EMPLOYEE_DIRECTORY_COLUMNS}, profiles(id, full_name_ar)`)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -51,16 +51,17 @@ export class CoreRepository {
   /** Name picker only — avoids the heavy directory embed that can hit statement timeout (57014). */
   async listEmployeeNameOptions(
     organizationId: string,
-  ): Promise<Array<{ id: string; employee_number: string | null; profiles: { full_name_ar: string | null } | null }>> {
+  ): Promise<Array<{ id: string; profile_id: string; employee_number: string | null; profiles: { full_name_ar: string | null } | null }>> {
     const { data, error } = await this.supabase
       .from("employees")
-      .select("id, employee_number, profiles(full_name_ar)")
+      .select("id, profile_id, employee_number, profiles(full_name_ar)")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) fail(error);
     return (data ?? []) as unknown as Array<{
       id: string;
+      profile_id: string;
       employee_number: string | null;
       profiles: { full_name_ar: string | null } | null;
     }>;
@@ -332,7 +333,7 @@ export class CoreRepository {
     // PostgREST cannot embed employees(*) from organization_members (PGRST200).
     const { data: members, error } = await this.supabase
       .from("organization_members")
-      .select("*, profiles(*)")
+      .select("profile_id, status, profiles(id, full_name_ar, full_name_en, is_active)")
       .eq("organization_id", organizationId)
       .order("joined_at", { ascending: false })
       .limit(100);

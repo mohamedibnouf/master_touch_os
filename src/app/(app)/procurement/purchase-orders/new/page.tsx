@@ -7,6 +7,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createPoFromQuotationAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewPurchaseOrderPage({
   searchParams,
@@ -61,9 +62,10 @@ export default async function NewPurchaseOrderPage({
   const project = quote ? (Array.isArray(quote.projects) ? quote.projects[0] : quote.projects) : null;
   const items = quote ? ((quote.supplier_quotation_items as Array<Record<string, unknown>>) ?? []) : [];
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createPoFromQuotationAction(formData);
+    const state = await createPoFromQuotationAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/procurement/purchase-orders");
   }
 
@@ -71,7 +73,7 @@ export default async function NewPurchaseOrderPage({
     <div className="mx-auto max-w-3xl" data-testid="po-create-page">
       <PageHeader title="أمر شراء جديد" description="ترث البيانات تلقائياً من العرض المرسَّى" />
       <Card>
-        <form action={action} className="grid gap-5" data-testid="po-create-form">
+        <ServerActionForm action={action} className="grid gap-5" data-testid="po-create-form">
           {quote ? (
             <input type="hidden" name="quotationId" value={String(quote.id)} />
           ) : (
@@ -170,7 +172,7 @@ export default async function NewPurchaseOrderPage({
             </Link>
             <Button type="submit" data-testid="po-create-submit">إنشاء أمر الشراء</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

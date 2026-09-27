@@ -4,6 +4,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { DatabaseError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -53,7 +54,11 @@ async function syncHrAlerts(employeeId: string) {
  * Authorization is least-privilege: employee.create (or user.create), NOT broad user admin.
  * Role assignment still requires role.assign separately when a role is selected.
  */
-export async function createEmployeeAction(formData: FormData) {
+export async function createEmployeeAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إنشاء الموظف. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canCreate =
@@ -168,9 +173,14 @@ export async function createEmployeeAction(formData: FormData) {
 
   revalidatePath("/employees");
   if (employee?.id) revalidatePath(`/employees/${employee.id}`);
+  });
 }
 
-export async function updateEmployeeEmploymentAction(formData: FormData) {
+export async function updateEmployeeEmploymentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تحديث بيانات التوظيف. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "employee.manage");
   const parsed = updateEmployeeEmploymentSchema.safeParse({
     employeeId: formData.get("employeeId"),
@@ -233,9 +243,14 @@ export async function updateEmployeeEmploymentAction(formData: FormData) {
   await syncHrAlerts(parsed.data.employeeId);
   revalidatePath("/employees");
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
-export async function updateEmployeeProfileAction(formData: FormData) {
+export async function updateEmployeeProfileAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "employee.manage");
   const parsed = updateEmployeeProfileSchema.safeParse({
     employeeId: formData.get("employeeId"),
@@ -276,9 +291,14 @@ export async function updateEmployeeProfileAction(formData: FormData) {
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${emp.id}`);
+  });
 }
 
-export async function assignEmployeeDepartmentAction(formData: FormData) {
+export async function assignEmployeeDepartmentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "employee.manage");
   const parsed = assignDepartmentSchema.safeParse({
     employeeId: formData.get("employeeId"),
@@ -320,9 +340,14 @@ export async function assignEmployeeDepartmentAction(formData: FormData) {
   revalidatePath("/employees");
   revalidatePath(`/employees/${parsed.data.employeeId}`);
   revalidatePath("/departments");
+  });
 }
 
-export async function upsertEmployeeComplianceAction(formData: FormData) {
+export async function upsertEmployeeComplianceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -380,9 +405,14 @@ export async function upsertEmployeeComplianceAction(formData: FormData) {
 
   await syncHrAlerts(parsed.data.employeeId);
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
-export async function upsertDepartmentAction(formData: FormData) {
+export async function upsertDepartmentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ الإدارة. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
 
@@ -404,7 +434,7 @@ export async function upsertDepartmentAction(formData: FormData) {
   authorize(ctx, isCreate ? "department.create" : "department.update");
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("upsert_department", {
+  const { error } = await supabase.rpc("upsert_department", {
     p_organization_id: ctx.organization.id,
     p_department_id: emptyToNull(parsed.data.departmentId),
     p_code: parsed.data.code,
@@ -418,10 +448,14 @@ export async function upsertDepartmentAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath("/departments");
-  return data;
+  });
 }
 
-export async function setEmployeeActiveAction(formData: FormData) {
+export async function setEmployeeActiveAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const can =
@@ -491,12 +525,17 @@ export async function setEmployeeActiveAction(formData: FormData) {
 
   revalidatePath("/employees");
   revalidatePath(`/employees/${emp.id}`);
+  });
 }
 
 /**
  * Phase 4.2: Contracts Actions
  */
-export async function createEmployeeContractAction(formData: FormData) {
+export async function createEmployeeContractAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -560,9 +599,14 @@ export async function createEmployeeContractAction(formData: FormData) {
   });
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
-export async function activateEmployeeContractAction(formData: FormData) {
+export async function activateEmployeeContractAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -587,12 +631,17 @@ export async function activateEmployeeContractAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
 /**
  * Phase 4.2: Versioned Compensation Actions
  */
-export async function createCompensationVersionAction(formData: FormData) {
+export async function createCompensationVersionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -630,12 +679,17 @@ export async function createCompensationVersionAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
 /**
  * Phase 4.2: Secure HR Documents Actions
  */
-export async function uploadEmployeeDocumentAction(formData: FormData) {
+export async function uploadEmployeeDocumentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -734,6 +788,7 @@ export async function uploadEmployeeDocumentAction(formData: FormData) {
   });
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
 export async function getEmployeeDocumentDownloadUrlAction(input: {
@@ -779,7 +834,11 @@ export async function getEmployeeDocumentDownloadUrlAction(input: {
 /**
  * Phase 4.2: Employee Banking Actions
  */
-export async function upsertEmployeeBankAction(formData: FormData) {
+export async function upsertEmployeeBankAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -817,9 +876,14 @@ export async function upsertEmployeeBankAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }
 
-export async function deactivateEmployeeBankAction(formData: FormData) {
+export async function deactivateEmployeeBankAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ForbiddenError();
   const canManage =
@@ -846,4 +910,5 @@ export async function deactivateEmployeeBankAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
 
   revalidatePath(`/employees/${parsed.data.employeeId}`);
+  });
 }

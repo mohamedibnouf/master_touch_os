@@ -8,6 +8,7 @@ import { AttendanceRepository } from "@/server/repositories/attendance.repositor
 import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 function formatTs(value: string | null) {
   if (!value) return "—";
@@ -123,11 +124,11 @@ export default async function AttendanceDashboardPage() {
             geofenceReady ? (
               <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="attendance-check-in" />
             ) : (
-              <form action={checkInAction} className="w-full sm:w-auto">
+              <ServerActionForm action={checkInAction} className="w-full sm:w-auto">
                 <Button type="submit" className="w-full sm:w-auto" data-testid="attendance-check-in">
                   تسجيل الحضور
                 </Button>
-              </form>
+              </ServerActionForm>
             )
           ) : null}
           {canCheckOut ? (
@@ -139,11 +140,11 @@ export default async function AttendanceDashboardPage() {
                 variant="secondary"
               />
             ) : (
-              <form action={checkOutAction} className="w-full sm:w-auto">
+              <ServerActionForm action={checkOutAction} className="w-full sm:w-auto">
                 <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="attendance-check-out">
                   تسجيل الانصراف
                 </Button>
-              </form>
+              </ServerActionForm>
             )
           ) : null}
         </div>

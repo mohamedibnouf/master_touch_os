@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { assignEmployeeShiftAction } from "@/server/use-cases/attendance";
 
 export default async function HrAttendanceAssignmentsPage() {
@@ -16,11 +17,9 @@ export default async function HrAttendanceAssignmentsPage() {
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const core = new CoreRepository(supabase);
-  const [assignments, shifts, employees] = await Promise.all([
-    repo.listAssignments(ctx.organization.id),
-    repo.listShifts(ctx.organization.id, true),
-    core.listEmployees(ctx.organization.id),
-  ]);
+  const assignments = await repo.listAssignments(ctx.organization.id);
+  const shifts = await repo.listShifts(ctx.organization.id, true);
+  const employees = await core.listEmployeeNameOptions(ctx.organization.id);
 
   const shiftMap = new Map(shifts.map((s) => [s.id, s.name_ar]));
   const empMap = new Map(
@@ -33,7 +32,7 @@ export default async function HrAttendanceAssignmentsPage() {
 
       <Card className="mb-6" data-testid="attendance-assign-form">
         <h2 className="mb-4 font-semibold text-navy">تعيين وردية</h2>
-        <form action={assignEmployeeShiftAction} className="grid gap-3">
+        <ServerActionForm action={assignEmployeeShiftAction} className="grid gap-3">
           <Field label="الموظف">
             <Select name="employeeId" required>
               <option value="">اختر</option>
@@ -61,10 +60,11 @@ export default async function HrAttendanceAssignmentsPage() {
             <Input type="date" name="effectiveTo" />
           </Field>
           <Button type="submit">حفظ التعيين</Button>
-        </form>
+        </ServerActionForm>
       </Card>
 
-      <Card className="overflow-x-auto p-0">
+      <Card className="p-0">
+        <TableScroll>
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
@@ -85,6 +85,7 @@ export default async function HrAttendanceAssignmentsPage() {
             ))}
           </tbody>
         </table>
+        </TableScroll>
       </Card>
     </div>
   );

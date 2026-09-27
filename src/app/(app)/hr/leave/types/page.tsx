@@ -4,6 +4,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertLeaveTypeAction } from "@/server/use-cases/leave";
 
 export default async function HrLeaveTypesPage() {
@@ -20,7 +21,7 @@ export default async function HrLeaveTypesPage() {
 
       <Card className="mb-6" data-testid="leave-type-form">
         <h2 className="mb-4 font-semibold text-navy">إضافة / تحديث نوع</h2>
-        <form action={upsertLeaveTypeAction} className="grid gap-3 md:grid-cols-2">
+        <ServerActionForm action={upsertLeaveTypeAction} className="grid gap-3 md:grid-cols-2">
           <Field label="الرمز">
             <Input name="code" required placeholder="ANNUAL" />
           </Field>
@@ -66,7 +67,7 @@ export default async function HrLeaveTypesPage() {
           <div className="md:col-span-2">
             <Button type="submit">حفظ النوع</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
 
       <Card className="overflow-x-auto p-0">

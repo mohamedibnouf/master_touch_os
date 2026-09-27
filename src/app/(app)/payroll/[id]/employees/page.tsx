@@ -10,6 +10,7 @@ import {
   addPayrollManualEarningAction,
 } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 function formatSar(amount: number) {
   return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
@@ -111,7 +112,7 @@ export default async function PayrollEmployeesPage({
         <div className="grid gap-4 lg:grid-cols-2">
           <Card data-testid="payroll-manual-earning-form">
             <h2 className="mb-3 font-semibold text-navy">استحقاق يدوي</h2>
-            <form action={addPayrollManualEarningAction} className="grid gap-3">
+            <ServerActionForm action={addPayrollManualEarningAction} className="grid gap-3">
               <Field label="القيد">
                 <Select name="entryId" required defaultValue="">
                   <option value="" disabled>
@@ -140,12 +141,12 @@ export default async function PayrollEmployeesPage({
                 <Input name="reason" required minLength={3} />
               </Field>
               <Button type="submit">إضافة استحقاق</Button>
-            </form>
+            </ServerActionForm>
           </Card>
 
           <Card data-testid="payroll-manual-deduction-form">
             <h2 className="mb-3 font-semibold text-navy">خصم يدوي</h2>
-            <form action={addPayrollManualDeductionAction} className="grid gap-3">
+            <ServerActionForm action={addPayrollManualDeductionAction} className="grid gap-3">
               <Field label="القيد">
                 <Select name="entryId" required defaultValue="">
                   <option value="" disabled>
@@ -174,7 +175,7 @@ export default async function PayrollEmployeesPage({
                 <Input name="reason" required minLength={3} />
               </Field>
               <Button type="submit">إضافة خصم</Button>
-            </form>
+            </ServerActionForm>
           </Card>
         </div>
       ) : null}

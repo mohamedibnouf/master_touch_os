@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { markNotificationReadAction } from "@/server/use-cases/platform";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NotificationsPage() {
   const ctx = await getAuthContext();
@@ -61,12 +62,12 @@ export default async function NotificationsPage() {
                   ) : null}
                 </div>
                 {!item.read_at ? (
-                  <form action={markNotificationReadAction}>
+                  <ServerActionForm action={markNotificationReadAction}>
                     <input type="hidden" name="id" value={item.id} />
                     <Button type="submit" variant="secondary">
                       تعليم كمقروء
                     </Button>
-                  </form>
+                  </ServerActionForm>
                 ) : null}
               </div>
             </Card>

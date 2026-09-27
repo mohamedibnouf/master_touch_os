@@ -9,6 +9,7 @@ import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { DatabaseError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createNotificationService } from "@/server/services/notification.service";
 import {
   addPayrollManualDeductionSchema,
@@ -106,7 +107,11 @@ function revalidatePayroll(periodId?: string) {
   }
 }
 
-export async function createPayrollPeriodAction(formData: FormData) {
+export async function createPayrollPeriodAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "payroll.prepare");
   // Do not Zod-validate organizationId: seed org UUID is not RFC-variant compliant
   // (e.g. 11111111-1111-1111-1111-111111111111) and is already trusted from auth context.
@@ -125,9 +130,14 @@ export async function createPayrollPeriodAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePayroll((data as PayrollPeriod).id);
+  });
 }
 
-export async function calculatePayrollPeriodAction(formData: FormData) {
+export async function calculatePayrollPeriodAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.calculate");
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
@@ -138,9 +148,14 @@ export async function calculatePayrollPeriodAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function submitPayrollForReviewAction(formData: FormData) {
+export async function submitPayrollForReviewAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "payroll.prepare");
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
@@ -165,9 +180,14 @@ export async function submitPayrollForReviewAction(formData: FormData) {
 
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function markPayrollReviewedAction(formData: FormData) {
+export async function markPayrollReviewedAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "payroll.review");
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
@@ -192,9 +212,14 @@ export async function markPayrollReviewedAction(formData: FormData) {
 
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function approvePayrollPeriodAction(formData: FormData) {
+export async function approvePayrollPeriodAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "payroll.approve");
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
@@ -219,9 +244,14 @@ export async function approvePayrollPeriodAction(formData: FormData) {
 
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function lockPayrollPeriodAction(formData: FormData) {
+export async function lockPayrollPeriodAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.lock");
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
@@ -266,9 +296,14 @@ export async function lockPayrollPeriodAction(formData: FormData) {
 
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function cancelPayrollPeriodAction(formData: FormData) {
+export async function cancelPayrollPeriodAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.prepare");
   const parsed = cancelPayrollPeriodSchema.safeParse({
     periodId: formData.get("periodId"),
@@ -283,9 +318,14 @@ export async function cancelPayrollPeriodAction(formData: FormData) {
   if (error) throw new DatabaseError(error);
   revalidatePayroll(parsed.data.periodId);
 
+  });
 }
 
-export async function addPayrollManualEarningAction(formData: FormData) {
+export async function addPayrollManualEarningAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.adjust");
   const parsed = addPayrollManualEarningSchema.safeParse({
     entryId: formData.get("entryId"),
@@ -310,9 +350,14 @@ export async function addPayrollManualEarningAction(formData: FormData) {
   revalidatePayroll(earning.payroll_period_id);
   revalidatePath(`/payroll/payslips/${parsed.data.entryId}`);
 
+  });
 }
 
-export async function addPayrollManualDeductionAction(formData: FormData) {
+export async function addPayrollManualDeductionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.adjust");
   const parsed = addPayrollManualDeductionSchema.safeParse({
     entryId: formData.get("entryId"),
@@ -336,9 +381,14 @@ export async function addPayrollManualDeductionAction(formData: FormData) {
   const row = data as { payroll_period_id?: string };
   revalidatePayroll(row.payroll_period_id);
 
+  });
 }
 
-export async function recordPayrollPaymentAction(formData: FormData) {
+export async function recordPayrollPaymentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "payroll.record_payment");
   const parsed = recordPayrollPaymentSchema.safeParse({
     entryId: formData.get("entryId"),
@@ -364,9 +414,14 @@ export async function recordPayrollPaymentAction(formData: FormData) {
   if (pay.payroll_entry_id) revalidatePath(`/payroll/payslips/${pay.payroll_entry_id}`);
   revalidatePath("/my/payslips");
 
+  });
 }
 
-export async function updatePayrollSettingsAction(formData: FormData) {
+export async function updatePayrollSettingsAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية الرواتب. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "payroll.manage_settings");
   const parsed = updatePayrollSettingsSchema.safeParse({
     currency: formData.get("currency") || "SAR",
@@ -391,5 +446,6 @@ export async function updatePayrollSettingsAction(formData: FormData) {
   });
   if (error) throw new DatabaseError(error);
   revalidatePath("/payroll/settings");
+  });
 }
 

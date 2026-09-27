@@ -14,6 +14,7 @@ import {
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
 import { EntityAttachmentForm } from "@/components/commercial/entity-attachment-form";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function PurchaseRequestDetailPage({
   params,
@@ -136,7 +137,7 @@ export default async function PurchaseRequestDetailPage({
       {canSubmit ? (
         <Card className="mb-6" data-testid="pr-submit-approval-card">
           <h2 className="mb-3 font-semibold text-navy">تقديم للاعتماد</h2>
-          <form action={submitPurchaseRequestForApprovalAction} className="flex flex-wrap gap-3" data-testid="pr-submit-approval-form">
+          <ServerActionForm action={submitPurchaseRequestForApprovalAction} className="flex flex-wrap gap-3" data-testid="pr-submit-approval-form">
             <input type="hidden" name="prId" value={pr.id} />
             <select name="approverProfileId" required className="h-10 rounded-md border px-3 text-sm" data-testid="pr-approver">
               <option value="">اختر المعتمد</option>
@@ -152,7 +153,7 @@ export default async function PurchaseRequestDetailPage({
               })}
             </select>
             <Button type="submit" data-testid="pr-submit-approval">تقديم للاعتماد</Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
@@ -160,18 +161,18 @@ export default async function PurchaseRequestDetailPage({
         <Card className="mb-6">
           <h2 className="mb-3 font-semibold text-navy">قرار الاعتماد</h2>
           <div className="flex gap-3">
-            <form action={decideEntityApprovalAction}>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="A" />
               <Button type="submit">اعتماد ✓</Button>
-            </form>
-            <form action={decideEntityApprovalAction}>
+            </ServerActionForm>
+            <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="D" />
               <Button type="submit" variant="danger">رفض</Button>
-            </form>
+            </ServerActionForm>
           </div>
         </Card>
       ) : null}
@@ -179,7 +180,7 @@ export default async function PurchaseRequestDetailPage({
       {canConvert ? (
         <Card className="mb-6">
           <h2 className="mb-3 font-semibold text-navy">تحويل إلى طلب عرض أسعار (RFQ)</h2>
-          <form action={createRfqFromPrAction} className="grid gap-3 md:grid-cols-2">
+          <ServerActionForm action={createRfqFromPrAction} className="grid gap-3 md:grid-cols-2">
             <input type="hidden" name="prId" value={pr.id} />
             <div>
               <label className="mb-1 block text-sm font-medium">عنوان RFQ</label>
@@ -192,7 +193,7 @@ export default async function PurchaseRequestDetailPage({
             <div className="md:col-span-2 flex justify-end">
               <Button type="submit">إنشاء RFQ →</Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 

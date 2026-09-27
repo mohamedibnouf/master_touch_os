@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { canDisablePreference } from "@/modules/notifications/policy";
 import type { NotificationCategory } from "@/modules/notifications/catalog";
@@ -15,7 +16,11 @@ function isHubSchemaError(message: string | undefined): boolean {
   return /does not exist|schema cache|notification_preferences|push_subscriptions/i.test(message ?? "");
 }
 
-export async function saveNotificationPreferenceAction(formData: FormData) {
+export async function saveNotificationPreferenceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ التفضيل. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "notification.read");
   const category = String(formData.get("category") ?? "") as NotificationCategory;
   const channel = String(formData.get("channel") ?? "") as (typeof NOTIFICATION_CHANNELS)[number];
@@ -52,12 +57,14 @@ export async function saveNotificationPreferenceAction(formData: FormData) {
     newValues: { category, channel, enabled },
   });
   revalidatePath("/notifications/preferences");
+  });
 }
 
 export async function savePushSubscriptionAction(payload: {
   endpoint: string;
   keys: { p256dh: string; auth: string };
 }) {
+  try {
   const ctx = authorize(await getAuthContext(), "notification.read");
   const parsed = validatePushSubscription(payload);
   const supabase = await createServerSupabaseClient();
@@ -87,9 +94,16 @@ export async function savePushSubscriptionAction(payload: {
   });
   revalidatePath("/notifications/preferences");
   return { ok: true as const };
+  } catch {
+    return { ok: false as const, reason: "save_failed" };
+  }
 }
 
-export async function revokePushSubscriptionAction(formData: FormData) {
+export async function revokePushSubscriptionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ التفضيل. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "notification.read");
   const endpoint = String(formData.get("endpoint") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -106,4 +120,5 @@ export async function revokePushSubscriptionAction(formData: FormData) {
     entityId: ctx.userId,
   });
   revalidatePath("/notifications/preferences");
+  });
 }

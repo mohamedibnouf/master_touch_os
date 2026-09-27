@@ -3,12 +3,14 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthContext } from "@/server/context";
 import { authorize, hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { DatabaseError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import {
@@ -84,7 +86,11 @@ async function notifyProfiles(
   }
 }
 
-export async function submitLeaveRequestAction(formData: FormData) {
+export async function submitLeaveRequestAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تقديم طلب الإجازة. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "leave.request");
   if (!ctx.employee) {
     throw new ValidationError("لا يوجد سجل موظف مرتبط بحسابك.", "No employee record linked to your account.");
@@ -141,10 +147,15 @@ export async function submitLeaveRequestAction(formData: FormData) {
   revalidatePath("/leave");
   revalidatePath("/leave/team");
   revalidatePath("/hr/leave");
-  return req;
+  redirect(`/leave/${req.id}`);
+  });
 }
 
-export async function decideLeaveRequestAction(formData: FormData) {
+export async function decideLeaveRequestAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر اعتماد طلب الإجازة. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ValidationError("يجب تسجيل الدخول.", "You must sign in.");
 
@@ -220,9 +231,14 @@ export async function decideLeaveRequestAction(formData: FormData) {
   revalidatePath(`/leave/${req.id}`);
   revalidatePath("/leave/team");
   revalidatePath("/hr/leave");
+  });
 }
 
-export async function cancelLeaveRequestAction(formData: FormData) {
+export async function cancelLeaveRequestAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إلغاء طلب الإجازة. حاول مرة أخرى.", async () => {
   const ctx = await getAuthContext();
   if (!ctx) throw new ValidationError("يجب تسجيل الدخول.", "You must sign in.");
 
@@ -278,9 +294,14 @@ export async function cancelLeaveRequestAction(formData: FormData) {
   revalidatePath("/leave");
   revalidatePath(`/leave/${req.id}`);
   revalidatePath("/hr/leave");
+  });
 }
 
-export async function adjustLeaveBalanceAction(formData: FormData) {
+export async function adjustLeaveBalanceAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تعديل رصيد الإجازة. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "leave.adjust_balance");
   const parsed = adjustLeaveBalanceSchema.safeParse({
     employeeId: formData.get("employeeId"),
@@ -306,9 +327,14 @@ export async function adjustLeaveBalanceAction(formData: FormData) {
   revalidatePath("/hr/leave/balances");
   revalidatePath("/leave");
   void ctx;
+  });
 }
 
-export async function upsertLeaveTypeAction(formData: FormData) {
+export async function upsertLeaveTypeAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ نوع الإجازة. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "leave.manage");
   const maxConsecRaw = String(formData.get("maximum_consecutive_days") ?? "").trim();
   const maxCarryRaw = String(formData.get("maximum_carry_forward_days") ?? "").trim();
@@ -378,4 +404,5 @@ export async function upsertLeaveTypeAction(formData: FormData) {
 
   revalidatePath("/hr/leave/types");
   revalidatePath("/leave/new");
+  });
 }

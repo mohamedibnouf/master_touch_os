@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, Field, PageHeader, Textarea } from "@/components/ui/primitives";
+import { isUuid } from "@/lib/utils";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { leaveStatusLabel } from "@/lib/hr/labels";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { cancelLeaveRequestAction, decideLeaveRequestAction } from "@/server/use-cases/leave";
 
 export default async function LeaveDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   const { id } = await params;
+  if (!isUuid(id)) notFound();
 
   const supabase = await createServerSupabaseClient();
   const repo = new LeaveRepository(supabase);
@@ -88,7 +91,7 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
       {canDecideManager || canDecideHr ? (
         <Card className="mb-4">
           <h2 className="mb-3 font-semibold text-navy">اتخاذ قرار</h2>
-          <form action={decideLeaveRequestAction} className="grid gap-3">
+          <ServerActionForm action={decideLeaveRequestAction} className="grid gap-3">
             <input type="hidden" name="requestId" value={req.id} />
             <Field label="ملاحظة">
               <Textarea name="comment" />
@@ -101,18 +104,18 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
                 رفض
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
 
       {canCancel ? (
         <Card>
-          <form action={cancelLeaveRequestAction}>
+          <ServerActionForm action={cancelLeaveRequestAction}>
             <input type="hidden" name="requestId" value={req.id} />
             <Button type="submit" variant="secondary" data-testid="leave-cancel">
               إلغاء الطلب
             </Button>
-          </form>
+          </ServerActionForm>
         </Card>
       ) : null}
     </div>

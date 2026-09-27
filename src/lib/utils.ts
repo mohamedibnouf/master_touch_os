@@ -9,6 +9,12 @@ export function generateCorrelationId(): string {
   return crypto.randomUUID();
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export function formatProjectCode(prefix: string, sequence: number): string {
   return `${prefix}-${String(sequence).padStart(4, "0")}`;
 }

@@ -5,6 +5,7 @@ import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
 import { createPurchaseRequestAction } from "@/server/use-cases/procurement";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 
 export default async function NewPurchaseRequestPage() {
   const ctx = authorize(await getAuthContext(), "purchase_request.create");
@@ -20,9 +21,10 @@ export default async function NewPurchaseRequestPage() {
     redirect("/procurement/purchase-requests");
   }
 
-  async function action(formData: FormData) {
+  async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
-    await createPurchaseRequestAction(formData);
+    const state = await createPurchaseRequestAction(_prev, formData);
+    if (!state?.ok) return state;
     redirect("/procurement/purchase-requests");
   }
 
@@ -33,7 +35,7 @@ export default async function NewPurchaseRequestPage() {
         description="أنشئ طلب شراء داخلي — سيتم توليد الرقم تلقائياً"
       />
       <Card>
-        <form action={action} className="grid gap-4" data-testid="pr-create-form">
+        <ServerActionForm action={action} className="grid gap-4" data-testid="pr-create-form">
           <Field label="المشروع">
             <Select name="projectId" required defaultValue="" data-testid="pr-project-id">
               <option value="" disabled>اختر مشروعاً</option>
@@ -77,7 +79,7 @@ export default async function NewPurchaseRequestPage() {
             </Link>
             <Button type="submit" data-testid="pr-create-submit">إنشاء مسودة</Button>
           </div>
-        </form>
+        </ServerActionForm>
       </Card>
     </div>
   );

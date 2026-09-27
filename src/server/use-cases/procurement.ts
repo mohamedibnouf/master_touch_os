@@ -5,6 +5,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -18,7 +19,11 @@ function revalidateCommercial(...paths: string[]) {
   for (const path of paths) revalidatePath(path);
 }
 
-export async function createSupplierAction(formData: FormData) {
+export async function createSupplierAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "supplier.manage");
   const legalName = String(formData.get("legalName") ?? "").trim();
   const tradeName = String(formData.get("tradeName") ?? "") || null;
@@ -71,9 +76,14 @@ export async function createSupplierAction(formData: FormData) {
   });
 
   revalidateCommercial("/procurement", "/procurement/suppliers");
+  });
 }
 
-export async function createPurchaseRequestAction(formData: FormData) {
+export async function createPurchaseRequestAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "purchase_request.create");
   const parsed = z
     .object({
@@ -152,6 +162,7 @@ export async function createPurchaseRequestAction(formData: FormData) {
   });
 
   revalidateCommercial("/procurement", "/procurement/purchase-requests", `/projects/${parsed.data.projectId}`);
+  });
 }
 
 async function createCommercialApproval(
@@ -230,7 +241,11 @@ async function requireThresholdRule(
   return match;
 }
 
-export async function submitPurchaseRequestForApprovalAction(formData: FormData) {
+export async function submitPurchaseRequestForApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "purchase_request.create");
   const prId = String(formData.get("prId") ?? "");
   const approverProfileId = String(formData.get("approverProfileId") ?? "");
@@ -274,9 +289,14 @@ export async function submitPurchaseRequestForApprovalAction(formData: FormData)
   });
 
   revalidateCommercial("/procurement/purchase-requests", `/procurement/purchase-requests/${prId}`, "/approvals", "/");
+  });
 }
 
-export async function applyCommercialApprovalDecisionAction(formData: FormData) {
+export async function applyCommercialApprovalDecisionAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const officialCode = String(formData.get("officialCode") ?? "");
   const permission = officialCode === "D" ? "approval.reject" : "approval.approve";
   authorize(await getAuthContext(), permission);
@@ -345,9 +365,14 @@ export async function applyCommercialApprovalDecisionAction(formData: FormData) 
   }
 
   revalidateCommercial("/approvals", "/");
+  });
 }
 
-export async function createRfqFromPrAction(formData: FormData) {
+export async function createRfqFromPrAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "rfq.create");
   const prId = String(formData.get("prId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -416,9 +441,14 @@ export async function createRfqFromPrAction(formData: FormData) {
 
   await supabase.from("purchase_requests").update({ status: "converted_to_rfq" }).eq("id", pr.id);
   revalidateCommercial(`/procurement/rfqs/${rfq.id}`, "/procurement/rfqs", `/procurement/purchase-requests/${prId}`);
+  });
 }
 
-export async function issueRfqAction(formData: FormData) {
+export async function issueRfqAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "rfq.issue");
   const rfqId = String(formData.get("rfqId") ?? "");
   const supabase = await createServerSupabaseClient();
@@ -469,9 +499,14 @@ export async function issueRfqAction(formData: FormData) {
   });
 
   revalidateCommercial(`/procurement/rfqs/${rfqId}`, "/procurement/rfqs", "/procurement");
+  });
 }
 
-export async function updateRfqSupplierResponseAction(formData: FormData) {
+export async function updateRfqSupplierResponseAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "rfq.manage");
   const invitationId = String(formData.get("invitationId") ?? "");
   const responseStatus = String(formData.get("responseStatus") ?? "");
@@ -497,9 +532,14 @@ export async function updateRfqSupplierResponseAction(formData: FormData) {
     .eq("id", invitationId);
   if (error) throw new DatabaseError(error);
   revalidateCommercial(`/procurement/rfqs/${invite.rfq_id}`);
+  });
 }
 
-export async function createQuotationAction(formData: FormData) {
+export async function createQuotationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "quotation.create");
   const rfqId = String(formData.get("rfqId") ?? "");
   const supplierId = String(formData.get("supplierId") ?? "");
@@ -609,9 +649,14 @@ export async function createQuotationAction(formData: FormData) {
   });
 
   revalidateCommercial(`/procurement/rfqs/${rfqId}`, `/procurement/quotations/${quote.id}`, "/procurement");
+  });
 }
 
-export async function recommendAwardAction(formData: FormData) {
+export async function recommendAwardAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "quotation.recommend");
   const rfqId = String(formData.get("rfqId") ?? "");
   const quotationId = String(formData.get("quotationId") ?? "");
@@ -678,9 +723,14 @@ export async function recommendAwardAction(formData: FormData) {
   });
 
   revalidateCommercial(`/procurement/rfqs/${rfqId}/comparison`, "/approvals");
+  });
 }
 
-export async function createPoFromQuotationAction(formData: FormData) {
+export async function createPoFromQuotationAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "purchase_order.create");
   const quotationId = String(formData.get("quotationId") ?? "");
   const requiredDeliveryDate = String(formData.get("requiredDeliveryDate") ?? "") || null;
@@ -754,9 +804,14 @@ export async function createPoFromQuotationAction(formData: FormData) {
   }
 
   revalidateCommercial(`/procurement/purchase-orders/${po.id}`, "/procurement/purchase-orders");
+  });
 }
 
-export async function submitPurchaseOrderForApprovalAction(formData: FormData) {
+export async function submitPurchaseOrderForApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "purchase_order.create");
   const poId = String(formData.get("poId") ?? "");
   const approverProfileId = String(formData.get("approverProfileId") ?? "");
@@ -777,18 +832,28 @@ export async function submitPurchaseOrderForApprovalAction(formData: FormData) {
     .eq("id", poId);
   if (error) throw new DatabaseError(error);
   revalidateCommercial(`/procurement/purchase-orders/${poId}`, "/approvals");
+  });
 }
 
-export async function issuePurchaseOrderAction(formData: FormData) {
+export async function issuePurchaseOrderAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   authorize(await getAuthContext(), "purchase_order.issue");
   const poId = String(formData.get("poId") ?? "");
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.rpc("issue_purchase_order", { p_po_id: poId });
   if (error) throw new DatabaseError(error);
   revalidateCommercial(`/procurement/purchase-orders/${poId}`, "/procurement/purchase-orders", "/procurement");
+  });
 }
 
-export async function createAndPostGoodsReceiptAction(formData: FormData) {
+export async function createAndPostGoodsReceiptAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "goods_receipt.create");
   const poId = String(formData.get("poId") ?? "");
   const deliveryDate = String(formData.get("deliveryDate") ?? "") || new Date().toISOString().slice(0, 10);
@@ -863,4 +928,5 @@ export async function createAndPostGoodsReceiptAction(formData: FormData) {
     `/procurement/purchase-orders/${poId}`,
     "/procurement/goods-receipts",
   );
+  });
 }

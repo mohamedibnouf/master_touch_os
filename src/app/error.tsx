@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { appErrorBoundaryCopy } from "@/lib/errors/boundary-copy";
 
 export default function Error({
   error,
@@ -9,10 +10,11 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const copy = appErrorBoundaryCopy(error);
   return (
     <div className="mx-auto max-w-lg rounded-lg border border-line bg-white p-6">
-      <h1 className="text-lg font-semibold text-navy">تعذّر تحميل الصفحة</h1>
-      <p className="mt-2 text-sm text-muted">حدث خطأ غير متوقع. أعد المحاولة أو عد للرئيسية.</p>
+      <h1 className="text-lg font-semibold text-navy">{copy.title}</h1>
+      <p className="mt-2 text-sm text-muted">{copy.body}</p>
       {error.digest ? <p className="mt-2 text-xs text-muted">مرجع: {error.digest}</p> : null}
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <button

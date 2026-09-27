@@ -225,25 +225,25 @@ export function geofenceUserMessage(reason: string): { ar: string; en: string } 
   const u = reason.toUpperCase();
   if (u.includes("OUTSIDE")) {
     return {
-      ar: "أنت خارج نطاق موقع العمل المسموح لتسجيل الحضور.",
+      ar: "أنت خارج النطاق المسموح للحضور.",
       en: "You are outside the allowed workplace area.",
     };
   }
   if (u.includes("POOR_ACCURACY")) {
     return {
-      ar: "دقة الموقع الحالية غير كافية. انتقل إلى مكان مفتوح أو فعّل الموقع الدقيق ثم حاول مرة أخرى.",
-      en: "Location accuracy is not sufficient. Move outdoors or enable precise location and retry.",
+      ar: "دقة تحديد الموقع غير كافية. انتظر قليلاً وحاول مرة أخرى.",
+      en: "Location accuracy is not sufficient. Wait a moment and retry.",
     };
   }
   if (u.includes("NO_WORKPLACE")) {
     return {
-      ar: "لم يتم تحديد موقع عمل معتمد لهذا الموظف.",
+      ar: "لا يوجد موقع حضور مخصص لك حالياً. تواصل مع الإدارة.",
       en: "No approved workplace is configured for this employee.",
     };
   }
   if (u.includes("INACTIVE_WORKPLACE")) {
     return {
-      ar: "موقع العمل المحدد غير متاح حاليًا.",
+      ar: "موقع الحضور المخصص غير نشط حالياً.",
       en: "The assigned workplace is currently inactive.",
     };
   }
@@ -254,7 +254,7 @@ export function geofenceUserMessage(reason: string): { ar: string; en: string } 
     };
   }
   if (u.includes("INVALID_LOCATION")) {
-    return { ar: "تعذر التحقق من إحداثيات الموقع.", en: "The reported coordinates are invalid." };
+    return { ar: "تعذر التحقق من موقعك الحالي.", en: "The reported coordinates are invalid." };
   }
   return { ar: "تعذر تسجيل الحضور. حاول مرة أخرى.", en: "Attendance could not be recorded. Please retry." };
 }

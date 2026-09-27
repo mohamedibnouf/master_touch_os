@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, Field, Input, PageHeader } from "@/components/ui/primitives";
+import { ServerActionForm } from "@/components/forms/server-action-form";
+import { isUuid } from "@/lib/utils";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -46,6 +48,7 @@ export default async function PayrollPeriodDetailPage({
   if (!canView) redirect("/my/payslips");
 
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const supabase = await createServerSupabaseClient();
   const repo = new PayrollRepository(supabase);
   const period = await repo.getPeriod(ctx.organization.id, id);
@@ -116,49 +119,49 @@ export default async function PayrollPeriodDetailPage({
         <h2 className="mb-3 font-semibold text-navy">الإجراءات</h2>
         <div className="flex flex-wrap gap-2">
           {canCalculate ? (
-            <form action={calculatePayrollPeriodAction}>
+            <ServerActionForm action={calculatePayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-calculate-btn">
                 احتساب
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canSubmit ? (
-            <form action={submitPayrollForReviewAction}>
+            <ServerActionForm action={submitPayrollForReviewAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-submit-btn">
                 إرسال للمراجعة
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canReview ? (
-            <form action={markPayrollReviewedAction}>
+            <ServerActionForm action={markPayrollReviewedAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" variant="secondary" data-testid="payroll-review-btn">
                 تأكيد المراجعة
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canApprove ? (
-            <form action={approvePayrollPeriodAction}>
+            <ServerActionForm action={approvePayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-approve-btn">
                 اعتماد
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
           {canLock ? (
-            <form action={lockPayrollPeriodAction}>
+            <ServerActionForm action={lockPayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-lock-btn">
                 قفل
               </Button>
-            </form>
+            </ServerActionForm>
           ) : null}
         </div>
 
         {canCancel ? (
-          <form action={cancelPayrollPeriodAction} className="mt-4 grid gap-3 sm:grid-cols-3" data-testid="payroll-cancel-form">
+          <ServerActionForm action={cancelPayrollPeriodAction} className="mt-4 grid gap-3 sm:grid-cols-3" testId="payroll-cancel-form">
             <input type="hidden" name="periodId" value={period.id} />
             <Field label="سبب الإلغاء">
               <Input name="reason" required minLength={3} placeholder="سبب الإلغاء" />
@@ -168,7 +171,7 @@ export default async function PayrollPeriodDetailPage({
                 إلغاء الفترة
               </Button>
             </div>
-          </form>
+          </ServerActionForm>
         ) : null}
       </Card>
 

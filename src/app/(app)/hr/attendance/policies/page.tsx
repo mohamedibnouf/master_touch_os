@@ -4,6 +4,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertAttendancePolicyAction } from "@/server/use-cases/attendance";
 
 export default async function HrAttendancePoliciesPage() {
@@ -20,7 +21,7 @@ export default async function HrAttendancePoliciesPage() {
 
       <Card className="mb-6" data-testid="attendance-policy-form">
         <h2 className="mb-4 font-semibold text-navy">إضافة / تحديث سياسة</h2>
-        <form action={upsertAttendancePolicyAction} className="grid gap-3">
+        <ServerActionForm action={upsertAttendancePolicyAction} className="grid gap-3">
           <Field label="الرمز">
             <Input name="code" required placeholder="DEFAULT" />
           </Field>
@@ -61,7 +62,7 @@ export default async function HrAttendancePoliciesPage() {
             </Select>
           </Field>
           <Button type="submit">حفظ السياسة</Button>
-        </form>
+        </ServerActionForm>
       </Card>
 
       <Card className="overflow-x-auto p-0">

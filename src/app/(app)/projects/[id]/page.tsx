@@ -5,6 +5,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
   assignProjectMemberAction,
   createApprovalAction,
@@ -234,7 +235,7 @@ export default async function ProjectDetailPage({
                       </td>
                       <td className="px-4 py-3">
                         {hasPermission(ctx, "project.update") ? (
-                          <form action={updateProjectStageAction} className="flex min-w-[220px] flex-col gap-2 sm:flex-row">
+                          <ServerActionForm action={updateProjectStageAction} className="flex min-w-[220px] flex-col gap-2 sm:flex-row">
                             <input type="hidden" name="stageId" value={stage.id} />
                             <Select name="status" defaultValue={stage.status}>
                               <option value="not_started">لم تبدأ</option>
@@ -246,7 +247,7 @@ export default async function ProjectDetailPage({
                             <Button type="submit" variant="secondary">
                               حفظ
                             </Button>
-                          </form>
+                          </ServerActionForm>
                         ) : null}
                       </td>
                     </tr>
@@ -281,7 +282,7 @@ export default async function ProjectDetailPage({
           {hasPermission(ctx, "project.manage_team") ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">تعيين عضو</h2>
-              <form action={assignProjectMemberAction} className="space-y-3">
+              <ServerActionForm action={assignProjectMemberAction} className="space-y-3">
                 <input type="hidden" name="projectId" value={project.id} />
                 <Field label="المستخدم">
                   <Select name="profileId" required>
@@ -299,7 +300,7 @@ export default async function ProjectDetailPage({
                   <Input name="roleLabel" defaultValue="member" />
                 </Field>
                 <Button type="submit">تعيين</Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </div>
@@ -545,7 +546,7 @@ export default async function ProjectDetailPage({
           {hasPermission(ctx, "document.upload") ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">رفع مستند</h2>
-              <form action={uploadDocumentAction} className="space-y-3">
+              <ServerActionForm action={uploadDocumentAction} className="space-y-3">
                 <input type="hidden" name="projectId" value={project.id} />
                 <Field label="العنوان">
                   <Input name="title" required />
@@ -562,7 +563,7 @@ export default async function ProjectDetailPage({
                   <Input name="file" type="file" required />
                 </Field>
                 <Button type="submit">رفع</Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </div>
@@ -573,7 +574,7 @@ export default async function ProjectDetailPage({
           {hasPermission(ctx, "approval.create") ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">طلب موافقة</h2>
-              <form action={createApprovalAction} className="space-y-3">
+              <ServerActionForm action={createApprovalAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
                 <Field label="العنوان">
@@ -592,13 +593,13 @@ export default async function ProjectDetailPage({
                   </Select>
                 </Field>
                 <Button type="submit">إنشاء طلب</Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
           {hasPermission(ctx, "workflow.start") ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
-              <form action={startWorkflowAction} className="space-y-3">
+              <ServerActionForm action={startWorkflowAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
                 <Field label="القالب">
@@ -611,7 +612,7 @@ export default async function ProjectDetailPage({
                   </Select>
                 </Field>
                 <Button type="submit">بدء</Button>
-              </form>
+              </ServerActionForm>
             </Card>
           ) : null}
         </div>
