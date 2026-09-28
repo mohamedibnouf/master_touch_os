@@ -3,11 +3,12 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogContext = Record<string, unknown>;
 
 function emit(level: LogLevel, message: string, context?: LogContext): void {
+  const safe = sanitize(context);
   const entry = {
+    ...safe,
     level,
     message,
     timestamp: new Date().toISOString(),
-    ...sanitize(context),
   };
 
   if (level === "error") {

@@ -36,7 +36,7 @@ export function formActionFailure(err: unknown, unexpectedAr: string): FormActio
   }
   if (err instanceof DatabaseError) {
     const code = postgresCode(err);
-    logger.error("form action database failure", { code, message: err.message });
+    logger.error("form action database failure", { code, errorMessage: err.message });
     if (code === "23505") {
       return { ok: false, message: "هذه البيانات مستخدمة مسبقاً." };
     }
@@ -52,7 +52,7 @@ export function formActionFailure(err: unknown, unexpectedAr: string): FormActio
     return { ok: false, message: err.userMessageAr };
   }
   logger.error("form action unexpected failure", {
-    message: err instanceof Error ? err.message : "unknown",
+    errorMessage: err instanceof Error ? err.message : "unknown",
   });
   return { ok: false, message: unexpectedAr };
 }

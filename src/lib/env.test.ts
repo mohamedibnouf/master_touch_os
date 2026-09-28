@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   GET_SERVER_ENV_KEYS,
+  SERVER_ENV_VALIDATION_FAILED_EVENT,
+  emitServerEnvValidationFailed,
   parseServerEnvRecord,
   readServerEnvRecordFromProcess,
   serverEnvIssueDiagnostics,
@@ -85,5 +87,42 @@ describe("serverEnvIssueDiagnostics", () => {
     expect(safe).not.toContain("Invalid email");
     expect(safe).not.toMatch(/@/);
     expect(Object.keys(serverEnvIssueDiagnostics(parsed.error)[0] ?? {}).sort()).toEqual(["code", "name"]);
+  });
+});
+
+describe("logger reserved fields", () => {
+  it("does not let context.message replace the logger message (Vercel-visible overwrite)", async () => {
+    const { logger } = await import("@/lib/logger");
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    logger.error("form action unexpected failure", {
+      message: "Missing or invalid server environment variables. Copy .env.example to .env.local.",
+    });
+    const entry = spy.mock.calls.at(-1)?.[0] as { message?: string };
+    spy.mockRestore();
+    expect(entry?.message).toBe("form action unexpected failure");
+  });
+});
+
+describe("emitServerEnvValidationFailed", () => {
+  it("writes event, variable name, and issue code to console.error without the env value", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    emitServerEnvValidationFailed([{ name: "BOOTSTRAP_ADMIN_EMAIL", code: "invalid_format" }]);
+    const payload = spy.mock.calls.find((call) => {
+      const first = call[0];
+      return Boolean(
+        first &&
+          typeof first === "object" &&
+          (first as { event?: string }).event === SERVER_ENV_VALIDATION_FAILED_EVENT,
+      );
+    })?.[0] as { event?: string; issues?: Array<{ name: string; code: string }> } | undefined;
+    spy.mockRestore();
+
+    expect(payload?.event).toBe(SERVER_ENV_VALIDATION_FAILED_EVENT);
+    expect(payload?.issues).toEqual([{ name: "BOOTSTRAP_ADMIN_EMAIL", code: "invalid_format" }]);
+    const blob = JSON.stringify(payload);
+    expect(blob).toContain("BOOTSTRAP_ADMIN_EMAIL");
+    expect(blob).toContain("invalid_format");
+    expect(blob).not.toContain("not-an-email-value");
+    expect(blob).not.toMatch(/@mastertouch|eyJ|sk-/i);
   });
 });

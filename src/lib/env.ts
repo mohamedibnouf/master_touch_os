@@ -57,12 +57,23 @@ export const GET_SERVER_ENV_KEYS = [
 
 export type ServerEnvIssueDiagnostic = { name: string; code: string };
 
+export const SERVER_ENV_VALIDATION_FAILED_EVENT = "server_env_validation_failed" as const;
+
 /** Names + Zod codes only. Never include issue.message or received/input values. */
 export function serverEnvIssueDiagnostics(error: z.ZodError): ServerEnvIssueDiagnostic[] {
   return error.issues.map((issue) => ({
     name: issue.path.length > 0 ? issue.path.map(String).join(".") : "unknown",
     code: String(issue.code),
   }));
+}
+
+export function emitServerEnvValidationFailed(issues: ServerEnvIssueDiagnostic[]): void {
+  const payload = {
+    event: SERVER_ENV_VALIDATION_FAILED_EVENT,
+    issues,
+  };
+  console.error(payload);
+  logger.error(SERVER_ENV_VALIDATION_FAILED_EVENT, payload);
 }
 
 export function parseServerEnvRecord(record: Record<string, unknown>) {
@@ -131,9 +142,7 @@ export function getServerEnv(): ServerEnv {
   const parsed = parseServerEnvRecord(readServerEnvRecordFromProcess());
 
   if (!parsed.success) {
-    logger.error("Invalid server environment variables", {
-      issues: serverEnvIssueDiagnostics(parsed.error),
-    });
+    emitServerEnvValidationFailed(serverEnvIssueDiagnostics(parsed.error));
     throw new Error(
       "Missing or invalid server environment variables. Copy .env.example to .env.local.",
     );
