@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { isPostgresUuid } from "@/lib/postgres-uuid";
+
+const postgresUuid = z.string().refine(isPostgresUuid, { message: "Invalid uuid" });
 
 export const createUserSchema = z.object({
   email: z.string().email(),
@@ -35,8 +38,8 @@ export const createEmployeeSchema = z.object({
   initial_password: z.string().min(8).max(128).optional(),
   job_title_ar: z.string().trim().max(160).optional(),
   job_title_en: z.string().trim().max(160).optional(),
-  department_id: z.string().uuid().optional(),
-  role_id: z.string().uuid().optional(),
+  department_id: postgresUuid.optional(),
+  role_id: postgresUuid.optional(),
   employment_type: employmentTypeEnum.optional(),
   nationality: z.string().trim().max(120).optional(),
   work_location: z.string().trim().max(160).optional(),
@@ -105,7 +108,7 @@ export const upsertDepartmentSchema = z.object({
 
 export const assignRoleSchema = z.object({
   profileId: z.string().uuid(),
-  roleId: z.string().uuid(),
+  roleId: postgresUuid,
 });
 
 export const assignDepartmentSchema = z.object({

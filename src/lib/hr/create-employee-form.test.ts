@@ -66,13 +66,38 @@ describe("HR create employee form (البيانات غير مكتملة)", () =>
     expect(parsed.success).toBe(true);
   });
 
-  it("C. required + department + role succeeds", () => {
+  it("accepts seeded system role ids that Postgres stores as uuid but Zod RFC uuid() rejects", () => {
     const { parsed } = parseForm({
       ...required,
-      department_id: "11111111-1111-4111-8111-111111111111",
-      role_id: "22222222-2222-4222-8222-222222222222",
+      role_id: "20000000-0000-0000-0000-000000000007",
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it("rejects a non-uuid role identifier", () => {
+    const { parsed } = parseForm({ ...required, role_id: "engineer" });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(createEmployeeValidationMessageAr(parsed.error)).toBe("الدور المحدد غير صالح.");
+  });
+
+  it("rejects privileged role assignment from the HR path unless platform admin", () => {
+    expect(
+      hrCreateRoleAssignmentError({
+        roleId: "20000000-0000-0000-0000-000000000001",
+        canAssignRole: true,
+        isPlatformAdmin: false,
+        role: { code: "super_admin", is_external: false },
+      }),
+    ).toBe("privileged");
+    expect(
+      hrCreateRoleAssignmentError({
+        roleId: "20000000-0000-0000-0000-000000000007",
+        canAssignRole: true,
+        isPlatformAdmin: false,
+        role: { code: "engineer", is_external: false },
+      }),
+    ).toBeNull();
   });
 
   it("D. password >= 8 marks login provisioned", () => {

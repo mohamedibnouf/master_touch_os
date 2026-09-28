@@ -49,5 +49,19 @@ describe("operational role assignment", () => {
     expect(
       isOperationalAssignableRole({ code: "engineer", is_external: false, allowPrivileged: false }),
     ).toBe(true);
+    expect(
+      isOperationalAssignableRole({ code: "client", is_external: true, allowPrivileged: false }),
+    ).toBe(false);
+  });
+
+  it("does not require an existing employee to classify assignable roles", () => {
+    const emptyDirectoryRoles = [
+      { code: "engineer", is_external: false },
+      { code: "super_admin", is_external: false },
+    ];
+    const assignable = emptyDirectoryRoles.filter((role) =>
+      isOperationalAssignableRole({ ...role, allowPrivileged: false }),
+    );
+    expect(assignable.map((r) => r.code)).toEqual(["engineer"]);
   });
 });
