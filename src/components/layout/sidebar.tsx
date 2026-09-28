@@ -62,7 +62,7 @@ const groups: NavGroup[] = [
   },
   {
     id: "commercial",
-    label: "التشغيل التجاري",
+    label: "التشغيل",
     items: [
       { href: "/procurement", label: "المشتريات", icon: ShoppingCart, show: "procurement" },
       { href: "/finance", label: "المالية", icon: Wallet, show: "finance" },
@@ -136,32 +136,39 @@ export function Sidebar({
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex h-full w-72 shrink-0 flex-col border-l border-white/10 bg-navy text-white print:hidden",
-        "fixed inset-y-0 start-0 z-50 transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 lg:transition-none",
+        "flex h-full w-72 shrink-0 flex-col bg-navy text-white print:hidden",
+        "fixed inset-y-0 start-0 z-50 duration-200 ease-out transition-transform lg:static lg:z-auto lg:translate-x-0 lg:transition-none",
+        "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
         open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full lg:translate-x-0",
       )}
+      style={{
+        background:
+          "linear-gradient(180deg, #24365e 0%, #1b2a4a 28%, #162238 100%)",
+      }}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-5">
+      <div className="flex items-start justify-between gap-3 px-5 pb-5 pt-6">
         <div className="min-w-0">
+          <div className="mb-3 h-1 w-8 rounded-full bg-bronze" aria-hidden />
           <p className="text-[11px] font-semibold tracking-[0.22em] text-bronze">MASTER TOUCH</p>
-          <h1 className="mt-1 text-lg font-semibold">نظام التشغيل</h1>
+          <p className="mt-1.5 text-[15px] font-semibold leading-snug">نظام التشغيل</p>
         </div>
         <button
           type="button"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-white/80 hover:bg-white/10 lg:hidden"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-white/90 duration-150 hover:bg-white/10 lg:hidden"
           aria-label="إغلاق القائمة"
           onClick={onClose}
         >
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4">
+      <div className="mx-5 h-px bg-white/10" aria-hidden />
+      <nav className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-5" aria-label="التنقل الرئيسي">
         {visibleGroups.map((group) => (
           <div key={group.id}>
             {group.id !== "home" ? (
-              <p className="px-3 pb-1 text-[10px] font-semibold tracking-wide text-white/40">{group.label}</p>
+              <p className="px-3 pb-2 text-[11px] font-medium text-white/70">{group.label}</p>
             ) : null}
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -171,16 +178,30 @@ export function Sidebar({
                     <Link
                       href={item.href}
                       onClick={onClose}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition lg:min-h-0",
-                        active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white",
+                        "relative flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-2.5 py-2 text-sm duration-150 transition-colors lg:min-h-10",
+                        active
+                          ? "bg-white/12 font-medium text-white"
+                          : "text-white/80 hover:bg-white/8 hover:text-white",
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
+                      {active ? (
+                        <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-bronze" aria-hidden />
+                      ) : null}
+                      <span
+                        className={cn(
+                          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          active ? "bg-white/12 text-bronze" : "bg-white/6 text-white/85",
+                        )}
+                        aria-hidden
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
                       <span className="truncate">{item.label}</span>
                     </Link>
                     {isFinance && onFinance ? (
-                      <div className="me-2 mt-1 space-y-0.5 border-r border-white/10 pe-2">
+                      <div className="me-2 mt-1 space-y-0.5 border-s border-white/10 pe-2">
                         {financeSubLinks.map((sub) => {
                           const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
                           return (
@@ -188,10 +209,11 @@ export function Sidebar({
                               key={sub.href}
                               href={sub.href}
                               onClick={onClose}
+                              aria-current={subActive ? "page" : undefined}
                               data-testid={`sidebar-${sub.href.replaceAll("/", "-").slice(1)}`}
                               className={cn(
-                                "block rounded-md py-2 pe-3 ps-6 text-xs transition",
-                                subActive ? "bg-white/10 text-white" : "text-white/55 hover:text-white/85",
+                                "block rounded-[var(--radius-control)] py-2 pe-3 ps-6 text-xs duration-150 transition-colors",
+                                subActive ? "bg-white/10 font-medium text-white" : "text-white/70 hover:bg-white/6 hover:text-white",
                               )}
                             >
                               {sub.label}

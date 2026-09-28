@@ -43,7 +43,7 @@ export function NavigationPendingBar() {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden print:hidden",
+        "pointer-events-none fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden print:hidden duration-150 transition-opacity",
         active ? "opacity-100" : "opacity-0",
       )}
       role="progressbar"

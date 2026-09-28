@@ -10,7 +10,7 @@ import { HeaderNotifications } from "./header-notifications";
 function HeaderBellFallback() {
   return (
     <div
-      className="h-11 w-11 animate-pulse rounded-md border border-line bg-paper"
+      className="mt-icon-btn animate-pulse"
       aria-hidden
       data-testid="header-notifications-loading"
     />

@@ -21,10 +21,10 @@ export function HeaderNotifications({
   return (
     <details className="relative" data-testid="header-notifications">
       <summary
-        className="relative flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-md border border-line text-navy marker:hidden [&::-webkit-details-marker]:hidden"
+        className="mt-icon-btn mt-icon-btn-inverse relative cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden"
         aria-label={unreadCount > 0 ? `التنبيهات، ${unreadCount} غير مقروء` : "التنبيهات"}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4" aria-hidden />
         {unreadCount > 0 ? (
           <span
             data-testid="header-unread-count"
@@ -34,7 +34,7 @@ export function HeaderNotifications({
           </span>
         ) : null}
       </summary>
-      <div className="absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-2 shadow-lg">
+      <div className="absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-surface)] border border-line bg-white p-2 shadow-[var(--shadow-2)]">
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted">لا توجد تنبيهات.</p>
         ) : (
@@ -43,9 +43,12 @@ export function HeaderNotifications({
               <li key={item.id}>
                 <Link
                   href={item.href ?? "/notifications"}
-                  className="block rounded-md px-3 py-2 hover:bg-paper"
+                  className="block rounded-[var(--radius-control)] px-3 py-2 duration-150 hover:bg-paper"
                 >
-                  <p className={`text-sm ${item.read_at ? "text-muted" : "font-medium text-navy"}`}>
+                  <p
+                    className={`text-sm ${item.read_at ? "text-muted" : "font-medium text-navy"}`}
+                    dir="auto"
+                  >
                     {item.title}
                   </p>
                   <p className="text-xs text-muted">
@@ -56,7 +59,7 @@ export function HeaderNotifications({
             ))}
           </ul>
         )}
-        <Link href="/notifications" className="mt-2 block rounded-md px-3 py-2 text-center text-sm text-navy hover:bg-paper">
+        <Link href="/notifications" className="mt-2 block rounded-[var(--radius-control)] px-3 py-2 text-center text-sm font-medium text-navy duration-150 hover:bg-paper">
           كل التنبيهات
         </Link>
       </div>

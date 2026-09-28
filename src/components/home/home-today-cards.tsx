@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, Button, Card } from "@/components/ui/primitives";
+import { CalendarDays, Clock } from "lucide-react";
+import { Badge, Button } from "@/components/ui/primitives";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -54,21 +55,38 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
     Boolean(attendance?.check_in_at) &&
     !attendance?.check_out_at;
 
+  const showAttendance = hasPermission(ctx, "attendance.view_self");
+  const showLeave = hasPermission(ctx, "leave.view_self");
+  if (!showAttendance && !showLeave) return null;
+
+  const checkedIn = Boolean(attendance?.check_in_at);
+  const statusTone = !attendance ? "neutral" : attendance.check_out_at ? "success" : checkedIn ? "warning" : "info";
+
   return (
-    <div className="mb-6 grid gap-3 sm:grid-cols-2">
-      {hasPermission(ctx, "attendance.view_self") ? (
-        <Card data-testid="home-attendance">
-          <p className="text-sm text-muted">الحضور · {todayYmd}</p>
-          <p className="mt-1 text-xl font-semibold text-navy">
-            {attendance ? attendanceStatusLabel(attendance.attendance_status) : "لم يُسجَّل بعد"}
-          </p>
-          {shift ? <p className="mt-1 text-xs text-muted">{shift.name_ar}</p> : null}
-          {attendance?.check_in_at && !attendance.check_out_at ? (
-            <Badge tone="warning" className="mt-2">
-              لم يُسجَّل الانصراف
-            </Badge>
-          ) : null}
-          <div className="mt-3 flex flex-col gap-2">
+    <div className="flex h-full flex-col gap-3">
+      {showAttendance ? (
+        <section data-testid="home-attendance" className="mt-surface-priority flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="relative bg-navy px-4 py-4 text-white md:px-5 md:py-5">
+            <span className="absolute inset-y-4 start-0 w-0.5 rounded-full bg-bronze" aria-hidden />
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-white/12">
+                <Clock className="h-5 w-5 text-white" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-white/70">الحضور اليوم · {todayYmd}</p>
+                <p className="mt-1 text-xl font-semibold leading-snug">
+                  {attendance ? attendanceStatusLabel(attendance.attendance_status) : "لم يُسجَّل بعد"}
+                </p>
+                {shift ? <p className="mt-1 text-sm text-white/70">{shift.name_ar}</p> : null}
+                {attendance?.check_in_at && !attendance.check_out_at ? (
+                  <span className="mt-2 inline-block">
+                    <Badge tone={statusTone}>لم يُسجَّل الانصراف</Badge>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 bg-white px-4 py-3 md:px-5">
             {canCheckIn ? (
               geofenceReady ? (
                 <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="home-check-in" />
@@ -96,24 +114,33 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
                 </ServerActionForm>
               )
             ) : null}
-            <Link href="/attendance" className="text-sm text-navy underline">
+            {!canCheckIn && !canCheckOut ? (
+              <p className="text-sm text-muted">لا يوجد إجراء حضور متاح حالياً.</p>
+            ) : null}
+            <Link href="/attendance" className="text-xs font-medium text-navy duration-150 hover:underline">
               صفحة الحضور
             </Link>
           </div>
-        </Card>
+        </section>
       ) : null}
 
-      {hasPermission(ctx, "leave.view_self") ? (
-        <Card data-testid="home-leave">
-          <p className="text-sm text-muted">الإجازات</p>
-          <p className="mt-1 text-xl font-semibold text-navy">
-            {leaveAvailable == null ? "—" : `${leaveAvailable} يوم متاح`}
-          </p>
-          <p className="mt-1 text-xs text-muted">{leavePendingCount} طلب قيد المعالجة</p>
-          <Link href="/leave" className="mt-3 inline-block text-sm text-navy underline">
+      {showLeave ? (
+        <section
+          data-testid="home-leave"
+          className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[var(--radius-surface)] bg-navy/[0.05] px-3 py-2.5"
+        >
+          <span className="inline-flex min-w-0 items-center gap-2 text-sm text-navy">
+            <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="font-medium">الإجازات</span>
+            <span className="font-semibold tabular-nums">
+              {leaveAvailable == null ? "—" : `${leaveAvailable} يوم`}
+            </span>
+            <span className="text-muted">· {leavePendingCount} قيد المعالجة</span>
+          </span>
+          <Link href="/leave" className="text-xs font-medium text-navy duration-150 hover:underline">
             إجازاتي
           </Link>
-        </Card>
+        </section>
       ) : null}
     </div>
   );

@@ -15,7 +15,7 @@ export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-lg border border-line bg-card p-4 md:p-5">
+        <div key={i} className="mt-surface p-4 md:p-5">
           <SkeletonPulse className="h-3 w-24" />
           <SkeletonPulse className="mt-3 h-8 w-16" />
         </div>
@@ -26,7 +26,7 @@ export function KpiRowSkeleton({ count = 4 }: { count?: number }) {
 
 export function TableListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-card">
+    <div className="mt-surface overflow-hidden">
       <div className="space-y-3 p-4">
         {Array.from({ length: rows }).map((_, i) => (
           <SkeletonPulse key={i} className="h-10 w-full" />
