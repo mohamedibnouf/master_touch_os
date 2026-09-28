@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Timer, UserCheck, Users } from "lucide-react";
+import { EmptyState, PageHeader } from "@/components/ui/primitives";
+import { PageContainer } from "@/components/layout/page-container";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { ServerActionForm } from "@/components/forms/server-action-form";
-import { createEmployeeAction } from "@/server/use-cases/hr";
-import { isOperationalAssignableRole } from "@/lib/hr/roles";
-import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES, employmentTypeLabel } from "@/lib/hr/labels";
-import { deriveEmployeeDirectoryStats, directoryProfileName } from "@/lib/hr/directory-page";
+import { deriveEmployeeDirectoryStats } from "@/lib/hr/directory-page";
 import { traceEmployeesPageOp } from "@/lib/hr/employees-page-trace";
-import type { EmploymentStatus } from "@/types/enums";
+import { EmployeeCreateForm } from "@/components/hr/employee-create-form";
+import { EmployeeDirectory } from "@/components/hr/employee-directory";
 
 type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 
@@ -48,153 +47,78 @@ export default async function EmployeesPage() {
   const allowPrivilegedRoles = ctx.profile.is_platform_admin;
 
   return (
-    <div data-testid="employees-page">
+    <PageContainer data-testid="employees-page" className="space-y-5">
       <PageHeader
         title="الموظفون"
-        description="سجل الموظفين التشغيلي — بدون رواتب أو بيانات بنكية في الدليل العام"
+        description="إدارة ملفات الموظفين وبياناتهم الوظيفية — بدون رواتب أو بيانات بنكية في الدليل العام"
+        actions={
+          canCreate ? (
+            <Link
+              href="#employee-create-card"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-navy-deep md:min-h-10"
+            >
+              إضافة موظف
+            </Link>
+          ) : null
+        }
       />
 
-      <div className="mb-6 grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3" data-testid="employees-stats">
-        <Card>
-          <p className="text-sm text-muted">إجمالي السجلات</p>
-          <p className="mt-1 text-2xl font-semibold text-navy">{stats.total}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">نشطون</p>
-          <p className="mt-1 text-2xl font-semibold text-success">{stats.active}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">تحت التجربة</p>
-          <p className="mt-1 text-2xl font-semibold text-navy">{stats.probation}</p>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3" data-testid="employees-stats">
+        <div className="mt-metric mt-tint-navy">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+            <Users className="h-3.5 w-3.5 text-navy" aria-hidden />
+            إجمالي السجلات
+          </span>
+          <span className="mt-1.5 block text-xl font-semibold tabular-nums text-navy">{stats.total}</span>
+        </div>
+        <div className="mt-metric mt-tint-success">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+            <UserCheck className="h-3.5 w-3.5 text-navy" aria-hidden />
+            نشطون
+          </span>
+          <span className="mt-1.5 block text-xl font-semibold tabular-nums text-navy">{stats.active}</span>
+        </div>
+        <div className="mt-metric mt-tint-info col-span-2 md:col-span-1">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+            <Timer className="h-3.5 w-3.5 text-navy" aria-hidden />
+            تحت التجربة
+          </span>
+          <span className="mt-1.5 block text-xl font-semibold tabular-nums text-navy">{stats.probation}</span>
+        </div>
       </div>
 
       {canCreate ? (
-        <Card className="mb-6" data-testid="employee-create-card">
-          <h2 className="mb-4 text-base font-semibold text-navy">توظيف موظف جديد</h2>
-          <p className="mb-4 text-sm text-muted">
-            يتطلب صلاحية إنشاء موظف. سجّل الدخول للموظف يتم بالرقم الوظيفي وكلمة المرور — ليس بالبريد.
-            تعيين الأدوار يتطلب صلاحية منفصلة.
-          </p>
-          <ServerActionForm action={createEmployeeAction} className="grid gap-3 md:grid-cols-2" testId="employee-create-form">
-            <Field label="الرقم الوظيفي">
-              <Input name="employee_number" required data-testid="employee-create-number" />
-            </Field>
-            <Field label="كلمة مرور الدخول (اختياري)">
-              <Input
-                name="initial_password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                data-testid="employee-create-password"
-              />
-            </Field>
-            <Field label="بريد داخلي اختياري — لا يُطلب من الموظف عند الدخول">
-              <Input name="email" type="email" data-testid="employee-create-email" />
-            </Field>
-            <Field label="الاسم بالعربية">
-              <Input name="full_name_ar" required minLength={2} data-testid="employee-create-name-ar" />
-            </Field>
-            <Field label="الاسم بالإنجليزية">
-              <Input name="full_name_en" required minLength={2} data-testid="employee-create-name-en" />
-            </Field>
-            <Field label="المسمى الوظيفي">
-              <Input name="job_title_ar" data-testid="employee-create-title" />
-            </Field>
-            <Field label="نوع التوظيف">
-              <Select name="employment_type" defaultValue="" data-testid="employee-create-type">
-                <option value="">غير محدد</option>
-                {EMPLOYMENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {EMPLOYMENT_TYPE_LABELS[t].ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="الإدارة">
-              <Select name="department_id" defaultValue="" data-testid="employee-create-department">
-                <option value="">بدون</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            {canAssignRole ? (
-              <Field label="الدور">
-                <Select name="role_id" defaultValue="" data-testid="employee-create-role">
-                  <option value="">بدون</option>
-                  {roleRows
-                    .filter((role) =>
-                      isOperationalAssignableRole({
-                        code: role.code,
-                        is_external: role.is_external,
-                        allowPrivileged: allowPrivilegedRoles,
-                      }),
-                    )
-                    .map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name_ar}
-                      </option>
-                    ))}
-                </Select>
-              </Field>
-            ) : null}
-            <Field label="الجنسية">
-              <Input name="nationality" />
-            </Field>
-            <Field label="موقع العمل">
-              <Input name="work_location" />
-            </Field>
-            <Field label="تاريخ الالتحاق">
-              <Input name="joining_date" type="date" />
-            </Field>
-            <div className="md:col-span-2">
-              <Button type="submit" className="w-full sm:w-auto" data-testid="employee-create-submit">
-                إنشاء الموظف
-              </Button>
-            </div>
-          </ServerActionForm>
-        </Card>
+        <EmployeeCreateForm
+          departments={departments}
+          roles={roleRows}
+          canAssignRole={canAssignRole}
+          allowPrivilegedRoles={allowPrivilegedRoles}
+        />
       ) : null}
 
       {employees.length === 0 ? (
-        <EmptyState title="لا يوجد موظفون بعد." />
+        <div id="employees-list">
+          <EmptyState
+            title="لا يوجد موظفون بعد."
+            description="عند إنشاء أول موظف سيظهر في هذا الدليل."
+            action={
+              canCreate ? (
+                <Link
+                  href="#employee-create-card"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white"
+                >
+                  إضافة موظف
+                </Link>
+              ) : null
+            }
+          />
+        </div>
       ) : (
-        <div className="space-y-3" data-testid="employees-list">
-          {employees.map((employee) => {
-            const status = employee.employment_status as EmploymentStatus;
-            const typeLabel = employmentTypeLabel(employee.employment_type);
-            return (
-              <Card key={employee.id} data-testid={`employee-row-${employee.id}`}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <Link
-                      href={`/employees/${employee.id}`}
-                      className="text-base font-semibold text-navy underline-offset-2 hover:underline"
-                      data-testid={`employee-link-${employee.id}`}
-                    >
-                      {directoryProfileName(employee.profiles)}
-                    </Link>
-                    <p className="text-sm text-muted">
-                      {employee.employee_number ? `${employee.employee_number} · ` : ""}
-                      {employee.job_title_ar || "بدون مسمى"}
-                      {typeLabel !== "—" ? ` · ${typeLabel}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge tone={employee.is_active ? "success" : "danger"}>
-                      {employee.is_active ? "نشط" : "موقوف"}
-                    </Badge>
-                    <Badge tone="neutral">{EMPLOYMENT_STATUS_LABELS[status]?.ar ?? status}</Badge>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+        <div id="employees-list">
+          <h2 className="mt-section-title mb-2">دليل الموظفين</h2>
+          <EmployeeDirectory employees={employees} />
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

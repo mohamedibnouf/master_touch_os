@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, Field, Input, Select, TableScroll } from "@/components/ui/primitives";
+import { PageContainer } from "@/components/layout/page-container";
+import { EntityHeader } from "@/components/ui/entity-header";
+import { DetailGrid } from "@/components/ui/detail-grid";
+import { FormSection } from "@/components/ui/form-section";
+import { displayInitials } from "@/lib/ui/initials";
+import { auditActionLabel } from "@/lib/ui/audit-action-labels";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { ServerActionForm } from "@/components/forms/server-action-form";
@@ -181,167 +187,152 @@ export default async function EmployeeDetailPage({
     ...(canManage ? [{ id: "activity", label: "النشاط" }] : []),
   ];
 
+  const nameAr = (profile as { full_name_ar?: string } | null)?.full_name_ar || "موظف";
+  const nameEn = (profile as { full_name_en?: string } | null)?.full_name_en;
+
   return (
-    <div data-testid="employee-detail-page">
-      <PageHeader
-        title={(profile as { full_name_ar?: string } | null)?.full_name_ar || "موظف"}
-        description={[
-          employee.employee_number,
-          employee.job_title_ar,
-          empType ? EMPLOYMENT_TYPE_LABELS[empType].ar : null,
-        ]
+    <PageContainer data-testid="employee-detail-page" className="space-y-5">
+      <EntityHeader
+        initials={displayInitials(nameAr === "موظف" ? "" : nameAr)}
+        title={nameAr}
+        subtitle={nameEn}
+        meta={[employee.employee_number, employee.job_title_ar, empType ? EMPLOYMENT_TYPE_LABELS[empType].ar : null]
           .filter(Boolean)
           .join(" · ")}
+        badges={
+          <>
+            <Badge tone={employee.is_active ? "success" : "danger"}>
+              {employee.is_active ? "نشط" : "موقوف"}
+            </Badge>
+            {loginStatus ? (
+              <Badge
+                tone={loginStatus === "ready" ? "success" : loginStatus === "disabled" ? "danger" : "warning"}
+                data-testid="employee-login-status"
+              >
+                دخول: {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
+              </Badge>
+            ) : null}
+            <Badge tone="neutral">{EMPLOYMENT_STATUS_LABELS[status]?.ar ?? status}</Badge>
+            {currentContract ? (
+              <Badge tone="navy" data-testid="active-contract-badge">
+                عقد سارٍ: {currentContract.contract_number}
+              </Badge>
+            ) : null}
+          </>
+        }
         actions={
-          <Link href="/employees" className="text-sm underline" data-testid="employee-back-link">
+          <Link
+            href="/employees"
+            className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-line bg-white px-3 text-sm font-medium text-navy duration-150 hover:bg-paper md:min-h-10"
+            data-testid="employee-back-link"
+          >
             الدليل
           </Link>
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Badge tone={employee.is_active ? "success" : "danger"}>
-          {employee.is_active ? "نشط" : "موقوف"}
-        </Badge>
-        {loginStatus ? (
-          <Badge
-            tone={loginStatus === "ready" ? "success" : loginStatus === "disabled" ? "danger" : "warning"}
-            data-testid="employee-login-status"
-          >
-            حالة حساب الدخول: {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
-          </Badge>
-        ) : null}
-        <Badge tone="neutral">{EMPLOYMENT_STATUS_LABELS[status]?.ar ?? status}</Badge>
-        {currentContract ? (
-          <Badge tone="navy" data-testid="active-contract-badge">
-            عقد سارٍ: {currentContract.contract_number}
-          </Badge>
-        ) : null}
-      </div>
-
       {setupRows.length > 0 ? (
-        <Card className="mb-6" data-testid="employee-setup-checklist">
-          <h2 className="mb-3 font-semibold text-navy">إعداد الموظف</h2>
+        <section className="mt-surface p-4 md:p-5" data-testid="employee-setup-checklist">
+          <h2 className="mb-3 text-sm font-semibold text-navy">إعداد الموظف</h2>
           <ul className="grid gap-2 text-sm sm:grid-cols-2">
             {setupRows.map((row) => (
-              <li key={row.key} className="flex items-center justify-between gap-2 border-b border-line pb-1">
-                <span>{row.label}</span>
+              <li
+                key={row.key}
+                className="flex items-center justify-between gap-2 rounded-[var(--radius-control)] bg-paper/80 px-3 py-2"
+              >
+                <span className="min-w-0 text-muted">{row.label}</span>
                 {row.href ? (
-                  <Link href={row.href} className="text-navy underline" data-testid={`setup-${row.key}`}>
+                  <Link href={row.href} className="shrink-0 font-medium text-navy duration-150 hover:underline" data-testid={`setup-${row.key}`}>
                     {row.statusLabel}
                   </Link>
                 ) : (
-                  <span data-testid={`setup-${row.key}`}>{row.statusLabel}</span>
+                  <span className="shrink-0 font-medium text-navy" data-testid={`setup-${row.key}`}>
+                    {row.statusLabel}
+                  </span>
                 )}
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
       ) : null}
 
-      <div
-        className="mb-6 flex gap-2 overflow-x-auto overscroll-x-contain border-b border-line pb-3 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      <nav
+        className="mb-2 flex gap-1 overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         data-testid="employee-tabs"
+        aria-label="أقسام ملف الموظف"
       >
         {tabs.map((t) => (
           <Link
             key={t.id}
             href={`/employees/${id}?tab=${t.id}`}
             data-testid={`employee-tab-${t.id}`}
-            className={`shrink-0 rounded-md px-3 py-2 text-sm ${
-              tab === t.id ? "bg-navy text-white" : "bg-paper text-muted hover:text-ink"
+            className={`shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium duration-150 ${
+              tab === t.id ? "bg-navy text-white" : "text-muted hover:bg-white hover:text-navy"
             }`}
           >
             {t.label}
           </Link>
         ))}
-      </div>
+      </nav>
 
       {tab === "overview" ? (
         <div className="grid gap-6 lg:grid-cols-2">
           {canManage && loginStatus ? (
             <Card data-testid="employee-login-card" className="lg:col-span-2">
-              <h2 className="mb-2 font-semibold text-navy">حالة حساب الدخول</h2>
-              <p className="mb-3 text-sm text-muted">
-                يسجّل الموظف دخوله بالرقم الوظيفي وكلمة المرور فقط. لا تُعرض كلمة المرور هنا.
-              </p>
-              <p className="mb-4 text-sm">
-                الحالة:{" "}
-                <span data-testid="employee-login-status-text">
-                  {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
-                </span>
-              </p>
-              {employee.is_active && employee.employee_number ? (
-                <ServerActionForm action={provisionEmployeeLoginAction} className="grid max-w-md gap-3">
-                  <input type="hidden" name="employeeId" value={employee.id} />
-                  <Field label="كلمة مرور الدخول">
-                    <Input
-                      name="password"
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete="new-password"
-                      data-testid="employee-login-password"
-                    />
-                  </Field>
-                  <Button type="submit" data-testid="employee-login-provision">
-                    تفعيل حساب الدخول
-                  </Button>
-                </ServerActionForm>
-              ) : (
-                <p className="text-sm text-muted">فعّل الموظف وعيّن رقماً وظيفياً قبل تفعيل الدخول.</p>
-              )}
+              <FormSection
+                title="حالة حساب الدخول"
+                description="يسجّل الموظف دخوله بالرقم الوظيفي وكلمة المرور فقط. لا تُعرض كلمة المرور هنا ولا البريد الداخلي المُولَّد."
+              >
+                <p className="mb-4 text-sm">
+                  الحالة:{" "}
+                  <span data-testid="employee-login-status-text" className="font-semibold text-navy">
+                    {EMPLOYEE_LOGIN_STATUS_LABEL_AR[loginStatus]}
+                  </span>
+                </p>
+                {employee.is_active && employee.employee_number ? (
+                  <ServerActionForm action={provisionEmployeeLoginAction} className="grid max-w-md gap-3">
+                    <input type="hidden" name="employeeId" value={employee.id} />
+                    <Field label="كلمة مرور الدخول" hint="8 أحرف على الأقل.">
+                      <Input
+                        name="password"
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        data-testid="employee-login-password"
+                      />
+                    </Field>
+                    <Button type="submit" data-testid="employee-login-provision">
+                      تفعيل حساب الدخول
+                    </Button>
+                  </ServerActionForm>
+                ) : (
+                  <p className="text-sm text-muted">فعّل الموظف وعيّن رقماً وظيفياً قبل تفعيل الدخول.</p>
+                )}
+              </FormSection>
             </Card>
           ) : null}
           <Card data-testid="employee-overview-card">
-            <h2 className="mb-3 font-semibold text-navy">البيانات الأساسية</h2>
-            <dl className="grid gap-2 text-sm">
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الرقم الوظيفي</dt>
-                <dd data-testid="emp-number">{employee.employee_number ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الاسم (عربي)</dt>
-                <dd data-testid="emp-name-ar">{(profile as { full_name_ar?: string } | null)?.full_name_ar ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الاسم (إنجليزي)</dt>
-                <dd data-testid="emp-name-en">{(profile as { full_name_en?: string } | null)?.full_name_en ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">المسمى الوظيفي (عربي)</dt>
-                <dd data-testid="emp-job-title-ar">{employee.job_title_ar ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">نوع التوظيف</dt>
-                <dd data-testid="emp-employment-type">{employmentTypeLabel(employee.employment_type)}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">تاريخ الانضمام</dt>
-                <dd data-testid="emp-joining-date">{employee.joining_date ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">موقع العمل</dt>
-                <dd data-testid="emp-work-location">{employee.work_location ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الجنسية</dt>
-                <dd data-testid="emp-nationality">{employee.nationality ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الجنس</dt>
-                <dd data-testid="emp-gender">{genderLabel(gender)}</dd>
-              </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">تاريخ الميلاد</dt>
-                <dd data-testid="emp-dob">{canSensitive ? employee.date_of_birth ?? "—" : "محمي"}</dd>
-              </div>
-            </dl>
+            <h2 className="mb-3 text-sm font-semibold text-navy">البيانات الأساسية</h2>
+            <DetailGrid
+              items={[
+                { label: "الرقم الوظيفي", value: employee.employee_number ?? "—", testId: "emp-number" },
+                { label: "الاسم (عربي)", value: (profile as { full_name_ar?: string } | null)?.full_name_ar ?? "—", testId: "emp-name-ar" },
+                { label: "الاسم (إنجليزي)", value: (profile as { full_name_en?: string } | null)?.full_name_en ?? "—", testId: "emp-name-en" },
+                { label: "المسمى الوظيفي (عربي)", value: employee.job_title_ar ?? "—", testId: "emp-job-title-ar" },
+                { label: "نوع التوظيف", value: employmentTypeLabel(employee.employment_type), testId: "emp-employment-type" },
+                { label: "تاريخ الانضمام", value: employee.joining_date ?? "—", testId: "emp-joining-date" },
+                { label: "موقع العمل", value: employee.work_location ?? "—", testId: "emp-work-location" },
+                { label: "الجنسية", value: employee.nationality ?? "—", testId: "emp-nationality" },
+                { label: "الجنس", value: genderLabel(gender), testId: "emp-gender" },
+                { label: "تاريخ الميلاد", value: canSensitive ? employee.date_of_birth ?? "—" : "محمي", testId: "emp-dob" },
+              ]}
+            />
           </Card>
 
           {canManage ? (
             <Card data-testid="employee-edit-employment-card">
-              <h2 className="mb-3 font-semibold text-navy">تحديث بيانات التوظيف</h2>
+              <h2 className="mb-3 text-sm font-semibold text-navy">تحديث بيانات التوظيف</h2>
               <ServerActionForm action={updateEmployeeEmploymentAction} className="grid gap-3">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <Field label="الرقم الوظيفي">
@@ -462,22 +453,24 @@ export default async function EmployeeDetailPage({
       {tab === "organization" ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card data-testid="employee-org-card">
-            <h2 className="mb-3 font-semibold text-navy">الهيكل والإدارة</h2>
-            <dl className="grid gap-2 text-sm">
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الأقسام الحالية</dt>
-                <dd data-testid="emp-departments">
-                  {deptLinks.length === 0
-                    ? "غير معين"
-                    : deptLinks
-                        .map((d) => {
-                          const dept = d.departments as { name_ar?: string } | null;
-                          return dept?.name_ar ?? "قسم";
-                        })
-                        .join("، ")}
-                </dd>
-              </div>
-            </dl>
+            <h2 className="mb-3 text-sm font-semibold text-navy">الهيكل والإدارة</h2>
+            <DetailGrid
+              items={[
+                {
+                  label: "الأقسام الحالية",
+                  testId: "emp-departments",
+                  value:
+                    deptLinks.length === 0
+                      ? "غير معين"
+                      : deptLinks
+                          .map((d) => {
+                            const dept = d.departments as { name_ar?: string } | null;
+                            return dept?.name_ar ?? "قسم";
+                          })
+                          .join("، "),
+                },
+              ]}
+            />
           </Card>
 
           {canManage ? (
@@ -691,7 +684,7 @@ export default async function EmployeeDetailPage({
                 لا توجد عقود مسجلة لهذا الموظف.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
@@ -752,7 +745,7 @@ export default async function EmployeeDetailPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
           </Card>
         </div>
@@ -785,7 +778,7 @@ export default async function EmployeeDetailPage({
                 </div>
                 <div className="rounded-lg bg-paper p-3 border border-line">
                   <span className="text-xs text-muted">إجمالي الراتب</span>
-                  <p className="text-lg font-bold text-forest" data-testid="comp-total-display">
+                  <p className="text-lg font-bold text-navy" data-testid="comp-total-display">
                     {(
                       Number(currentCompensation.basic_salary) +
                       Number(currentCompensation.housing_allowance) +
@@ -875,7 +868,7 @@ export default async function EmployeeDetailPage({
                 لا توجد سجلات تاريخية للرواتب.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
@@ -925,7 +918,7 @@ export default async function EmployeeDetailPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
           </Card>
         </div>
@@ -1001,7 +994,7 @@ export default async function EmployeeDetailPage({
                 لا توجد وثائق مرفوعة لهذا الموظف.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
@@ -1032,7 +1025,7 @@ export default async function EmployeeDetailPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
           </Card>
         </div>
@@ -1095,7 +1088,7 @@ export default async function EmployeeDetailPage({
                 لا توجد حسابات بنكية مسجلة لهذا الموظف.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
@@ -1154,7 +1147,7 @@ export default async function EmployeeDetailPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
           </Card>
         </div>
@@ -1203,11 +1196,11 @@ export default async function EmployeeDetailPage({
           {audit.length === 0 ? (
             <p className="text-sm text-muted">لا يوجد نشاط مسجل.</p>
           ) : (
-            <ul className="grid gap-2 text-xs">
+            <ul className="grid gap-2 text-sm">
               {audit.map((a) => (
-                <li key={a.id} className="flex justify-between border-b border-line pb-1">
-                  <span>{a.action}</span>
-                  <span className="text-muted">{new Date(a.created_at).toLocaleString("ar-SA")}</span>
+                <li key={a.id} className="flex justify-between gap-3 border-b border-line pb-1">
+                  <span className="min-w-0 font-medium text-navy">{auditActionLabel(a.action)}</span>
+                  <span className="shrink-0 text-muted">{new Date(a.created_at).toLocaleString("ar-SA")}</span>
                 </li>
               ))}
             </ul>
@@ -1216,7 +1209,11 @@ export default async function EmployeeDetailPage({
       ) : null}
 
       {canManage ? (
-        <div className="mt-6 flex justify-end">
+        <section className="rounded-[var(--radius-surface)] border border-danger/20 bg-danger/5 p-4 md:p-5">
+          <h2 className="text-sm font-semibold text-danger">إجراء حساس</h2>
+          <p className="mt-1 mb-3 text-xs text-muted">
+            إيقاف الموظف يؤثر على الدخول التشغيلي وفق القواعد الحالية. لا يُنفَّذ إلا بصلاحية الإدارة.
+          </p>
           <ServerActionForm action={setEmployeeActiveAction}>
             <input type="hidden" name="employeeId" value={employee.id} />
             <input type="hidden" name="isActive" value={(!employee.is_active).toString()} />
@@ -1228,8 +1225,8 @@ export default async function EmployeeDetailPage({
               {employee.is_active ? "إيقاف الموظف (Deactivate)" : "تنشيط الموظف (Reactivate)"}
             </Button>
           </ServerActionForm>
-        </div>
+        </section>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
