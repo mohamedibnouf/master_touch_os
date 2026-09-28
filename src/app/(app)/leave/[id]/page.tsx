@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, Field, PageHeader, Textarea } from "@/components/ui/primitives";
@@ -51,7 +52,7 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
       : undefined;
 
   return (
-    <div className="mx-auto max-w-2xl" data-testid="leave-detail">
+    <PageContainer className="mx-auto max-w-2xl" data-testid="leave-detail">
       <PageHeader
         title="تفاصيل طلب الإجازة"
         description={type?.name_ar ?? "إجازة"}
@@ -118,6 +119,6 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
           </ServerActionForm>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

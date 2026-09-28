@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Badge, Card, EmptyState, Field, PageHeader } from "@/components/ui/primitives";
@@ -296,7 +297,7 @@ export default async function SearchPage({
   if (!canSearch) redirect("/");
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader title="بحث موحّد" description="PR, RFQ, PO, مورد، فاتورة، وثائق هندسية — بحث من قاعدة البيانات" />
       <Card className="mb-6">
         <form className="flex flex-wrap gap-3">
@@ -352,6 +353,6 @@ export default async function SearchPage({
           </div>
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -142,7 +143,7 @@ export default async function EngineeringPage({
   const projectQs = projectFilter ? `&project=${projectFilter}` : "";
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="الهندسة"
         description="طلبات الاستفسار، الاعتمادات، المخططات، الفحوصات، وعدم المطابقة"
@@ -621,7 +622,7 @@ export default async function EngineeringPage({
           )}
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
 

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, PageHeader } from "@/components/ui/primitives";
@@ -50,7 +51,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
     .maybeSingle();
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={rfq.rfq_number}
         description={rfq.title}
@@ -276,6 +277,6 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           </ul>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

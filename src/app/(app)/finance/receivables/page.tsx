@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -86,7 +87,7 @@ export default async function ReceivablesPage({
     : items;
 
   return (
-    <div data-testid="receivables-page">
+    <PageContainer data-testid="receivables-page" className="space-y-5">
       <PageHeader
         title="ذمم العملاء"
         description="تحليل أعمار الذمم المدينة حسب تاريخ الاستحقاق والمتبقي"
@@ -166,6 +167,6 @@ export default async function ReceivablesPage({
           </div>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -44,7 +45,7 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
     outstanding > 0;
 
   return (
-    <div data-testid="invoice-detail-page">
+    <PageContainer data-testid="invoice-detail-page" className="space-y-5">
       <PageHeader
         title={invoice.invoice_number}
         description={`فاتورة مورد — ${(supplier as Record<string, string> | null)?.legal_name ?? "—"}`}
@@ -272,6 +273,6 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
           </ul>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

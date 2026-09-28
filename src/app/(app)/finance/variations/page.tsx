@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -31,7 +32,7 @@ export default async function VariationsPage({
   });
 
   return (
-    <div data-testid="variations-page">
+    <PageContainer data-testid="variations-page" className="space-y-5">
       <PageHeader
         title="أوامر التغيير"
         description="سجل VO — من الطلب إلى الاعتماد"
@@ -108,6 +109,6 @@ export default async function VariationsPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

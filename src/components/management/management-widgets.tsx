@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card } from "@/components/ui/primitives";
+import { Badge } from "@/components/ui/primitives";
 import type { ManagementAttentionItem } from "@/modules/management/types";
 import type { RiskFinding } from "@/modules/management/risk/types";
 
@@ -32,7 +32,9 @@ export function AttentionList({ items }: { items: ManagementAttentionItem[] }) {
         <li key={item.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={severityTone[item.severity] ?? "neutral"}>{item.severity}</Badge>
+              <Badge tone={severityTone[item.severity] ?? "neutral"}>
+                {severityLabelAr[item.severity] ?? item.severity}
+              </Badge>
               <Link
                 href={item.href}
                 className="font-medium text-navy underline"
@@ -128,13 +130,13 @@ export function MetricGrid({
 }) {
   if (metrics.length === 0) return null;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {metrics.map((m) => {
         const body = (
-          <Card className="h-full" data-testid={`management-metric-${m.key}`}>
-            <p className="text-sm text-muted">{m.label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-navy">{m.value}</p>
-          </Card>
+          <div className="mt-metric mt-tint-navy h-full" data-testid={`management-metric-${m.key}`}>
+            <p className="text-[11px] font-medium text-muted">{m.label}</p>
+            <p className="mt-1.5 text-xl font-semibold tabular-nums text-navy">{m.value}</p>
+          </div>
         );
         return m.href ? (
           <Link key={m.key} href={m.href} className="block">

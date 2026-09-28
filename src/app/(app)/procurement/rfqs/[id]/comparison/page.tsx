@@ -1,6 +1,7 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button, Card, Field, PageHeader, Select, Textarea } from "@/components/ui/primitives";
+import { Button, Card, Field, PageHeader, Select, Textarea, TableScroll } from "@/components/ui/primitives";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
 import { getAuthContext } from "@/server/context";
@@ -62,7 +63,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
 
   if (quotes.length === 0) {
     return (
-      <div>
+      <PageContainer className="space-y-5">
         <PageHeader title={`مقارنة عروض — ${rfq.rfq_number}`} description={rfq.title} />
         <Card>
           <p className="text-sm text-muted">لا توجد عروض أسعار مستلمة لهذا الطلب بعد.</p>
@@ -70,7 +71,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
             العودة لـ {rfq.rfq_number}
           </Link>
         </Card>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -87,7 +88,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
   const users = usersResult.data ?? [];
 
   return (
-    <div data-testid="comparison-page">
+    <PageContainer data-testid="comparison-page" className="space-y-5">
       <PageHeader
         title={`مقارنة عروض — ${rfq.rfq_number}`}
         description={rfq.title}
@@ -132,7 +133,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
 
       {/* Matrix */}
       <Card className="mb-6 p-0">
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="w-full text-sm">
             <thead className="bg-paper text-right text-muted">
               <tr>
@@ -234,7 +235,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
               </tr>
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {/* Recommendation form */}
@@ -327,6 +328,6 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
           </Link>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

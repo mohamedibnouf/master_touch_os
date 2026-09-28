@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -16,7 +17,7 @@ export default async function HrAttendancePoliciesPage() {
   const policies = await new AttendanceRepository(supabase).listPolicies(ctx.organization.id);
 
   return (
-    <div data-testid="attendance-policies">
+    <PageContainer data-testid="attendance-policies" className="space-y-5">
       <PageHeader title="سياسات الحضور" description="إدارة سياسات التأخير والحد الأدنى للعمل" />
 
       <Card className="mb-6" data-testid="attendance-policy-form">
@@ -89,6 +90,6 @@ export default async function HrAttendancePoliciesPage() {
           </tbody>
         </table>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

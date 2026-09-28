@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, PageHeader } from "@/components/ui/primitives";
@@ -59,7 +60,7 @@ export default async function PurchaseRequestDetailPage({
   ) as Record<string, unknown> | undefined;
 
   return (
-    <div data-testid="pr-detail-page">
+    <PageContainer data-testid="pr-detail-page" className="space-y-5">
       <PageHeader
         title={pr.pr_number}
         description={project ? `${(project as Record<string, string>).project_code} — ${(project as Record<string, string>).name_ar}` : ""}
@@ -236,6 +237,6 @@ export default async function PurchaseRequestDetailPage({
           </ul>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

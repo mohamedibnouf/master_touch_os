@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -12,7 +13,7 @@ export default async function ManagementReportsIndexPage() {
   if (!canViewManagement(ctx)) redirect("/");
 
   return (
-    <div data-testid="management-reports-index">
+    <PageContainer data-testid="management-reports-index" className="space-y-5">
       <PageHeader
         title="تقارير الإدارة"
         description="تقارير حتمية مبنية على البيانات التشغيلية ومحرك المخاطر — بدون ذكاء اصطناعي."
@@ -28,6 +29,6 @@ export default async function ManagementReportsIndexPage() {
           </Link>
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }

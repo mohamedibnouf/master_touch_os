@@ -1,5 +1,6 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -23,7 +24,7 @@ export default async function NotificationPreferencesPage() {
   const prefs = new Map((data ?? []).map((p) => [`${p.category}:${p.channel}`, p.enabled as boolean]));
 
   return (
-    <div data-testid="notification-preferences">
+    <PageContainer data-testid="notification-preferences" className="space-y-5">
       <PageHeader
         title="تفضيلات التنبيه"
         description="التحكم بالقنوات لا يلغي صلاحياتك. التنبيه داخل التطبيق إلزامي للعمل والموافقات والرواتب."
@@ -34,7 +35,8 @@ export default async function NotificationPreferencesPage() {
           description="سيتم تفعيل التفضيلات واشتراك الأجهزة بعد مراجعة وتطبيق الترحيل 062."
         />
       ) : (
-        <Card className="mb-6 overflow-x-auto">
+        <Card className="mb-6 p-0">
+          <TableScroll>
           <table className="w-full min-w-[520px] text-sm">
             <thead className="text-muted">
               <tr>
@@ -69,6 +71,7 @@ export default async function NotificationPreferencesPage() {
               ))}
             </tbody>
           </table>
+          </TableScroll>
         </Card>
       )}
 
@@ -80,6 +83,6 @@ export default async function NotificationPreferencesPage() {
           Web Push يحتاج مفاتيح VAPID بعد تطبيق 062
         </Badge>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

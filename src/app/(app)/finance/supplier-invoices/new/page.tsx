@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -57,7 +58,7 @@ export default async function NewSupplierInvoicePage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl" data-testid="invoice-create-page">
+    <PageContainer className="mx-auto max-w-2xl" data-testid="invoice-create-page">
       <PageHeader title="فاتورة مورد جديدة" description="ستُنفَّذ المطابقة تلقائياً عند الحفظ" />
       <Card>
         <ServerActionForm action={action} className="grid gap-4" data-testid="invoice-create-form">
@@ -112,6 +113,6 @@ export default async function NewSupplierInvoicePage({
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

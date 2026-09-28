@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -78,7 +79,7 @@ export default async function HrAttendancePage({
   ).length;
 
   return (
-    <div data-testid="attendance-hr-dashboard">
+    <PageContainer data-testid="attendance-hr-dashboard" className="space-y-5">
       <PageHeader
         title="إدارة الحضور"
         description="لوحة الموارد البشرية للحضور اليومي"
@@ -276,6 +277,6 @@ export default async function HrAttendancePage({
           </table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

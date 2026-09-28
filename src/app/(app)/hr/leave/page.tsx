@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
@@ -60,7 +61,7 @@ export default async function HrLeavePage() {
   const lowBalanceHint = types.filter((t) => t.is_active && t.annual_entitlement_days > 0).length;
 
   return (
-    <div data-testid="leave-hr-dashboard">
+    <PageContainer data-testid="leave-hr-dashboard" className="space-y-5">
       <PageHeader
         title="إدارة الإجازات"
         description="اعتماد الموارد البشرية ومراقبة الأرصدة"
@@ -153,6 +154,6 @@ export default async function HrLeavePage() {
         </table>
         </TableScroll>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

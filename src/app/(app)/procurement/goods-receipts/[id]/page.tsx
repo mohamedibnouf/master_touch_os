@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -30,7 +31,7 @@ export default async function GoodsReceiptDetailPage({ params }: { params: Promi
   const items = (receipt.goods_receipt_items as Array<Record<string, unknown>>) ?? [];
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={receipt.receipt_number}
         description={`استلام بضاعة — ${(supplier as Record<string, string> | null)?.legal_name ?? "—"}`}
@@ -107,6 +108,6 @@ export default async function GoodsReceiptDetailPage({ params }: { params: Promi
           <p className="text-sm">{receipt.notes}</p>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

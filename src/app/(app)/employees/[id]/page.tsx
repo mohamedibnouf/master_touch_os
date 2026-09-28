@@ -257,7 +257,7 @@ export default async function EmployeeDetailPage({
       ) : null}
 
       <nav
-        className="mb-2 flex gap-1 overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mb-2 flex min-w-0 max-w-full gap-1 overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         data-testid="employee-tabs"
         aria-label="أقسام ملف الموظف"
       >

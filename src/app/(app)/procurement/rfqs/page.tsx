@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -30,7 +31,7 @@ export default async function RfqsPage({
   });
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="طلبات عروض الأسعار"
         description="RFQ — إرسال طلبات الأسعار للموردين"
@@ -95,6 +96,6 @@ export default async function RfqsPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

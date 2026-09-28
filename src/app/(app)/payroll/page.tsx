@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
@@ -49,7 +50,7 @@ export default async function PayrollDashboardPage() {
   const defaultMonth = now.getMonth() + 1;
 
   return (
-    <div data-testid="payroll-dashboard">
+    <PageContainer data-testid="payroll-dashboard" className="space-y-5">
       <PageHeader
         title="الرواتب"
         description="فترات مسير الرواتب الشهرية"
@@ -137,6 +138,6 @@ export default async function PayrollDashboardPage() {
           </TableScroll>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

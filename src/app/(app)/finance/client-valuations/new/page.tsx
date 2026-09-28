@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -59,7 +60,7 @@ export default async function NewClientValuationPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl" data-testid="valuation-create-page">
+    <PageContainer className="mx-auto max-w-2xl" data-testid="valuation-create-page">
       <PageHeader
         title="مستخلص عميل جديد"
         description="يُعاد حساب المبالغ تلقائياً بعد الحفظ"
@@ -140,6 +141,6 @@ export default async function NewClientValuationPage({
           </ServerActionForm>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

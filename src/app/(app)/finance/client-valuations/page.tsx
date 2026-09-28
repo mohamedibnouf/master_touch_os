@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -31,7 +32,7 @@ export default async function ClientValuationsPage({
   });
 
   return (
-    <div data-testid="client-valuations-page">
+    <PageContainer data-testid="client-valuations-page" className="space-y-5">
       <PageHeader
         title="مستخلصات العميل"
         description="سجل مستخلصات AR — من المطالبة إلى التصديق"
@@ -113,6 +114,6 @@ export default async function ClientValuationsPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

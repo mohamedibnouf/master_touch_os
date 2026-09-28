@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { notFound, redirect } from "next/navigation";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
@@ -28,7 +29,7 @@ export default async function PurchaseOrderPrintPage({
   const prj = project as Record<string, string> | null;
 
   return (
-    <div className="mx-auto max-w-3xl print:mx-0 print:max-w-none">
+    <PageContainer className="mx-auto max-w-3xl print:mx-0 print:max-w-none">
       {/* Print button */}
       <div className="mb-6 print:hidden">
         <button
@@ -177,6 +178,6 @@ export default async function PurchaseOrderPrintPage({
           <p className="mt-1">أُصدر في: {po.issued_at ? new Date(po.issued_at).toLocaleString("ar-SA") : "—"}</p>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createProjectAction } from "@/server/use-cases/platform";
@@ -13,7 +14,7 @@ export default async function NewProjectPage() {
   const users = await repo.listUsers(ctx.organization.id);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageContainer className="mx-auto max-w-2xl">
       <PageHeader title="إنشاء مشروع" description="يتم توليد رمز المشروع تلقائياً وبشكل آمن من قاعدة البيانات" />
       <Card>
         <ServerActionForm action={createProjectAction} className="space-y-4">
@@ -63,6 +64,6 @@ export default async function NewProjectPage() {
           </Button>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

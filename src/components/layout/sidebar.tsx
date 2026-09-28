@@ -117,7 +117,7 @@ export function Sidebar({
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
+    const mq = window.matchMedia("(min-width: 1280px)");
     const sync = () => setIsDesktop(mq.matches);
     sync();
     mq.addEventListener("change", sync);
@@ -136,10 +136,11 @@ export function Sidebar({
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex h-full w-72 shrink-0 flex-col bg-navy text-white print:hidden",
-        "fixed inset-y-0 start-0 z-50 duration-200 ease-out transition-transform lg:static lg:z-auto lg:translate-x-0 lg:transition-none",
+        "flex w-72 shrink-0 flex-col bg-navy text-white print:hidden",
+        "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out max-xl:transition-transform",
+        "xl:static xl:z-auto xl:h-auto xl:min-h-dvh xl:self-stretch xl:translate-x-0 xl:transition-none",
         "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
-        open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full lg:translate-x-0",
+        open ? "max-xl:translate-x-0" : "max-xl:-translate-x-full max-xl:rtl:translate-x-full",
       )}
       style={{
         background:
@@ -154,7 +155,7 @@ export function Sidebar({
         </div>
         <button
           type="button"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-white/90 duration-150 hover:bg-white/10 lg:hidden"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-white/90 duration-150 hover:bg-white/10 xl:hidden"
           aria-label="إغلاق القائمة"
           onClick={onClose}
         >
@@ -180,7 +181,7 @@ export function Sidebar({
                       onClick={onClose}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "relative flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-2.5 py-2 text-sm duration-150 transition-colors lg:min-h-10",
+                        "relative flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-2.5 py-2 text-sm duration-150 transition-colors xl:min-h-10",
                         active
                           ? "bg-white/12 font-medium text-white"
                           : "text-white/80 hover:bg-white/8 hover:text-white",

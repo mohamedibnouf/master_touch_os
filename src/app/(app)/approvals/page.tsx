@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -6,6 +7,8 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isEntityApprovalTypeSupported } from "@/lib/approvals/entity-approval-types";
+import { approvalStatusLabel, approvalStepStatusLabel } from "@/lib/ui/operational-labels";
+import { auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import { decideApprovalAction } from "@/server/use-cases/platform";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
 import { ServerActionForm } from "@/components/forms/server-action-form";
@@ -54,7 +57,7 @@ export default async function ApprovalsPage({
   const canDecide = hasPermission(ctx, "approval.approve") || hasPermission(ctx, "approval.reject");
 
   return (
-    <div data-testid="approvals-page">
+    <PageContainer data-testid="approvals-page" className="space-y-5">
       <PageHeader
         title="الموافقات"
         description="طلبات الاعتماد الرسمية برموز القرار A–E"
@@ -88,11 +91,13 @@ export default async function ApprovalsPage({
                   <div>
                     <h2 className="text-base font-semibold text-navy">{request.title}</h2>
                     <p className="mt-1 text-xs text-muted">
-                      {request.entity_type} · {request.status}
+                      {auditEntityLabel(request.entity_type)} · {approvalStatusLabel(request.status)}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Badge tone={isOverdue ? "danger" : "navy"}>{isOverdue ? "متأخر" : request.status}</Badge>
+                    <Badge tone={isOverdue ? "danger" : "navy"}>
+                      {isOverdue ? "متأخر" : approvalStatusLabel(request.status)}
+                    </Badge>
                     {request.due_at ? (
                       <Badge>
                         الاستحقاق:{" "}
@@ -106,7 +111,7 @@ export default async function ApprovalsPage({
                   {steps.map((step) => (
                     <li key={step.id} className="flex items-center justify-between text-sm">
                       <span>
-                        خطوة {step.sequence} · {step.status}
+                        خطوة {step.sequence} · {approvalStepStatusLabel(step.status)}
                         {step.decision ? ` · ${step.decision}` : ""}
                       </span>
                       {step.user_id === ctx.userId ? <Badge tone="navy">مسندة إليك</Badge> : null}
@@ -140,6 +145,6 @@ export default async function ApprovalsPage({
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

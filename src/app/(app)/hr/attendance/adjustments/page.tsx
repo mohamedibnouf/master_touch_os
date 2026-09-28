@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -52,7 +53,7 @@ export default async function HrAttendanceAdjustmentsPage() {
   ]);
 
   return (
-    <div data-testid="attendance-adjustments">
+    <PageContainer data-testid="attendance-adjustments" className="space-y-5">
       <PageHeader title="تعديلات الحضور" description="سجل تعديلات HR غير القابل للتغيير" />
 
       {canAdjust ? (
@@ -132,6 +133,6 @@ export default async function HrAttendanceAdjustmentsPage() {
           </table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

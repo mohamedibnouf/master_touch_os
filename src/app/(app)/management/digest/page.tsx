@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
@@ -33,7 +34,7 @@ export default async function ManagementDigestPage() {
   const digest = await maybeAiDigestSummary(facts);
 
   return (
-    <div data-testid="management-digest">
+    <PageContainer data-testid="management-digest" className="space-y-5">
       <PageHeader title="الملخص الإداري اليومي" description="حقائق حتمية من مركز القيادة. الذكاء الاصطناعي اختياري ولا يخترع أرقاماً." />
       <ManagementNav pathname="/management/digest" />
       <Card>
@@ -45,6 +46,6 @@ export default async function ManagementDigestPage() {
           <EmptyState title="لا عناصر انتباه اليوم." />
         </div>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

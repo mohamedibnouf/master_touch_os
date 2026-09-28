@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -69,7 +70,7 @@ export default async function AttendanceTeamPage() {
   ).length;
 
   return (
-    <div data-testid="attendance-team">
+    <PageContainer data-testid="attendance-team" className="space-y-5">
       <PageHeader
         title="حضور الفريق"
         description={`اليوم ${today}`}
@@ -159,6 +160,6 @@ export default async function AttendanceTeamPage() {
           </div>
         ) : null}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

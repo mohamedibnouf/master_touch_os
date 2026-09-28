@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/primitives";
@@ -29,7 +30,7 @@ export default async function ExecutiveReportPage() {
   const report = buildExecutiveReport({ context, snapshot });
 
   return (
-    <div data-testid="management-report-executive">
+    <PageContainer data-testid="management-report-executive" className="space-y-5">
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
@@ -75,6 +76,6 @@ export default async function ExecutiveReportPage() {
           </Card>
         ) : null}
       </ReportChrome>
-    </div>
+    </PageContainer>
   );
 }

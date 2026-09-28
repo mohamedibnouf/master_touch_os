@@ -78,7 +78,7 @@ export function AppShellFrame({
         <button
           type="button"
           aria-label="إغلاق القائمة"
-          className="fixed inset-0 z-40 bg-navy/40 lg:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-navy/40 xl:hidden print:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
@@ -96,7 +96,7 @@ export function AppShellFrame({
         >
           <button
             type="button"
-            className="mt-icon-btn mt-icon-btn-inverse lg:hidden"
+            className="mt-icon-btn mt-icon-btn-inverse xl:hidden"
             aria-label="فتح القائمة"
             aria-expanded={drawerOpen}
             aria-controls="app-sidebar"
@@ -149,7 +149,7 @@ export function AppShellFrame({
 
         <main
           id="main-content"
-          className="min-w-0 flex-1 px-4 py-4 md:px-8 md:py-5 print:p-0"
+          className="min-w-0 w-full flex-1 px-4 py-4 md:px-8 md:py-5 print:max-w-none print:p-0"
           style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
         >
           {children}

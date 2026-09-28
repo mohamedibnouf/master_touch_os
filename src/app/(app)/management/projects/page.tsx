@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -23,7 +24,7 @@ export default async function ManagementProjectsPage() {
   );
 
   return (
-    <div data-testid="management-projects">
+    <PageContainer data-testid="management-projects" className="space-y-5">
       <PageHeader title="ذكاء المشاريع" description="ملخص حتمي من بيانات المشاريع الحالية" />
       <ManagementNav pathname="/management/projects" />
       <MetricGrid
@@ -43,6 +44,6 @@ export default async function ManagementProjectsPage() {
           — هذه الصفحة ليست مصدراً ثانياً للحقيقة.
         </p>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

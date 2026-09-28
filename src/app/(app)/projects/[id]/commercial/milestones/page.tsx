@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Textarea } from "@/components/ui/primitives";
@@ -32,7 +33,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
   const nextNumber = milestones.length > 0 ? Math.max(...milestones.map((m) => m.milestone_number)) + 1 : 1;
 
   return (
-    <div data-testid="project-milestones-page">
+    <PageContainer data-testid="project-milestones-page" className="space-y-5">
       <PageHeader
         title="مراحل الدفع"
         description={`${project.project_code} — ${project.name_ar}`}
@@ -168,6 +169,6 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
           ) : null}
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

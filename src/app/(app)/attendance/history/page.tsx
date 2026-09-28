@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -24,10 +25,10 @@ export default async function AttendanceHistoryPage() {
   }
   if (!ctx.employee) {
     return (
-      <div>
+      <PageContainer className="space-y-5">
         <PageHeader title="سجل الحضور" description="لا يوجد سجل موظف مرتبط بحسابك." />
         <EmptyState title="تواصل مع الموارد البشرية لربط حسابك بملف موظف." />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -39,7 +40,7 @@ export default async function AttendanceHistoryPage() {
   );
 
   return (
-    <div data-testid="attendance-history">
+    <PageContainer data-testid="attendance-history" className="space-y-5">
       <PageHeader
         title="سجل الحضور"
         description="آخر 90 يوماً"
@@ -84,6 +85,6 @@ export default async function AttendanceHistoryPage() {
           </table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

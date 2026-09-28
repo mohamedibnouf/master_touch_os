@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -40,7 +41,7 @@ export default async function ManagementOverviewPage() {
   ].filter(Boolean) as Array<{ key: string; label: string; value: number; href?: string }>;
 
   return (
-    <div data-testid="management-overview">
+    <PageContainer data-testid="management-overview" className="space-y-5">
       <PageHeader
         title="مركز القيادة التنفيذية"
         description={`ذكاء إداري حتمي — تاريخ المرجع ${snapshot.asOfDate} (آسيا/الرياض). عناصر الانتباه من محرك المخاطر 5.2.`}
@@ -222,6 +223,6 @@ export default async function ManagementOverviewPage() {
           )}
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

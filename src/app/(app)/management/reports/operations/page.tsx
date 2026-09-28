@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
@@ -38,7 +39,7 @@ export default async function OperationsReportPage() {
   const report = buildOperationsReport({ context, snapshot, riskInput });
 
   return (
-    <div data-testid="management-report-operations">
+    <PageContainer data-testid="management-report-operations" className="space-y-5">
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
@@ -70,6 +71,6 @@ export default async function OperationsReportPage() {
         </Card>
         <ReportRiskSection findings={report.operationalRisks} title="مخاطر تشغيلية / موافقات" />
       </ReportChrome>
-    </div>
+    </PageContainer>
   );
 }

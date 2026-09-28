@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
@@ -16,7 +17,7 @@ export default async function ManagementAnalystPage() {
   const asOfDate = riyadhTodayYmd();
 
   return (
-    <div data-testid="management-analyst">
+    <PageContainer data-testid="management-analyst" className="space-y-5">
       <PageHeader
         title="محلل الإدارة (ذكاء اصطناعي)"
         description="قراءة فقط — يعتمد حصراً على تقارير المخاطر والبيانات الإدارية المصرّح بها. لا يكتب في النظام."
@@ -27,6 +28,6 @@ export default async function ManagementAnalystPage() {
         aiEnabled={cfg.enabled}
         providerLabel={cfg.enabled ? `${cfg.provider}${cfg.model ? ` / ${cfg.model}` : ""}` : "none"}
       />
-    </div>
+    </PageContainer>
   );
 }

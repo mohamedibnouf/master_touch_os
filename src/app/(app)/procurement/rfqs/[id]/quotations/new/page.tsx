@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -40,7 +41,7 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
   }
 
   return (
-    <div className="mx-auto max-w-3xl" data-testid="quotation-create-page">
+    <PageContainer className="mx-auto max-w-3xl" data-testid="quotation-create-page">
       <PageHeader
         title={`تسجيل عرض سعر — ${rfq.rfq_number}`}
         description={rfq.title}
@@ -171,6 +172,6 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

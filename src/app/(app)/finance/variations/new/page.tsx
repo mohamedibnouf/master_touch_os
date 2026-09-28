@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -42,7 +43,7 @@ export default async function NewVariationPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl" data-testid="variation-create-page">
+    <PageContainer className="mx-auto max-w-2xl" data-testid="variation-create-page">
       <PageHeader
         title="أمر تغيير جديد"
         description="VO — تسجيل طلب تغيير تجاري"
@@ -116,6 +117,6 @@ export default async function NewVariationPage({
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

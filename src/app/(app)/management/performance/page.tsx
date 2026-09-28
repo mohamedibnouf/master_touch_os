@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
@@ -52,7 +53,7 @@ export default async function ManagementPerformancePage() {
   });
 
   return (
-    <div data-testid="management-performance">
+    <PageContainer data-testid="management-performance" className="space-y-5">
       <PageHeader
         title="حقائق الأداء التشغيلي"
         description="أعداد قابلة للتفسير فقط. لا يوجد ترتيب أو درجة إنتاجية."
@@ -86,6 +87,6 @@ export default async function ManagementPerformancePage() {
           </TableScroll>
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }

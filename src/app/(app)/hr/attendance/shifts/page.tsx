@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -21,7 +22,7 @@ export default async function HrAttendanceShiftsPage() {
   const policyMap = new Map(policies.map((p) => [p.id, p.name_ar]));
 
   return (
-    <div data-testid="attendance-shifts">
+    <PageContainer data-testid="attendance-shifts" className="space-y-5">
       <PageHeader title="الورديات" description="تعريف ورديات العمل وربطها بالسياسات" />
 
       <Card className="mb-6" data-testid="attendance-shift-form">
@@ -101,6 +102,6 @@ export default async function HrAttendanceShiftsPage() {
           </tbody>
         </table>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

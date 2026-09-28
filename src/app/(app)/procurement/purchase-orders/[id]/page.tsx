@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, PageHeader } from "@/components/ui/primitives";
@@ -65,7 +66,7 @@ export default async function PurchaseOrderDetailPage({
     .order("created_at", { ascending: false });
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={po.po_number}
         description={`أمر شراء — ${(supplier as Record<string, string> | null)?.legal_name ?? "—"}`}
@@ -316,6 +317,6 @@ export default async function PurchaseOrderDetailPage({
           </ul>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

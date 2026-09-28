@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -31,7 +32,7 @@ export default async function ClientInvoicesPage({
   });
 
   return (
-    <div data-testid="client-invoices-page">
+    <PageContainer data-testid="client-invoices-page" className="space-y-5">
       <PageHeader
         title="فواتير العملاء"
         description="سجل فواتير AR — إصدار وتحصيل"
@@ -103,6 +104,6 @@ export default async function ClientInvoicesPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

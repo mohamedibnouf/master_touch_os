@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, PageHeader } from "@/components/ui/primitives";
@@ -46,7 +47,7 @@ export default async function PayrollReviewPage({
   const canLock = hasPermission(ctx, "payroll.lock") && status === "approved";
 
   return (
-    <div data-testid="payroll-review">
+    <PageContainer data-testid="payroll-review" className="space-y-5">
       <PageHeader
         title={`مراجعة مسير ${period.year}/${String(period.month).padStart(2, "0")}`}
         description="ملخص للمراجعة والاعتماد والقفل"
@@ -138,6 +139,6 @@ export default async function PayrollReviewPage({
             ))}
         </ul>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

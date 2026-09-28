@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -39,7 +40,7 @@ export default async function ProjectCashflowPage({ params }: { params: Promise<
     .reduce((s, l) => s + l.amount, 0);
 
   return (
-    <div data-testid="project-cashflow-page">
+    <PageContainer data-testid="project-cashflow-page" className="space-y-5">
       <PageHeader
         title="التدفق النقدي"
         description={`${project.project_code} — توقعات التحصيل والصرف حسب الاستحقاق`}
@@ -148,6 +149,6 @@ export default async function ProjectCashflowPage({ params }: { params: Promise<
           </div>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

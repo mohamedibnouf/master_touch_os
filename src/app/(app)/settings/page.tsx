@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -7,6 +8,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignRoleAction, setUserActiveAction } from "@/server/use-cases/platform";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 
 type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 type MemberRow = {
@@ -42,7 +44,7 @@ export default async function SettingsPage() {
   const members = users as unknown as MemberRow[];
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader title="الإعدادات" description="المنشأة وإدارة المستخدمين وسجل التدقيق" />
 
       <Card className="mb-6">
@@ -159,9 +161,9 @@ export default async function SettingsPage() {
             <ul className="space-y-3">
               {audit.map((item) => (
                 <li key={item.id} className="border-b border-line pb-3 text-sm last:border-0">
-                  <p className="font-medium">{item.action}</p>
+                  <p className="font-medium text-navy">{auditActionLabel(item.action)}</p>
                   <p className="text-xs text-muted">
-                    {item.entity_type} ·{" "}
+                    {auditEntityLabel(item.entity_type)} ·{" "}
                     {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
                   </p>
                 </li>
@@ -170,6 +172,6 @@ export default async function SettingsPage() {
           )}
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

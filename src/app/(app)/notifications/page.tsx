@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -18,7 +19,7 @@ export default async function NotificationsPage() {
   const notifications = await repo.listNotifications(ctx.userId);
 
   return (
-    <div data-testid="notifications-page">
+    <PageContainer data-testid="notifications-page" className="space-y-5">
       <PageHeader
         title="التنبيهات"
         description="القناة الداخلية المعتمدة. البريد وواتساب والجهاز تُدار من التفضيلات بعد ترحيل 062."
@@ -75,6 +76,6 @@ export default async function NotificationsPage() {
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -61,7 +62,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
   const discrepancyInvoices = invoices.filter((i) => i.status === "discrepancy").length;
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={supplier.legal_name}
         description={supplier.supplier_code}
@@ -174,6 +175,6 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
           </p>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

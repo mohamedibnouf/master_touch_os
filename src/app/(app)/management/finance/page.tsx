@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -50,7 +51,7 @@ export default async function ManagementFinancePage() {
   ];
 
   return (
-    <div data-testid="management-finance">
+    <PageContainer data-testid="management-finance" className="space-y-5">
       <PageHeader
         title="ذكاء المالية"
         description="عدادات حالات فقط — المبالغ التفصيلية في الشاشات التشغيلية"
@@ -68,6 +69,6 @@ export default async function ManagementFinancePage() {
         </Link>{" "}
         وفق صلاحياتك المالية.
       </Card>
-    </div>
+    </PageContainer>
   );
 }

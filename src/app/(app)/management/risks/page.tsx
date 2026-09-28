@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -81,7 +82,7 @@ export default async function ManagementRisksPage({
   }
 
   return (
-    <div data-testid="management-risks">
+    <PageContainer data-testid="management-risks" className="space-y-5">
       <PageHeader
         title="محرك المخاطر"
         description={`نتائج حتمية مبنية على قواعد صريحة — ${asOfDate} (آسيا/الرياض). ليست تنبؤات ذكاء اصطناعي.`}
@@ -151,6 +152,6 @@ export default async function ManagementRisksPage({
         </h2>
         <RiskFindingsList findings={filtered} />
       </Card>
-    </div>
+    </PageContainer>
   );
 }

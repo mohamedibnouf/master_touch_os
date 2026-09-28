@@ -9,8 +9,8 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "min-w-0 w-full",
-        variant === "wide" && "mx-auto max-w-[1600px]",
+        "min-w-0 w-full print:max-w-none",
+        variant === "wide" && "max-w-none",
         variant === "form" && "mx-auto max-w-3xl",
         className,
       )}

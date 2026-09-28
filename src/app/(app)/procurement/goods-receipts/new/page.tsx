@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -32,14 +33,14 @@ export default async function NewGoodsReceiptPage({
 
   if (!poForForm) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <PageContainer className="mx-auto max-w-2xl">
         <PageHeader title="استلام بضاعة جديد" description="GRN" />
         <Card>
           <p className="text-sm text-warning">
             لا توجد أوامر شراء صادرة أو جزئية بانتظار الاستلام. أصدر أمر الشراء أولاً.
           </p>
         </Card>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -54,7 +55,7 @@ export default async function NewGoodsReceiptPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl" data-testid="grn-create-page">
+    <PageContainer className="mx-auto max-w-4xl" data-testid="grn-create-page">
       <PageHeader title="تسجيل استلام بضاعة" description="GRN — يُنشر فور الحفظ" />
       <Card>
         <ServerActionForm action={action} className="grid gap-5" data-testid="grn-create-form">
@@ -187,6 +188,6 @@ export default async function NewGoodsReceiptPage({
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { RegisterTable } from "@/components/commercial/register-table";
@@ -30,7 +31,7 @@ export default async function PurchaseOrdersPage({
   });
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="أوامر الشراء"
         description="سجل أوامر الشراء الصادرة"
@@ -86,6 +87,6 @@ export default async function PurchaseOrdersPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

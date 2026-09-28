@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -57,7 +58,7 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
   const canAttach = hasPermission(ctx, "document.upload");
 
   return (
-    <div data-testid="valuation-detail-page">
+    <PageContainer data-testid="valuation-detail-page" className="space-y-5">
       <PageHeader
         title={valuation.valuation_number}
         description={
@@ -321,6 +322,6 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
           />
         ) : null}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

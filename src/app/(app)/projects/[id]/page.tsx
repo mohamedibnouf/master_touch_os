@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -138,7 +139,7 @@ export default async function ProjectDetailPage({
     health.data === "red" ? "أحمر" : health.data === "amber" ? "كهرماني" : "أخضر";
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={project.name_ar}
         description={`${project.project_code} · ${project.name_en}`}
@@ -152,7 +153,7 @@ export default async function ProjectDetailPage({
         <Badge tone={healthTone as "danger" | "warning" | "success"}>صحة المشروع: {healthLabel}</Badge>
       </div>
 
-      <div className="mb-6 flex gap-2 overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
+      <div className="mb-6 min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
         {tabs.map((item) => (
           <a
             key={item.id}
@@ -625,7 +626,7 @@ export default async function ProjectDetailPage({
           </p>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
 

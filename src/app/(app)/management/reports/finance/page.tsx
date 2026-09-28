@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
@@ -29,7 +30,7 @@ export default async function FinanceReportPage() {
   const report = buildFinanceReport({ context, snapshot });
 
   return (
-    <div data-testid="management-report-finance">
+    <PageContainer data-testid="management-report-finance" className="space-y-5">
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
@@ -47,6 +48,6 @@ export default async function FinanceReportPage() {
         </div>
         <ReportRiskSection findings={report.commercialRisks} title="مخاطر تجارية" />
       </ReportChrome>
-    </div>
+    </PageContainer>
   );
 }

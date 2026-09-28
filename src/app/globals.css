@@ -252,11 +252,8 @@ table.table-register thead {
   color: var(--foreground-muted);
 }
 
-.table-scroll th,
-.table-scroll td,
-table.table-register th,
-table.table-register td {
-  border-bottom: 1px solid var(--border);
+.table-scroll tbody tr:hover {
+  background: color-mix(in srgb, var(--navy) 3.5%, #fff);
 }
 
 @keyframes nav-indeterminate {

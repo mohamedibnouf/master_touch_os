@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -48,7 +49,7 @@ export default async function PayrollPayslipPage({
     entry.payment_status !== "paid";
 
   return (
-    <div data-testid="payroll-payslip">
+    <PageContainer data-testid="payroll-payslip" className="space-y-5">
       <PageHeader
         title={`قسيمة ${entry.employee_name ?? entry.employee_number ?? ""}`}
         description={
@@ -174,6 +175,6 @@ export default async function PayrollPayslipPage({
           </ServerActionForm>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

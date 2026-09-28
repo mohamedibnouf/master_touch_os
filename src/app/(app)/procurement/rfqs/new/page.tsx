@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthContext } from "@/server/context";
@@ -37,7 +38,7 @@ export default async function NewRfqPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageContainer className="mx-auto max-w-2xl">
       <PageHeader title="طلب عرض أسعار جديد" description="أنشئ RFQ من طلب شراء معتمد" />
       <Card>
         <ServerActionForm action={action} className="grid gap-4">
@@ -89,6 +90,6 @@ export default async function NewRfqPage() {
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

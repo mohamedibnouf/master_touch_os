@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -32,7 +33,7 @@ export default async function PurchaseRequestsPage({
   });
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="طلبات الشراء"
         description="سجل طلبات الشراء الداخلية"
@@ -91,6 +92,6 @@ export default async function PurchaseRequestsPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

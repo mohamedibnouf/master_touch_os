@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -19,10 +20,10 @@ export default async function MyPayslipsPage() {
 
   if (!ctx.employee) {
     return (
-      <div data-testid="my-payslips">
+      <PageContainer data-testid="my-payslips" className="space-y-5">
         <PageHeader title="قسائم الرواتب" description="لا يوجد سجل موظف مرتبط بحسابك." />
         <EmptyState title="تواصل مع الموارد البشرية لربط حسابك بملف موظف." />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -42,7 +43,7 @@ export default async function MyPayslipsPage() {
   const canOps = hasPermission(ctx, "payroll.view_all") || hasPermission(ctx, "payroll.prepare");
 
   return (
-    <div data-testid="my-payslips">
+    <PageContainer data-testid="my-payslips" className="space-y-5">
       <PageHeader
         title="قسائمي"
         description="قسائم الرواتب المتاحة لحسابك"
@@ -94,6 +95,6 @@ export default async function MyPayslipsPage() {
           </table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

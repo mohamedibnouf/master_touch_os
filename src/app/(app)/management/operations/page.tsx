@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -48,7 +49,7 @@ export default async function ManagementOperationsPage() {
   ];
 
   return (
-    <div data-testid="management-operations">
+    <PageContainer data-testid="management-operations" className="space-y-5">
       <PageHeader title="ذكاء العمليات" description="موافقات ومشتريات — ملخص حتمي" />
       <ManagementNav pathname="/management/operations" />
       <MetricGrid metrics={metrics} />
@@ -63,6 +64,6 @@ export default async function ManagementOperationsPage() {
         </Link>{" "}
         للتنفيذ.
       </Card>
-    </div>
+    </PageContainer>
   );
 }

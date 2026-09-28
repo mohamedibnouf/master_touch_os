@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
@@ -26,7 +27,7 @@ export default async function HrAttendanceAssignmentsPage() {
   );
 
   return (
-    <div data-testid="attendance-assignments">
+    <PageContainer data-testid="attendance-assignments" className="space-y-5">
       <PageHeader title="تعيين الورديات" description="ربط الموظفين بالورديات بتاريخ سريان" />
 
       <Card className="mb-6" data-testid="attendance-assign-form">
@@ -86,6 +87,6 @@ export default async function HrAttendanceAssignmentsPage() {
         </table>
         </TableScroll>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

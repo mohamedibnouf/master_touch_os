@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -31,7 +32,7 @@ export default async function HrLeaveBalancesPage() {
   );
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader title="أرصدة الإجازات" description={`العام ${year}`} />
 
       {canAdjust ? (
@@ -99,6 +100,6 @@ export default async function HrLeaveBalancesPage() {
           </tbody>
         </table>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

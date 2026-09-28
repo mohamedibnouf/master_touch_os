@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Badge, Card, PageHeader } from "@/components/ui/primitives";
@@ -116,7 +117,7 @@ export default async function DocumentIntelligencePage({
       : [];
 
   return (
-    <div data-testid="document-intelligence" className="management-report">
+    <PageContainer data-testid="document-intelligence" className="space-y-5 management-report">
       <PageHeader
         title="ذكاء المستند — دراسة الحالة"
         description="استخراج منظم مع تحقق بشري. الذكاء الاصطناعي لا يعدّل سجلات المشروع تلقائياً."
@@ -250,6 +251,6 @@ export default async function DocumentIntelligencePage({
           )}
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

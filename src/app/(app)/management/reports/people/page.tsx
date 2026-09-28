@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
@@ -33,7 +34,7 @@ export default async function PeopleReportPage() {
   const report = buildPeopleReport({ context, snapshot, departmentDistribution });
 
   return (
-    <div data-testid="management-report-people">
+    <PageContainer data-testid="management-report-people" className="space-y-5">
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
@@ -62,6 +63,6 @@ export default async function PeopleReportPage() {
         ) : null}
         <ReportRiskSection findings={report.peopleRisks} title="مخاطر أفراد / امتثال / حضور" />
       </ReportChrome>
-    </div>
+    </PageContainer>
   );
 }

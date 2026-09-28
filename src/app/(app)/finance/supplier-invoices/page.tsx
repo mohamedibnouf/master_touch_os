@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -31,7 +32,7 @@ export default async function SupplierInvoicesPage({
   });
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="فواتير الموردين"
         description="سجل فواتير AP — مطابقة وصرف"
@@ -95,6 +96,6 @@ export default async function SupplierInvoicesPage({
           />
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

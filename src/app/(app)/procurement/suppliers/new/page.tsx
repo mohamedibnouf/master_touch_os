@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -24,7 +25,7 @@ export default async function NewSupplierPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageContainer className="mx-auto max-w-2xl">
       <PageHeader title="تسجيل مورد جديد" description="سيتم توليد رمز المورد تلقائياً" />
       <Card>
         <ServerActionForm action={action} className="grid gap-4">
@@ -73,6 +74,6 @@ export default async function NewSupplierPage() {
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

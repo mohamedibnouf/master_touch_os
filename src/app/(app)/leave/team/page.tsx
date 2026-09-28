@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -57,7 +58,7 @@ export default async function LeaveTeamPage() {
   );
 
   return (
-    <div data-testid="leave-team">
+    <PageContainer data-testid="leave-team" className="space-y-5">
       <PageHeader
         title="إجازات الفريق"
         description="طلبات بانتظار اعتماد المدير المباشر"
@@ -119,6 +120,6 @@ export default async function LeaveTeamPage() {
           </div>
         ) : null}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

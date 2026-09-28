@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -47,7 +48,7 @@ export default async function FinancePage() {
   ]);
 
   return (
-    <div data-testid="finance-dashboard-page">
+    <PageContainer data-testid="finance-dashboard-page" className="space-y-5">
       <PageHeader
         title="المالية"
         description="فواتير الموردين، مستخلصات العملاء، الذمم والتحصيل"
@@ -211,6 +212,6 @@ export default async function FinancePage() {
           )}
         </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

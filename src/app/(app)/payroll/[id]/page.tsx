@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, Field, Input, PageHeader } from "@/components/ui/primitives";
@@ -65,7 +66,7 @@ export default async function PayrollPeriodDetailPage({
     hasPermission(ctx, "payroll.prepare") && (status === "draft" || status === "calculated");
 
   return (
-    <div data-testid="payroll-period-detail">
+    <PageContainer data-testid="payroll-period-detail" className="space-y-5">
       <PageHeader
         title={`مسير ${period.year}/${String(period.month).padStart(2, "0")}`}
         description={`${period.period_start} → ${period.period_end}`}
@@ -192,6 +193,6 @@ export default async function PayrollPeriodDetailPage({
           </div>
         </dl>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

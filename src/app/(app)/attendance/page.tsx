@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
@@ -31,10 +32,10 @@ export default async function AttendanceDashboardPage() {
   }
   if (!ctx.employee) {
     return (
-      <div>
+      <PageContainer className="space-y-5">
         <PageHeader title="الحضور" description="لا يوجد سجل موظف مرتبط بحسابك." />
         <EmptyState title="تواصل مع الموارد البشرية لربط حسابك بملف موظف." />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -64,7 +65,7 @@ export default async function AttendanceDashboardPage() {
   const canHr = hasPermission(ctx, "attendance.view_all") || hasPermission(ctx, "attendance.manage");
 
   return (
-    <div data-testid="attendance-dashboard">
+    <PageContainer data-testid="attendance-dashboard" className="space-y-5">
       <PageHeader
         title="حضوري"
         description={`حالة اليوم ${today}`}
@@ -93,33 +94,34 @@ export default async function AttendanceDashboardPage() {
         }
       />
 
-      <Card className="mb-6" data-testid="attendance-today-card">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted">حالة اليوم</p>
-            <p className="mt-1 text-2xl font-semibold text-navy" data-testid="attendance-today-status">
-              {todayRecord ? attendanceStatusLabel(todayRecord.attendance_status) : "لم يُسجَّل بعد"}
+      <section className="mt-surface-priority mb-6 overflow-hidden" data-testid="attendance-today-card">
+        <div className="bg-navy px-4 py-4 text-white md:px-5">
+          <p className="text-xs font-medium text-white/70">حالة اليوم</p>
+          <p className="mt-1 text-2xl font-semibold" data-testid="attendance-today-status">
+            {todayRecord ? attendanceStatusLabel(todayRecord.attendance_status) : "لم يُسجَّل بعد"}
+          </p>
+          <p className="mt-2 text-sm text-white/70">
+            دخول: {formatTs(todayRecord?.check_in_at ?? null)} · خروج:{" "}
+            {formatTs(todayRecord?.check_out_at ?? null)}
+          </p>
+          {todayRecord ? (
+            <p className="mt-1 text-xs text-white/60">
+              عمل {todayRecord.worked_minutes} د · تأخير {todayRecord.late_minutes} د · انصراف مبكر{" "}
+              {todayRecord.early_leave_minutes} د
             </p>
-            <p className="mt-2 text-sm text-muted">
-              دخول: {formatTs(todayRecord?.check_in_at ?? null)} · خروج:{" "}
-              {formatTs(todayRecord?.check_out_at ?? null)}
-            </p>
-            {todayRecord ? (
-              <p className="mt-1 text-xs text-muted">
-                عمل {todayRecord.worked_minutes} د · تأخير {todayRecord.late_minutes} د · انصراف مبكر{" "}
-                {todayRecord.early_leave_minutes} د
-              </p>
-            ) : null}
-            {todayRecord?.check_in_at && !todayRecord.check_out_at ? (
-              <p className="mt-1 text-xs text-warning">لم يُسجَّل الانصراف بعد.</p>
-            ) : null}
-          </div>
-          {todayRecord ? <Badge tone={todayRecord.attendance_status === "present" ? "success" : "warning"}>
-            {attendanceStatusLabel(todayRecord.attendance_status)}
-          </Badge> : null}
+          ) : null}
+          {todayRecord?.check_in_at && !todayRecord.check_out_at ? (
+            <p className="mt-1 text-xs text-white/80">لم يُسجَّل الانصراف بعد.</p>
+          ) : null}
+          {todayRecord ? (
+            <span className="mt-2 inline-block">
+              <Badge tone={todayRecord.attendance_status === "present" ? "success" : "warning"}>
+                {attendanceStatusLabel(todayRecord.attendance_status)}
+              </Badge>
+            </span>
+          ) : null}
         </div>
-
-        <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-2 bg-white px-4 py-3 sm:flex-row md:px-5">
           {canCheckIn ? (
             geofenceReady ? (
               <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="attendance-check-in" />
@@ -148,11 +150,11 @@ export default async function AttendanceDashboardPage() {
             )
           ) : null}
         </div>
-        <p className="mt-3 text-xs text-muted">
+        <p className="mt-3 px-4 pb-3 text-xs text-muted md:px-5">
           يستخدم النظام موقعك فقط للتحقق من وجودك داخل نطاق موقع العمل عند تسجيل الحضور أو الانصراف. لا يتم تتبعك بشكل
           مستمر. تحديد الموقع عبر المتصفح دليل تشغيلي وليس ضماناً ضد تزييف GPS.
         </p>
-      </Card>
+      </section>
 
       <Card className="mb-6" data-testid="attendance-workplace-card">
         <h2 className="mb-2 font-semibold text-navy">مواقع الحضور المسموحة</h2>
@@ -230,6 +232,6 @@ export default async function AttendanceDashboardPage() {
           </TableScroll>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

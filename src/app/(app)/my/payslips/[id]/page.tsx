@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -36,7 +37,7 @@ export default async function MyPayslipDetailPage({
   ]);
 
   return (
-    <div data-testid="my-payslip-detail">
+    <PageContainer data-testid="my-payslip-detail" className="space-y-5">
       <PageHeader
         title="قسيمة راتبي"
         description={
@@ -111,6 +112,6 @@ export default async function MyPayslipDetailPage({
           )}
         </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

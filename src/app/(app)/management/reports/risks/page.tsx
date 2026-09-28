@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
@@ -47,7 +48,7 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
   );
 
   return (
-    <div data-testid="management-report-risks">
+    <PageContainer data-testid="management-report-risks" className="space-y-5">
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
@@ -82,6 +83,6 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
         ) : null}
         <ReportRiskSection findings={report.findings} title="النتائج" />
       </ReportChrome>
-    </div>
+    </PageContainer>
   );
 }

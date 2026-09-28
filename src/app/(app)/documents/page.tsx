@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
@@ -7,6 +8,7 @@ import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { uploadDocumentAction } from "@/server/use-cases/platform";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { documentStatusLabel } from "@/lib/ui/operational-labels";
 
 export default async function DocumentsPage() {
   const ctx = await getAuthContext();
@@ -21,7 +23,7 @@ export default async function DocumentsPage() {
   const canUpload = hasPermission(ctx, "document.upload");
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader title="المستندات" description="مستندات خاصة بإصدارات محفوظة وروابط موقّعة" />
 
       {canUpload ? (
@@ -93,7 +95,9 @@ export default async function DocumentsPage() {
                   <td className="px-4 py-3">
                     <Badge tone="navy">{doc.current_revision}</Badge>
                   </td>
-                  <td className="px-4 py-3">{doc.status}</td>
+                  <td className="px-4 py-3">
+                    <Badge tone="neutral">{documentStatusLabel(doc.status)}</Badge>
+                  </td>
                   <td className="px-4 py-3 text-muted">
                     {new Date(doc.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
                   </td>
@@ -116,6 +120,6 @@ export default async function DocumentsPage() {
           </table>
         </TableScroll>
       )}
-    </div>
+    </PageContainer>
   );
 }

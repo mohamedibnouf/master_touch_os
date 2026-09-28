@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthContext } from "@/server/context";
@@ -29,7 +30,7 @@ export default async function NewPurchaseRequestPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl" data-testid="pr-create-page">
+    <PageContainer className="mx-auto max-w-2xl" data-testid="pr-create-page">
       <PageHeader
         title="طلب شراء جديد"
         description="أنشئ طلب شراء داخلي — سيتم توليد الرقم تلقائياً"
@@ -81,6 +82,6 @@ export default async function NewPurchaseRequestPage() {
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

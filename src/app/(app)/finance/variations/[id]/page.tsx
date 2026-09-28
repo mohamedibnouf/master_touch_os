@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -44,7 +45,7 @@ export default async function VariationDetailPage({ params }: { params: Promise<
     ["under_review", "submitted", "negotiation"].includes(variation.status);
 
   return (
-    <div data-testid="variation-detail-page">
+    <PageContainer data-testid="variation-detail-page" className="space-y-5">
       <PageHeader
         title={variation.vo_number}
         description={
@@ -169,6 +170,6 @@ export default async function VariationDetailPage({ params }: { params: Promise<
           </ServerActionForm>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
@@ -30,7 +31,7 @@ export default async function ManagementActivityPage() {
   );
 
   return (
-    <div data-testid="management-activity-page">
+    <PageContainer data-testid="management-activity-page" className="space-y-5">
       <PageHeader title="النشاط الحرج" description="إسقاط مقروء من سجل التدقيق — ليس سجلاً خاماً كاملاً" />
       <ManagementNav pathname="/management/activity" />
       <Card>
@@ -53,6 +54,6 @@ export default async function ManagementActivityPage() {
           </ul>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

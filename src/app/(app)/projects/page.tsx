@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
@@ -5,6 +6,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { projectRiskLabel, projectStatusLabel } from "@/lib/ui/operational-labels";
 
 export default async function ProjectsPage({
   searchParams,
@@ -32,7 +34,7 @@ export default async function ProjectsPage({
   const pages = Math.max(1, Math.ceil(total / 20));
 
   return (
-    <div data-testid="projects-page">
+    <PageContainer data-testid="projects-page" className="space-y-5">
       <PageHeader
         title="المشاريع"
         description="سجل مشاريع الشركة مع التصفية والترقيم"
@@ -97,11 +99,11 @@ export default async function ProjectsPage({
                     <p className="text-xs text-muted">{project.name_en}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge>{project.status}</Badge>
+                    <Badge>{projectStatusLabel(project.status)}</Badge>
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={project.risk_level === "high" || project.risk_level === "critical" ? "danger" : "neutral"}>
-                      {project.risk_level}
+                      {projectRiskLabel(project.risk_level)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">{project.progress_percentage}%</td>
@@ -130,7 +132,7 @@ export default async function ProjectsPage({
           ) : null}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

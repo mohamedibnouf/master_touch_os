@@ -1,6 +1,7 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -46,7 +47,7 @@ export default async function PayrollEmployeesPage({
     (period.status === "draft" || period.status === "calculated" || period.status === "under_review");
 
   return (
-    <div data-testid="payroll-employees">
+    <PageContainer data-testid="payroll-employees" className="space-y-5">
       <PageHeader
         title={`موظفو المسير ${period.year}/${String(period.month).padStart(2, "0")}`}
         description={payrollPeriodStatusLabel(period.status)}
@@ -66,13 +67,14 @@ export default async function PayrollEmployeesPage({
         }
       />
 
-      <Card className="mb-6 overflow-x-auto p-0">
+      <Card className="mb-6 p-0">
         <div className="border-b border-line px-4 py-3 font-semibold text-navy">قيود الرواتب</div>
         {entries.length === 0 ? (
           <div className="p-4">
             <EmptyState title="لا توجد قيود. شغّل الاحتساب أولاً." />
           </div>
         ) : (
+          <TableScroll>
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
@@ -105,6 +107,7 @@ export default async function PayrollEmployeesPage({
               ))}
             </tbody>
           </table>
+          </TableScroll>
         )}
       </Card>
 
@@ -179,6 +182,6 @@ export default async function PayrollEmployeesPage({
           </Card>
         </div>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

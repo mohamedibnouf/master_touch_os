@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -22,7 +23,7 @@ export default async function NewLeavePage() {
   const dayBasis = (ctx.organization.leave_day_basis ?? "calendar") as LeaveDayBasis;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageContainer className="mx-auto max-w-2xl">
       <PageHeader title="طلب إجازة جديد" description="يُحسب عدد الأيام في الخادم عند الإرسال" />
       <Card>
         {types.length === 0 ? (
@@ -44,6 +45,6 @@ export default async function NewLeavePage() {
           />
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

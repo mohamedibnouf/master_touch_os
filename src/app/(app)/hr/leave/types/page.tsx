@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -16,7 +17,7 @@ export default async function HrLeaveTypesPage() {
   const types = await new LeaveRepository(supabase).listLeaveTypes(ctx.organization.id);
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader title="أنواع الإجازة" description="إدارة سياسات وأنواع الإجازات للمؤسسة" />
 
       <Card className="mb-6" data-testid="leave-type-form">
@@ -94,6 +95,6 @@ export default async function HrLeaveTypesPage() {
           </tbody>
         </table>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

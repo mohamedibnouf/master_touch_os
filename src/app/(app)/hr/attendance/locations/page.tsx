@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
@@ -25,9 +26,9 @@ export default async function HrWorkplaceLocationsPage() {
   const ready = await repo.geofenceSchemaReady();
   if (!ready) {
     return (
-      <div data-testid="attendance-locations">
+      <PageContainer data-testid="attendance-locations" className="space-y-5">
         <PageHeader title="مواقع العمل" description="ترحيل 063 غير مطبّق بعد." />
-      </div>
+      </PageContainer>
     );
   }
   const core = new CoreRepository(supabase);
@@ -48,7 +49,7 @@ export default async function HrWorkplaceLocationsPage() {
   }
 
   return (
-    <div data-testid="attendance-locations">
+    <PageContainer data-testid="attendance-locations" className="space-y-5">
       <PageHeader
         title="مواقع العمل"
         description="مواقع غير محدودة. الحضور يُقبل فقط من التعيينات الصريحة. الموقع الأساسي للمنشأة لا يمنح صلاحية البصمة تلقائياً."
@@ -271,6 +272,6 @@ export default async function HrWorkplaceLocationsPage() {
         </table>
         </TableScroll>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

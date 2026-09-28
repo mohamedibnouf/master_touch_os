@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -17,7 +18,7 @@ export default async function PayrollSettingsPage() {
   const settings = await new PayrollRepository(supabase).getSettings(ctx.organization.id);
 
   return (
-    <div data-testid="payroll-settings">
+    <PageContainer data-testid="payroll-settings" className="space-y-5">
       <PageHeader
         title="إعدادات الرواتب"
         description="قواعد الاحتساب والصرف الافتراضية"
@@ -86,6 +87,6 @@ export default async function PayrollSettingsPage() {
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
@@ -48,12 +49,12 @@ export default async function NewPurchaseOrderPage({
 
     if (!awardedQuotes.length) {
       return (
-        <div className="mx-auto max-w-2xl">
+        <PageContainer className="mx-auto max-w-2xl">
           <PageHeader title="أمر شراء جديد" description="إنشاء من عرض سعر مرسَّى" />
           <Card>
             <p className="text-sm text-warning">لا توجد عروض أسعار معتمدة للترسية. أكمل دورة المقارنة والاعتماد أولاً.</p>
           </Card>
-        </div>
+        </PageContainer>
       );
     }
   }
@@ -70,7 +71,7 @@ export default async function NewPurchaseOrderPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl" data-testid="po-create-page">
+    <PageContainer className="mx-auto max-w-3xl" data-testid="po-create-page">
       <PageHeader title="أمر شراء جديد" description="ترث البيانات تلقائياً من العرض المرسَّى" />
       <Card>
         <ServerActionForm action={action} className="grid gap-5" data-testid="po-create-form">
@@ -174,6 +175,6 @@ export default async function NewPurchaseOrderPage({
           </div>
         </ServerActionForm>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

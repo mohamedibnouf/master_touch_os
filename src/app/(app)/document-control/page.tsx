@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -94,7 +95,7 @@ export default async function DocumentControlPage({
     .slice(0, 15);
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="مراقبة الوثائق"
         description="سجل الوثائق الرسمي — التسجيل، الإصدار، الاعتماد، والمراجعات"
@@ -326,6 +327,6 @@ export default async function DocumentControlPage({
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

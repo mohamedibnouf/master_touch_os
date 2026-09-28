@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -115,7 +116,7 @@ export default async function ProcurementPage() {
   ];
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title="المشتريات"
         description="لوحة المتابعة التشغيلية للمشتريات"
@@ -253,6 +254,6 @@ export default async function ProcurementPage() {
           </Card>
         ) : null}
       </div>
-    </div>
+    </PageContainer>
   );
 }

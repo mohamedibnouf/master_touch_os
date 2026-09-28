@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
@@ -19,10 +20,10 @@ export default async function LeaveDashboardPage() {
   }
   if (!ctx.employee) {
     return (
-      <div>
+      <PageContainer className="space-y-5">
         <PageHeader title="الإجازات" description="لا يوجد سجل موظف مرتبط بحسابك." />
         <EmptyState title="تواصل مع الموارد البشرية لربط حسابك بملف موظف." />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -42,7 +43,7 @@ export default async function LeaveDashboardPage() {
   const canHr = hasPermission(ctx, "leave.view_all") || hasPermission(ctx, "leave.manage");
 
   return (
-    <div data-testid="leave-dashboard">
+    <PageContainer data-testid="leave-dashboard" className="space-y-5">
       <PageHeader
         title="إجازاتي"
         description={`أرصدة وطلبات الإجازة لعام ${year}`}
@@ -82,9 +83,9 @@ export default async function LeaveDashboardPage() {
           balances.map((b) => {
             const t = typeMap.get(b.leave_type_id);
             return (
-              <Card key={b.id}>
-                <p className="text-sm text-muted">{t?.name_ar ?? b.leave_type_id}</p>
-                <p className="mt-1 text-2xl font-semibold text-navy">{b.available_days}</p>
+              <Card key={b.id} className="mt-metric mt-tint-navy">
+                <p className="text-[11px] font-medium text-muted">{t?.name_ar ?? b.leave_type_id}</p>
+                <p className="mt-1.5 text-2xl font-semibold tabular-nums text-navy">{b.available_days}</p>
                 <p className="mt-1 text-xs text-muted">
                   مستخدم {b.used_days} · معلّق {b.pending_days} · استحقاق {b.entitled_days}
                 </p>
@@ -151,6 +152,6 @@ export default async function LeaveDashboardPage() {
           </TableScroll>
         )}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

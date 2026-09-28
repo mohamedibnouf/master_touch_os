@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui/primitives";
@@ -32,7 +33,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   const items = (quote.supplier_quotation_items as Array<Record<string, unknown>>) ?? [];
 
   return (
-    <div>
+    <PageContainer className="space-y-5">
       <PageHeader
         title={quote.quotation_number}
         description={`عرض سعر — ${(supplier as Record<string, string> | null)?.legal_name ?? "—"}`}
@@ -167,6 +168,6 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           <p className="text-sm">{quote.commercial_notes}</p>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

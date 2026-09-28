@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
@@ -30,7 +31,7 @@ export default async function ProjectContractPage({ params }: { params: Promise<
   const canManage = hasPermission(ctx, "finance.manage");
 
   return (
-    <div data-testid="project-contract-page">
+    <PageContainer data-testid="project-contract-page" className="space-y-5">
       <PageHeader
         title="عقد المشروع"
         description={`${project.project_code} — ${project.name_ar}`}
@@ -201,6 +202,6 @@ export default async function ProjectContractPage({ params }: { params: Promise<
           <p className="text-sm text-muted">لا يوجد عقد لهذا المشروع بعد.</p>
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }
