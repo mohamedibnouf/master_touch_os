@@ -9,7 +9,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "@/lib/errors";
-import { geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
+import { geofenceUserMessage, parseAttendancePunchRpc, MISSING_SHIFT_USER_MESSAGE } from "@/modules/attendance/geofence";
 import { canAddWorkplaceAssignment } from "@/modules/attendance/geofence";
 
 describe("appErrorBoundaryCopy", () => {
@@ -118,5 +118,27 @@ describe("overlapping workplace assignment", () => {
     );
     expect(formActionFailure(err, "fallback")?.ok).toBe(false);
     expect(formActionFailure(err, "fallback")?.message).toContain("متداخل");
+  });
+});
+
+describe("attendance check-in error preservation", () => {
+  it("preserves missing-shift validation instead of the generic save message", () => {
+    const state = formActionFailure(
+      new ValidationError(MISSING_SHIFT_USER_MESSAGE.ar, MISSING_SHIFT_USER_MESSAGE.en),
+      "fallback",
+    );
+    expect(state?.message).toBe(MISSING_SHIFT_USER_MESSAGE.ar);
+    expect(state?.message).not.toBe("حدث خطأ أثناء حفظ البيانات. حاول مرة أخرى.");
+  });
+
+  it("preserves outside-geofence validation instead of the generic save message", () => {
+    const mapped = geofenceUserMessage("GEOFENCE_OUTSIDE");
+    const state = formActionFailure(new ValidationError(mapped.ar, mapped.en), "fallback");
+    expect(state?.message).toBe("أنت خارج النطاق المسموح للحضور.");
+  });
+
+  it("still uses the generic save message only for unmapped DatabaseError", () => {
+    const state = formActionFailure(new DatabaseError({ message: "unexpected" }), "fallback");
+    expect(state?.message).toBe("حدث خطأ أثناء حفظ البيانات. حاول مرة أخرى.");
   });
 });

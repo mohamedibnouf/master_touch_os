@@ -8,7 +8,7 @@ import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { DatabaseError, ValidationError } from "@/lib/errors";
+import { DatabaseError, ForbiddenError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { formActionFailure, runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
@@ -24,7 +24,13 @@ import {
   upsertWorkplaceLocationSchema,
 } from "@/modules/attendance/schemas";
 import type { AttendanceRecord } from "@/types/models";
-import { canAddWorkplaceAssignment, geofenceUserMessage, parseAttendancePunchRpc } from "@/modules/attendance/geofence";
+import {
+  canAddWorkplaceAssignment,
+  classifyAttendanceRpcError,
+  geofenceUserMessage,
+  MISSING_SHIFT_USER_MESSAGE,
+  parseAttendancePunchRpc,
+} from "@/modules/attendance/geofence";
 import { workplaceUniqueViolationMessage } from "@/modules/attendance/workplace-write";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
@@ -91,12 +97,22 @@ function interpretLocationPunch(data: unknown, error: { message?: string } | nul
 
 function mapAttendanceRpcError(error: { message?: string } | null): never {
   const msg = error?.message ?? "";
-  if (/does not exist|schema cache|attendance_check_in/i.test(msg) && /p_latitude|function/i.test(msg)) {
+  const kind = classifyAttendanceRpcError(msg);
+  if (kind === "schema") {
     throw new ValidationError("ترحيل 063 غير مطبّق بعد.", "Migration 063 is not applied.");
   }
-  if (/GEOFENCE_|NO_WORKPLACE|OUTSIDE|POOR_ACCURACY|INACTIVE_WORKPLACE|INVALID_LOCATION|LOCATION_REQUIRED/i.test(msg)) {
+  if (kind === "geofence") {
     const mapped = geofenceUserMessage(msg);
     throw new ValidationError(mapped.ar, mapped.en);
+  }
+  if (kind === "shift") {
+    throw new ValidationError(MISSING_SHIFT_USER_MESSAGE.ar, MISSING_SHIFT_USER_MESSAGE.en);
+  }
+  if (kind === "forbidden") {
+    throw new ForbiddenError({ source: "attendance_rpc" });
+  }
+  if (kind === "unauthorized") {
+    throw new UnauthorizedError({ source: "attendance_rpc" });
   }
   throw new DatabaseError(error);
 }

@@ -259,6 +259,41 @@ export function geofenceUserMessage(reason: string): { ar: string; en: string } 
   return { ar: "تعذر تسجيل الحضور. حاول مرة أخرى.", en: "Attendance could not be recorded. Please retry." };
 }
 
+/** Copy already shown on /attendance when no shift is assigned. */
+export const MISSING_SHIFT_USER_MESSAGE = {
+  ar: "لا توجد وردية مُعيَّنة. تواصل مع الموارد البشرية.",
+  en: "No shift is assigned. Contact HR.",
+} as const;
+
+export type AttendanceRpcErrorClass =
+  | "schema"
+  | "geofence"
+  | "shift"
+  | "forbidden"
+  | "unauthorized"
+  | "unmapped";
+
+/** Classifies PostgREST/P0001 text from attendance_check_in / attendance_check_out. */
+export function classifyAttendanceRpcError(message: string): AttendanceRpcErrorClass {
+  const msg = message ?? "";
+  if (/does not exist|schema cache|attendance_check_in/i.test(msg) && /p_latitude|function/i.test(msg)) {
+    return "schema";
+  }
+  if (/GEOFENCE_|NO_WORKPLACE|OUTSIDE|POOR_ACCURACY|INACTIVE_WORKPLACE|INVALID_LOCATION|LOCATION_REQUIRED/i.test(msg)) {
+    return "geofence";
+  }
+  if (/\bNOT_FOUND\b/i.test(msg)) {
+    return "shift";
+  }
+  if (/\bFORBIDDEN\b/i.test(msg)) {
+    return "forbidden";
+  }
+  if (/\bUNAUTHORIZED\b/i.test(msg)) {
+    return "unauthorized";
+  }
+  return "unmapped";
+}
+
 export function evidenceCoordinatesToStore(input: {
   result: GeofenceReason;
   latitude: number | null;
@@ -297,8 +332,16 @@ export type AttendancePunchRpc = {
 };
 
 export function parseAttendancePunchRpc(data: unknown): AttendancePunchRpc | null {
-  if (!data || typeof data !== "object") return null;
-  const row = data as Record<string, unknown>;
+  let payload: unknown = data;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!payload || typeof payload !== "object") return null;
+  const row = payload as Record<string, unknown>;
   if (typeof row.accepted !== "boolean") return null;
   return {
     accepted: row.accepted,

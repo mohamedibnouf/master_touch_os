@@ -11,6 +11,8 @@ import {
   isValidLatitude,
   isValidLongitude,
   parseAttendancePunchRpc,
+  classifyAttendanceRpcError,
+  MISSING_SHIFT_USER_MESSAGE,
   resolveEligibleWorkplaceIds,
   resolveWorkplaceId,
   stripExactCoordinates,
@@ -305,5 +307,52 @@ describe("accuracy, directory privacy, and assignment resolution", () => {
     expect(stripped.longitude).toBeUndefined();
     expect(stripped.check_in_latitude).toBeUndefined();
     expect(stripped.distance).toBe(40);
+  });
+});
+
+describe("attendance RPC error classification", () => {
+  it("maps zero authorized workplaces to the existing domain geofence class", () => {
+    expect(classifyAttendanceRpcError("GEOFENCE_NO_WORKPLACE")).toBe("geofence");
+    expect(geofenceUserMessage("GEOFENCE_NO_WORKPLACE").ar).toContain("لا يوجد موقع حضور مخصص");
+  });
+
+  it("does not collapse missing shift (NOT_FOUND) into an unmapped persistence error", () => {
+    expect(classifyAttendanceRpcError("NOT_FOUND")).toBe("shift");
+    expect(classifyAttendanceRpcError("P0001: NOT_FOUND")).toBe("shift");
+    expect(MISSING_SHIFT_USER_MESSAGE.ar).toContain("وردية");
+  });
+
+  it("keeps GPS/geofence rejections as geofence, not unmapped", () => {
+    expect(classifyAttendanceRpcError("GEOFENCE_OUTSIDE")).toBe("geofence");
+    expect(classifyAttendanceRpcError("GEOFENCE_POOR_ACCURACY")).toBe("geofence");
+    expect(classifyAttendanceRpcError("GEOFENCE_INVALID_LOCATION")).toBe("geofence");
+  });
+
+  it("does not treat unknown SQL as a privileged bypass", () => {
+    expect(classifyAttendanceRpcError("permission denied for table")).toBe("unmapped");
+    expect(classifyAttendanceRpcError("42501")).toBe("unmapped");
+  });
+
+  it("parses jsonb punch payloads delivered as JSON strings", () => {
+    const parsed = parseAttendancePunchRpc(
+      JSON.stringify({
+        accepted: false,
+        reason_code: "GEOFENCE_OUTSIDE",
+        attempt_id: "11111111-1111-1111-1111-111111111111",
+        attendance_record: null,
+      }),
+    );
+    expect(parsed?.accepted).toBe(false);
+    expect(parsed?.reason_code).toBe("GEOFENCE_OUTSIDE");
+  });
+
+  it("accepts a valid eligible-workplace punch RPC payload", () => {
+    const parsed = parseAttendancePunchRpc({
+      accepted: true,
+      reason_code: "ACCEPTED",
+      attempt_id: "11111111-1111-1111-1111-111111111111",
+      attendance_record: { id: "rec" },
+    });
+    expect(parsed?.accepted).toBe(true);
   });
 });
