@@ -11,6 +11,7 @@ import { getDocumentAIConfig } from "@/modules/document-intelligence/ai-extract"
 import { compareBusinessCaseToProject } from "@/modules/document-intelligence/comparison";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import type { BusinessCaseExtraction, ExtractedFact } from "@/modules/document-intelligence/schema";
+import { DRIVE_INTELLIGENCE_UNAVAILABLE_AR, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
 
 function TrustBadge({ status }: { status: string | null }) {
   if (status === "VERIFIED") return <Badge tone="navy" data-testid="trust-verified">Verified</Badge>;
@@ -60,7 +61,7 @@ export default async function DocumentIntelligencePage({
 
   const { data: version } = await supabase
     .from("document_versions")
-    .select("id, revision, mime_type, file_name, checksum, is_current")
+    .select("id, revision, mime_type, file_name, checksum, is_current, file_source, file_path")
     .eq("document_id", id)
     .eq("organization_id", ctx.organization.id)
     .eq("is_current", true)
@@ -73,8 +74,11 @@ export default async function DocumentIntelligencePage({
 
   const payload = (intel?.extraction_payload ?? null) as BusinessCaseExtraction | null;
   const ai = getDocumentAIConfig();
-  const canAnalyze = hasPermission(ctx, "document.upload") || hasPermission(ctx, "document.update");
+  const canAnalyze =
+    (hasPermission(ctx, "document.upload") || hasPermission(ctx, "document.update")) &&
+    isStorageIntelligenceEligible(version ?? {});
   const canVerify = hasPermission(ctx, "document.approve");
+  const driveBlocked = version != null && !isStorageIntelligenceEligible(version);
 
   let project: {
     id: string;
@@ -162,6 +166,11 @@ export default async function DocumentIntelligencePage({
         {!ai.enabled ? (
           <p className="mt-3 text-sm text-muted" data-testid="doc-intel-unavailable">
             عيّن DOCUMENT_AI_PROVIDER=mock أو openai على الخادم.
+          </p>
+        ) : null}
+        {driveBlocked ? (
+          <p className="mt-3 text-sm text-muted" data-testid="doc-intel-drive-unavailable">
+            {DRIVE_INTELLIGENCE_UNAVAILABLE_AR}
           </p>
         ) : null}
         {intel?.error_message ? (

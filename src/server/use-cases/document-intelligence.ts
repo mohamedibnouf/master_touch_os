@@ -20,6 +20,7 @@ import { extractDocumentText } from "@/modules/document-intelligence/extract-tex
 import { chunkDocumentText } from "@/modules/document-intelligence/chunking";
 import { extractBusinessCaseWithAI, getDocumentAIConfig } from "@/modules/document-intelligence/ai-extract";
 import { DOCUMENT_AI_LIMITS } from "@/modules/document-intelligence/limits";
+import { DRIVE_INTELLIGENCE_UNAVAILABLE_AR, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
 
 async function loadAuthorizedDocument(documentId: string) {
   const ctx = await getAuthContext();
@@ -39,7 +40,7 @@ async function loadAuthorizedDocument(documentId: string) {
 
   const { data: version, error: vErr } = await supabase
     .from("document_versions")
-    .select("id, revision, file_path, file_name, mime_type, size_bytes, checksum, is_current")
+    .select("id, revision, file_path, file_name, mime_type, size_bytes, checksum, is_current, file_source")
     .eq("document_id", documentId)
     .eq("organization_id", ctx.organization.id)
     .eq("is_current", true)
@@ -60,6 +61,14 @@ export async function analyzeDocumentIntelligenceAction(input: {
     const { ctx, supabase, doc, version } = await loadAuthorizedDocument(input.documentId);
     if (!hasPermission(ctx, "document.upload") && !hasPermission(ctx, "document.update")) {
       throw new ForbiddenError();
+    }
+
+    if (!isStorageIntelligenceEligible(version)) {
+      return {
+        ok: false,
+        code: "DRIVE_UNAVAILABLE",
+        error: DRIVE_INTELLIGENCE_UNAVAILABLE_AR,
+      };
     }
 
     const cfg = getDocumentAIConfig();

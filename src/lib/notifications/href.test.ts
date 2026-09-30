@@ -6,6 +6,7 @@ describe("notificationEntityHref", () => {
     expect(notificationEntityHref("leave_request", "abc")).toBe("/leave/abc");
     expect(notificationEntityHref("project", "p1")).toBe("/projects/p1");
     expect(notificationEntityHref("payroll_period", "p1")).toBe("/payroll");
+    expect(notificationEntityHref("document", "doc-1")).toBe("/documents/doc-1");
   });
 
   it("returns null when the entity is unknown or incomplete", () => {

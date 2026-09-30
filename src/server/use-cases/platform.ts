@@ -18,18 +18,21 @@ import {
   decideApprovalSchema,
   startWorkflowSchema,
 } from "@/modules/approvals/schemas";
-import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { isPrivilegedRoleCode } from "@/lib/hr/roles";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
-import { authorize } from "@/server/policies/authorize";
+import { authorize, hasPermission } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { StorageService } from "@/server/services/storage.service";
+import { parseGoogleDriveUrl } from "@/modules/documents/google-drive-url";
+import { isStorageFileRequired } from "@/modules/documents/schemas";
+import { assertProjectBelongsToOrganization } from "@/modules/documents/project-scope";
 import type { Project } from "@/types/models";
 
 function nextRevision(current: string): string {
@@ -345,19 +348,41 @@ export async function uploadDocumentAction(
 ): Promise<FormActionState> {
   return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "document.upload");
+  const fileSourceRaw = String(formData.get("fileSource") || "storage");
   const parsed = uploadDocumentSchema.safeParse({
     title: formData.get("title"),
     category: formData.get("category"),
     projectId: formData.get("projectId") || undefined,
     documentId: formData.get("documentId") || undefined,
     confidentiality: formData.get("confidentiality") || "internal",
+    fileSource: fileSourceRaw,
+    driveUrl: formData.get("driveUrl") || undefined,
   });
   const file = formData.get("file");
-  if (!parsed.success || !(file instanceof File) || file.size === 0) {
+  const wantsStorage = isStorageFileRequired(parsed.success ? parsed.data.fileSource : fileSourceRaw);
+  if (!parsed.success || (wantsStorage && (!(file instanceof File) || file.size === 0))) {
     throw new ValidationError("تعذر رفع المستند.", "The document could not be uploaded.");
   }
 
   const supabase = await createServerSupabaseClient();
+  const projectId = parsed.data.projectId || null;
+  if (projectId) {
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id, organization_id")
+      .eq("id", projectId)
+      .maybeSingle<{ id: string; organization_id: string }>();
+    assertProjectBelongsToOrganization(project, ctx.organization.id);
+  }
+
+  let driveRef: ReturnType<typeof parseGoogleDriveUrl> = null;
+  if (parsed.data.fileSource === "google_drive") {
+    driveRef = parseGoogleDriveUrl(parsed.data.driveUrl ?? "");
+    if (!driveRef) {
+      throw new ValidationError("رابط Google Drive غير صالح.", "The Google Drive link is not valid.");
+    }
+  }
+
   const storage = new StorageService(supabase);
   let documentId = parsed.data.documentId || "";
   let revision = "A";
@@ -365,10 +390,10 @@ export async function uploadDocumentAction(
   if (documentId) {
     const { data: existing } = await supabase
       .from("documents")
-      .select("id, current_revision")
+      .select("id, current_revision, organization_id")
       .eq("id", documentId)
       .eq("organization_id", ctx.organization.id)
-      .maybeSingle<{ id: string; current_revision: string }>();
+      .maybeSingle<{ id: string; current_revision: string; organization_id: string }>();
     if (!existing) {
       throw new NotFoundError("المستند", "Document");
     }
@@ -378,7 +403,7 @@ export async function uploadDocumentAction(
       .from("documents")
       .insert({
         organization_id: ctx.organization.id,
-        project_id: parsed.data.projectId || null,
+        project_id: projectId,
         category: parsed.data.category,
         title: parsed.data.title,
         current_revision: "A",
@@ -392,35 +417,56 @@ export async function uploadDocumentAction(
     documentId = created.id;
   }
 
-  const uploaded = await storage.upload({
-    organizationId: ctx.organization.id,
-    projectId: parsed.data.projectId || null,
-    documentId,
-    revision,
-    file,
-  });
-
-  // Unique partial index: only one is_current=true per document
   await supabase
     .from("document_versions")
     .update({ is_current: false, is_superseded: true, superseded_at: new Date().toISOString() })
     .eq("document_id", documentId)
     .eq("is_current", true);
 
-  const { error: versionError } = await supabase.from("document_versions").insert({
-    organization_id: ctx.organization.id,
-    document_id: documentId,
-    revision,
-    file_path: uploaded.path,
-    file_name: file.name,
-    mime_type: file.type,
-    size_bytes: file.size,
-    checksum: uploaded.checksum,
-    uploaded_by: ctx.userId,
-    is_current: true,
-    is_superseded: false,
-  });
-  if (versionError) throw new DatabaseError(versionError);
+  if (parsed.data.fileSource === "google_drive" && driveRef) {
+    const { error: versionError } = await supabase.from("document_versions").insert({
+      organization_id: ctx.organization.id,
+      document_id: documentId,
+      revision,
+      file_source: "google_drive",
+      file_path: null,
+      file_name: parsed.data.title,
+      mime_type: null,
+      size_bytes: null,
+      checksum: null,
+      uploaded_by: ctx.userId,
+      is_current: true,
+      is_superseded: false,
+      external_provider: "google_drive",
+      external_file_id: driveRef.fileId,
+      external_url: driveRef.canonicalUrl,
+    });
+    if (versionError) throw new DatabaseError(versionError);
+  } else {
+    const uploaded = await storage.upload({
+      organizationId: ctx.organization.id,
+      projectId,
+      documentId,
+      revision,
+      file: file as File,
+    });
+
+    const { error: versionError } = await supabase.from("document_versions").insert({
+      organization_id: ctx.organization.id,
+      document_id: documentId,
+      revision,
+      file_source: "storage",
+      file_path: uploaded.path,
+      file_name: (file as File).name,
+      mime_type: (file as File).type,
+      size_bytes: (file as File).size,
+      checksum: uploaded.checksum,
+      uploaded_by: ctx.userId,
+      is_current: true,
+      is_superseded: false,
+    });
+    if (versionError) throw new DatabaseError(versionError);
+  }
 
   if (revision !== "A") {
     await supabase
@@ -435,13 +481,49 @@ export async function uploadDocumentAction(
     action: revision === "A" ? "document.uploaded" : "document.revised",
     entityType: "document",
     entityId: documentId,
-    newValues: { revision, title: parsed.data.title },
+    newValues: {
+      revision,
+      title: parsed.data.title,
+      source: parsed.data.fileSource === "google_drive" ? "google_drive" : "storage",
+    },
   });
 
   revalidatePath("/documents");
-  if (parsed.data.projectId) {
-    revalidatePath(`/projects/${parsed.data.projectId}`);
+  revalidatePath(`/documents/${documentId}`);
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`);
   }
+  });
+}
+
+export async function openStorageDocumentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر فتح الملف. حاول مرة أخرى.", async () => {
+    const ctx = await getAuthContext();
+    if (!ctx) throw new UnauthorizedError();
+    if (!hasPermission(ctx, "document.read")) {
+      throw new ForbiddenError({ permission: "document.read" });
+    }
+    const documentId = String(formData.get("documentId") ?? "");
+    if (!documentId) {
+      throw new ValidationError("المستند غير صالح.", "The document is not valid.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: version, error } = await supabase
+      .from("document_versions")
+      .select("file_source, file_path")
+      .eq("document_id", documentId)
+      .eq("organization_id", ctx.organization.id)
+      .eq("is_current", true)
+      .maybeSingle<{ file_source: string; file_path: string | null }>();
+    if (error || !version || version.file_source !== "storage" || !version.file_path) {
+      throw new ValidationError("ملف التخزين غير متاح.", "The stored file is not available.");
+    }
+    const storage = new StorageService(supabase);
+    const signed = await storage.signedUrl(version.file_path, 120);
+    redirect(signed);
   });
 }
 

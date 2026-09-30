@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -12,8 +12,14 @@ import {
   createApprovalAction,
   startWorkflowAction,
   updateProjectStageAction,
-  uploadDocumentAction,
 } from "@/server/use-cases/platform";
+import { DocumentSourceForm } from "@/components/documents/document-source-form";
+import {
+  DocumentDetailsLink,
+  DocumentOpenControl,
+  DocumentSourceBadge,
+} from "@/components/documents/document-open-control";
+import { documentStatusLabel } from "@/lib/ui/operational-labels";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات", "الذكاء الاصطناعي"];
 
@@ -42,6 +48,14 @@ export default async function ProjectDetailPage({
     supabase.from("workflow_definitions").select("id, name_ar").eq("status", "published"),
     supabase.rpc("compute_project_health", { p_project_id: project.id }),
   ]);
+
+  const currentFiles = await repo.listCurrentDocumentFiles(
+    ctx.organization.id,
+    documents.map((d) => d.id),
+  );
+  const fileByDoc = new Map(currentFiles.map((row) => [row.document_id, row]));
+  const canUploadDocs = hasPermission(ctx, "document.upload");
+  const canOpenStorage = hasPermission(ctx, "document.read");
 
   const canSeeFinance =
     hasPermission(ctx, "finance.read") || hasPermission(ctx, "commercial_reports.read");
@@ -526,45 +540,94 @@ export default async function ProjectDetailPage({
       ) : null}
 
       {tab === "documents" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4" data-testid="project-documents-panel">
           <Card>
             <h2 className="mb-3 font-semibold text-navy">مستندات المشروع</h2>
             {documents.length === 0 ? (
-              <p className="text-sm text-muted">لا توجد مستندات.</p>
+              <EmptyState title="لا توجد مستندات مرتبطة بهذا المشروع بعد." />
             ) : (
-              <ul className="space-y-2 text-sm">
-                {documents.map((doc) => (
-                  <li key={doc.id} className="flex justify-between border-b border-line pb-2">
-                    <span>{doc.title}</span>
-                    <span className="text-muted">
-                      {doc.category} · {doc.current_revision}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-3 md:hidden">
+                  {documents.map((doc) => {
+                    const file = fileByDoc.get(doc.id) ?? null;
+                    return (
+                      <li key={doc.id} className="rounded-lg border border-line p-3">
+                        <p className="font-medium text-navy">{doc.title}</p>
+                        <p className="mt-1 text-xs text-muted">
+                          {doc.document_number ? `${doc.document_number} · ` : ""}
+                          {doc.category} · {doc.current_revision} · {documentStatusLabel(doc.status)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          {new Date(doc.updated_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <DocumentSourceBadge source={file?.file_source} />
+                          <DocumentOpenControl documentId={doc.id} file={file} canOpenStorage={canOpenStorage} />
+                          <DocumentDetailsLink documentId={doc.id} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <TableScroll className="hidden rounded-lg border border-line md:block">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-paper text-right text-muted">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">المستند</th>
+                        <th className="px-3 py-2 font-medium">التصنيف</th>
+                        <th className="px-3 py-2 font-medium">الإصدار</th>
+                        <th className="px-3 py-2 font-medium">الحالة</th>
+                        <th className="px-3 py-2 font-medium">التحديث</th>
+                        <th className="px-3 py-2 font-medium">المصدر</th>
+                        <th className="px-3 py-2 font-medium">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {documents.map((doc) => {
+                        const file = fileByDoc.get(doc.id) ?? null;
+                        return (
+                          <tr key={doc.id} className="border-t border-line">
+                            <td className="px-3 py-2">
+                              <p className="font-medium text-navy">{doc.title}</p>
+                              {doc.document_number ? (
+                                <p className="text-xs text-muted">{doc.document_number}</p>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-2">{doc.category}</td>
+                            <td className="px-3 py-2">{doc.current_revision}</td>
+                            <td className="px-3 py-2">{documentStatusLabel(doc.status)}</td>
+                            <td className="px-3 py-2 text-muted">
+                              {new Date(doc.updated_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                            </td>
+                            <td className="px-3 py-2">
+                              <DocumentSourceBadge source={file?.file_source} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <DocumentOpenControl
+                                  documentId={doc.id}
+                                  file={file}
+                                  canOpenStorage={canOpenStorage}
+                                />
+                                <DocumentDetailsLink documentId={doc.id} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </TableScroll>
+                {documents.length >= 50 ? (
+                  <p className="mt-2 text-xs text-muted">يُعرض أحدث 50 مستنداً لهذا المشروع.</p>
+                ) : null}
+              </>
             )}
           </Card>
-          {hasPermission(ctx, "document.upload") ? (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">رفع مستند</h2>
-              <ServerActionForm action={uploadDocumentAction} className="space-y-3">
-                <input type="hidden" name="projectId" value={project.id} />
-                <Field label="العنوان">
-                  <Input name="title" required />
-                </Field>
-                <Field label="التصنيف">
-                  <Select name="category" defaultValue="business_case">
-                    <option value="business_case">دراسة الجدوى</option>
-                    <option value="contract">عقد</option>
-                    <option value="drawing">مخطط</option>
-                    <option value="other">أخرى</option>
-                  </Select>
-                </Field>
-                <Field label="الملف">
-                  <Input name="file" type="file" required />
-                </Field>
-                <Button type="submit">رفع</Button>
-              </ServerActionForm>
+          {canUploadDocs ? (
+            <Card data-testid="project-add-document">
+              <h2 className="mb-4 font-semibold text-navy">إضافة مستند</h2>
+              <DocumentSourceForm projectId={project.id} />
             </Card>
           ) : null}
         </div>

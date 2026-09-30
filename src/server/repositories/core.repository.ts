@@ -26,6 +26,7 @@ import {
   AUDIT_FEED_COLUMNS,
   DEPARTMENT_LIST_COLUMNS,
   DOCUMENT_LIST_COLUMNS,
+  DOCUMENT_CURRENT_VERSION_COLUMNS,
   EMPLOYEE_DIRECTORY_PAGE_COLUMNS,
   EMPLOYEE_DIRECTORY_PROFILE_COLUMNS,
   NOTIFICATION_HEADER_COLUMNS,
@@ -321,6 +322,35 @@ export class CoreRepository {
     const { data, error } = await query;
     if (error) fail(error);
     return (data ?? []) as DocumentRecord[];
+  }
+
+  async listCurrentDocumentFiles(
+    organizationId: string,
+    documentIds: string[],
+  ): Promise<
+    Array<{
+      document_id: string;
+      file_source: string | null;
+      external_url: string | null;
+      file_path: string | null;
+      is_current: boolean;
+    }>
+  > {
+    if (documentIds.length === 0) return [];
+    const { data, error } = await this.supabase
+      .from("document_versions")
+      .select(DOCUMENT_CURRENT_VERSION_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("is_current", true)
+      .in("document_id", documentIds);
+    if (error) fail(error);
+    return (data ?? []) as Array<{
+      document_id: string;
+      file_source: string | null;
+      external_url: string | null;
+      file_path: string | null;
+      is_current: boolean;
+    }>;
   }
 
   async listDocumentVersions(documentId: string) {
