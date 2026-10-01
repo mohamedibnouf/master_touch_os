@@ -1,11 +1,19 @@
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
+const optionalPublicString = z.preprocess(
+  (value) => (value === "" || value === undefined || value === null ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: optionalPublicString,
+  NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: optionalPublicString,
+  NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: optionalPublicString,
 });
 
 const serverSchema = publicSchema.extend({
@@ -40,6 +48,9 @@ export const GET_SERVER_ENV_KEYS = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+  "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID",
+  "NEXT_PUBLIC_GOOGLE_PICKER_API_KEY",
+  "NEXT_PUBLIC_GOOGLE_PICKER_ENABLED",
   "SUPABASE_SERVICE_ROLE_KEY",
   "BOOTSTRAP_ADMIN_EMAIL",
   "MANAGEMENT_AI_PROVIDER",
@@ -99,6 +110,9 @@ export function readServerEnvRecordFromProcess(): Record<string, string | undefi
     NOTIFICATIONS_CRON_SECRET: process.env.NOTIFICATIONS_CRON_SECRET,
     VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+    NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY,
+    NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_PICKER_ENABLED,
   };
 }
 
@@ -112,6 +126,9 @@ function readPublicEnv(): PublicEnv {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+    NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY,
+    NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_PICKER_ENABLED,
   });
 
   if (!parsed.success) {
@@ -293,6 +310,24 @@ export const ENV_CATALOG: readonly EnvClassification[] = [
     scope: "server",
     required: false,
     description: "Bearer secret for /api/internal/notifications/run",
+  },
+  {
+    name: "NEXT_PUBLIC_GOOGLE_PICKER_ENABLED",
+    scope: "public",
+    required: false,
+    description: "Enable Google Picker when true and public Google identifiers are set",
+  },
+  {
+    name: "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID",
+    scope: "public",
+    required: false,
+    description: "Google OAuth Web client ID for GIS token client (browser identifier)",
+  },
+  {
+    name: "NEXT_PUBLIC_GOOGLE_PICKER_API_KEY",
+    scope: "public",
+    required: false,
+    description: "HTTP-referrer-restricted Google Picker API key (browser identifier)",
   },
 ] as const;
 

@@ -21,11 +21,19 @@ function validFileId(id: string): boolean {
   return FILE_ID_RE.test(id);
 }
 
-function canonicalFor(kind: GoogleDriveKind, fileId: string): string {
+export function isGoogleDriveFileId(id: string): boolean {
+  return FILE_ID_RE.test(id);
+}
+
+export function canonicalGoogleDriveUrl(kind: GoogleDriveKind, fileId: string): string {
   if (kind === "document") return `https://docs.google.com/document/d/${fileId}/view`;
   if (kind === "spreadsheets") return `https://docs.google.com/spreadsheets/d/${fileId}/edit`;
   if (kind === "presentation") return `https://docs.google.com/presentation/d/${fileId}/view`;
   return `https://drive.google.com/file/d/${fileId}/view`;
+}
+
+function canonicalFor(kind: GoogleDriveKind, fileId: string): string {
+  return canonicalGoogleDriveUrl(kind, fileId);
 }
 
 function kindFromDocsPath(pathname: string): GoogleDriveKind | null {

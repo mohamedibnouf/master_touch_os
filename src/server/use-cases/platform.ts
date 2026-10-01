@@ -376,10 +376,15 @@ export async function uploadDocumentAction(
   }
 
   let driveRef: ReturnType<typeof parseGoogleDriveUrl> = null;
+  let driveMimeType: string | null = null;
   if (parsed.data.fileSource === "google_drive") {
     driveRef = parseGoogleDriveUrl(parsed.data.driveUrl ?? "");
     if (!driveRef) {
       throw new ValidationError("رابط Google Drive غير صالح.", "The Google Drive link is not valid.");
+    }
+    const rawMime = String(formData.get("driveMimeType") ?? "").trim();
+    if (rawMime && rawMime.length <= 180 && /^[a-z0-9.+*-]+\/[a-z0-9.+*-]+$/i.test(rawMime)) {
+      driveMimeType = rawMime;
     }
   }
 
@@ -431,7 +436,7 @@ export async function uploadDocumentAction(
       file_source: "google_drive",
       file_path: null,
       file_name: parsed.data.title,
-      mime_type: null,
+      mime_type: driveMimeType,
       size_bytes: null,
       checksum: null,
       uploaded_by: ctx.userId,

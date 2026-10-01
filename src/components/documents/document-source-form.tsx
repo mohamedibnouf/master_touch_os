@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Field, Input, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { GoogleDrivePickerControls } from "@/components/documents/google-drive-picker-controls";
 import { uploadDocumentAction } from "@/server/use-cases/platform";
+import { readGooglePickerPublicConfig, isGooglePickerReady } from "@/modules/documents/google-picker-config";
+import type { NormalizedGooglePickerFile } from "@/modules/documents/google-picker-normalize";
 
 const CATEGORIES: Array<{ value: string; label: string }> = [
   { value: "business_case", label: "دراسة حالة / Business Case" },
@@ -32,13 +35,40 @@ export function DocumentSourceForm({
   showProjectPicker?: boolean;
   projects?: Array<{ id: string; project_code: string; name_ar: string }>;
 }) {
+  const pickerConfig = useMemo(
+    () =>
+      readGooglePickerPublicConfig({
+        NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_PICKER_ENABLED,
+        NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+        NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY,
+      }),
+    [],
+  );
+  const pickerReady = isGooglePickerReady(pickerConfig);
+
   const [source, setSource] = useState<"google_drive" | "storage">("google_drive");
+  const [title, setTitle] = useState("");
+  const [driveUrl, setDriveUrl] = useState("");
+  const [selected, setSelected] = useState<NormalizedGooglePickerFile | null>(null);
+  const [showManualUrl, setShowManualUrl] = useState(!pickerReady);
+
+  function applyPickerFile(file: NormalizedGooglePickerFile) {
+    setSelected(file);
+    setDriveUrl(file.canonicalUrl);
+    setShowManualUrl(false);
+    setTitle((current) => (current.trim() ? current : file.name));
+  }
+
+  function clearPickerFile() {
+    setSelected(null);
+    setDriveUrl("");
+  }
 
   return (
     <ServerActionForm action={uploadDocumentAction} className="grid gap-3 md:grid-cols-2">
       {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
       <Field label="العنوان">
-        <Input name="title" required />
+        <Input name="title" required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
       <Field label="التصنيف">
         <Select name="category" required defaultValue="other">
@@ -72,19 +102,53 @@ export function DocumentSourceForm({
         </Field>
       ) : null}
       {source === "google_drive" ? (
-        <div className="md:col-span-2">
-          <Field
-            label="رابط Google Drive"
-            hint="يفتح الرابط في Google Drive حسب صلاحيات حسابك هناك. النظام لا يمنح صلاحية Drive."
-          >
-            <Input
-              name="driveUrl"
-              type="url"
-              required
-              placeholder="https://drive.google.com/file/d/…"
-              data-testid="document-drive-url"
+        <div className="grid gap-3 md:col-span-2">
+          {pickerReady ? (
+            <GoogleDrivePickerControls
+              clientId={pickerConfig.clientId}
+              apiKey={pickerConfig.apiKey}
+              selected={selected}
+              onSelected={applyPickerFile}
+              onCleared={clearPickerFile}
             />
-          </Field>
+          ) : null}
+          {pickerReady ? (
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                className="px-0"
+                onClick={() => setShowManualUrl((open) => !open)}
+                data-testid="document-drive-manual-toggle"
+              >
+                إدخال رابط Google Drive يدويًا
+              </Button>
+            </div>
+          ) : null}
+          {showManualUrl || !pickerReady ? (
+            <Field
+              label="رابط Google Drive"
+              hint="يفتح الرابط في Google Drive حسب صلاحيات حسابك هناك. النظام لا يمنح صلاحية Drive ولا يجعل الملف عامًا."
+            >
+              <Input
+                name="driveUrl"
+                type="url"
+                required={!selected}
+                value={driveUrl}
+                onChange={(e) => {
+                  setDriveUrl(e.target.value);
+                  setSelected(null);
+                }}
+                placeholder="https://drive.google.com/file/d/…"
+                data-testid="document-drive-url"
+              />
+            </Field>
+          ) : (
+            <>
+              <input type="hidden" name="driveUrl" value={driveUrl} required data-testid="document-drive-url" />
+              {selected?.mimeType ? <input type="hidden" name="driveMimeType" value={selected.mimeType} /> : null}
+            </>
+          )}
         </div>
       ) : (
         <Field label="الملف">
