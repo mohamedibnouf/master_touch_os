@@ -41,6 +41,8 @@ const ACTION_LABELS: Record<string, string> = {
   "document.approved": "تم اعتماد مستند",
   "document.rejected": "رُفض مستند",
   "document.resubmit_required": "مطلوب إعادة تقديم مستند",
+  "document.archived": "أرشفة المستند",
+  "document.restored": "استعادة المستند",
   "document_intelligence.extracted": "تم استخراج بيانات المستند",
   "document_intelligence.failed": "فشل تحليل المستند",
   "document_intelligence.verified": "تم التحقق من المستند",

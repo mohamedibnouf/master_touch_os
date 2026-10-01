@@ -11,7 +11,14 @@ function FormBusyNote() {
 }
 
 function FormError({ state }: { state: FormActionState }) {
-  if (!state || state.ok || !state.message) return null;
+  if (!state || !state.message) return null;
+  if (state.ok) {
+    return (
+      <p className="text-sm text-navy" data-testid="form-action-success">
+        {state.message}
+      </p>
+    );
+  }
   return (
     <p className="text-sm text-danger" data-testid="form-action-error">
       {state.message}

@@ -45,6 +45,7 @@ export default async function DocumentControlPage({
     )
     .eq("organization_id", ctx.organization.id)
     .eq("is_register_controlled", true)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
 

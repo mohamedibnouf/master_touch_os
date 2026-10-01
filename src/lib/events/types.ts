@@ -18,6 +18,8 @@ export const DOMAIN_EVENTS = [
   "document.approved",
   "document.resubmit_required",
   "document.rejected",
+  "document.archived",
+  "document.restored",
   "workflow.started",
   "workflow.step.completed",
   "workflow.cancelled",

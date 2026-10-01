@@ -1,5 +1,5 @@
 /**
- * Column allowlists from CREATE/ALTER in migrations 001–064.
+ * Column allowlists from CREATE/ALTER in migrations 001–066.
  * Used to keep PostgREST projections from selecting non-existent columns.
  */
 
@@ -196,6 +196,8 @@ export const SCHEMA_DOCUMENTS = [
   "workflow_instance_id",
   "approval_request_id",
   "is_register_controlled",
+  "archived_at",
+  "archived_by",
 ] as const;
 
 /** 009 notifications + 062 event_type, href, dedup_key */

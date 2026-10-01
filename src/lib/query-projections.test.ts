@@ -103,7 +103,7 @@ const PERFORMANCE_PASS_PROJECTIONS: Array<{ name: string; table: string; select:
   { name: "EMPLOYEE_PROJECTS", table: "project_members", select: EMPLOYEE_PROJECTS_SELECT },
 ];
 
-describe("performance-pass projections vs migrations 001–064", () => {
+describe("performance-pass projections vs migrations 001–066", () => {
   it("keeps the steps schema allowlist aligned with migration 007", () => {
     expect([...APPROVAL_STEPS_SCHEMA_COLUMNS].sort()).toEqual([...SCHEMA_APPROVAL_STEPS].sort());
     expect(SCHEMA_APPROVAL_ACTIONS).toContain("decision");

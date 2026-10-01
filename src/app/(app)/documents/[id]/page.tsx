@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
 import { documentStatusLabel } from "@/lib/ui/operational-labels";
 import { DocumentOpenControl, DocumentSourceBadge } from "@/components/documents/document-open-control";
+import { DocumentArchiveControl, DocumentRestoreControl } from "@/components/documents/document-lifecycle-controls";
 import { documentFileSourceLabelAr } from "@/modules/documents/file-source";
 
 export default async function DocumentDetailPage({
@@ -22,7 +23,7 @@ export default async function DocumentDetailPage({
   const { data: doc } = await supabase
     .from("documents")
     .select(
-      "id, title, category, document_number, current_revision, status, project_id, organization_id, confidentiality, uploaded_by, created_at, updated_at, is_register_controlled, type_code",
+      "id, title, category, document_number, current_revision, status, project_id, organization_id, confidentiality, uploaded_by, created_at, updated_at, is_register_controlled, type_code, archived_at, archived_by",
     )
     .eq("id", id)
     .eq("organization_id", ctx.organization.id)
@@ -48,10 +49,17 @@ export default async function DocumentDetailPage({
 
   const current = (versions ?? []).find((v) => v.is_current) ?? null;
   const canOpenStorage = hasPermission(ctx, "document.read");
+  const canArchive = hasPermission(ctx, "document.archive");
+  const isArchived = Boolean(doc.archived_at);
 
   return (
     <PageContainer className="space-y-5" data-testid="document-detail">
       <PageHeader title={doc.title} description="بيانات المستند وإصداراته ومصدر الملف." />
+      {isArchived ? (
+        <p className="rounded-[var(--radius-control)] border border-line bg-paper px-3 py-2 text-sm text-navy" data-testid="document-archived-banner">
+          مؤرشف — مخفي من القوائم التشغيلية. الملف والإصدارات محفوظة.
+        </p>
+      ) : null}
 
       <p className="text-sm">
         <Link href="/documents" className="text-navy underline">
@@ -120,6 +128,10 @@ export default async function DocumentDetailPage({
               ذكاء المستند
             </Link>
           ) : null}
+          {canArchive && !isArchived ? (
+            <DocumentArchiveControl documentId={doc.id} fileSource={current?.file_source} />
+          ) : null}
+          {canArchive && isArchived ? <DocumentRestoreControl documentId={doc.id} /> : null}
         </div>
       </Card>
 

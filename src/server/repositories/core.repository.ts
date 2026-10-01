@@ -309,7 +309,11 @@ export class CoreRepository {
     return data ?? [];
   }
 
-  async listDocuments(organizationId: string, projectId?: string): Promise<DocumentRecord[]> {
+  async listDocuments(
+    organizationId: string,
+    projectId?: string,
+    options?: { archived?: boolean },
+  ): Promise<DocumentRecord[]> {
     let query = this.supabase
       .from("documents")
       .select(DOCUMENT_LIST_COLUMNS)
@@ -318,6 +322,11 @@ export class CoreRepository {
       .limit(50);
     if (projectId) {
       query = query.eq("project_id", projectId);
+    }
+    if (options?.archived) {
+      query = query.not("archived_at", "is", null);
+    } else {
+      query = query.is("archived_at", null);
     }
     const { data, error } = await query;
     if (error) fail(error);
@@ -594,6 +603,7 @@ export class CoreRepository {
         .eq("organization_id", organizationId)
         .eq("responsible_engineer_id", profileId)
         .in("official_decision", ["C", "D"])
+        .is("archived_at", null)
         .limit(15),
       this.supabase
         .from("inspection_requests")

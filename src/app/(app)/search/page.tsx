@@ -30,6 +30,7 @@ export default async function SearchPage({
         .select("id, document_number, title, type_code, status, project_id")
         .eq("organization_id", ctx.organization.id)
         .or(`document_number.ilike.${pattern},title.ilike.${pattern}`)
+        .is("archived_at", null)
         .limit(20),
       supabase
         .from("rfis")

@@ -21,7 +21,7 @@ export const PROJECT_LIST_COLUMNS =
 export const PROJECT_PICKER_COLUMNS = "id, project_code, name_ar" as const;
 
 export const DOCUMENT_LIST_COLUMNS =
-  "id, title, category, current_revision, status, created_at, updated_at, project_id, document_number, uploaded_by" as const;
+  "id, title, category, current_revision, status, created_at, updated_at, project_id, document_number, uploaded_by, archived_at, archived_by" as const;
 
 export const DOCUMENT_CURRENT_VERSION_COLUMNS =
   "document_id, file_source, external_url, file_path, is_current" as const;

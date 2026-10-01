@@ -248,6 +248,8 @@ export type DocumentRecord = {
   confidentiality: ConfidentialityLevel;
   approval_state: string;
   uploaded_by: string;
+  archived_at?: string | null;
+  archived_by?: string | null;
   created_at: string;
   updated_at: string;
 };

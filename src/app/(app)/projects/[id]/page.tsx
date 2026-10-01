@@ -19,6 +19,7 @@ import {
   DocumentOpenControl,
   DocumentSourceBadge,
 } from "@/components/documents/document-open-control";
+import { DocumentArchiveControl } from "@/components/documents/document-lifecycle-controls";
 import { documentStatusLabel } from "@/lib/ui/operational-labels";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات", "الذكاء الاصطناعي"];
@@ -56,6 +57,7 @@ export default async function ProjectDetailPage({
   const fileByDoc = new Map(currentFiles.map((row) => [row.document_id, row]));
   const canUploadDocs = hasPermission(ctx, "document.upload");
   const canOpenStorage = hasPermission(ctx, "document.read");
+  const canArchiveDocs = hasPermission(ctx, "document.archive");
 
   const canSeeFinance =
     hasPermission(ctx, "finance.read") || hasPermission(ctx, "commercial_reports.read");
@@ -564,6 +566,9 @@ export default async function ProjectDetailPage({
                           <DocumentSourceBadge source={file?.file_source} />
                           <DocumentOpenControl documentId={doc.id} file={file} canOpenStorage={canOpenStorage} />
                           <DocumentDetailsLink documentId={doc.id} />
+                          {canArchiveDocs ? (
+                            <DocumentArchiveControl documentId={doc.id} fileSource={file?.file_source} />
+                          ) : null}
                         </div>
                       </li>
                     );
@@ -610,6 +615,9 @@ export default async function ProjectDetailPage({
                                   canOpenStorage={canOpenStorage}
                                 />
                                 <DocumentDetailsLink documentId={doc.id} />
+                              {canArchiveDocs ? (
+                                <DocumentArchiveControl documentId={doc.id} fileSource={file?.file_source} />
+                              ) : null}
                               </div>
                             </td>
                           </tr>

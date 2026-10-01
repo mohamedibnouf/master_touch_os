@@ -32,7 +32,7 @@ async function loadAuthorizedDocument(documentId: string) {
   const supabase = await createServerSupabaseClient();
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id, organization_id, project_id, title, category, current_revision, status")
+    .select("id, organization_id, project_id, title, category, current_revision, status, archived_at")
     .eq("id", documentId)
     .eq("organization_id", ctx.organization.id)
     .maybeSingle();
@@ -61,6 +61,14 @@ export async function analyzeDocumentIntelligenceAction(input: {
     const { ctx, supabase, doc, version } = await loadAuthorizedDocument(input.documentId);
     if (!hasPermission(ctx, "document.upload") && !hasPermission(ctx, "document.update")) {
       throw new ForbiddenError();
+    }
+
+    if (doc.archived_at) {
+      return {
+        ok: false,
+        code: "ARCHIVED",
+        error: "لا يمكن تحليل مستند مؤرشف كمستند تشغيلي.",
+      };
     }
 
     if (!isStorageIntelligenceEligible(version)) {

@@ -53,7 +53,7 @@ export default async function DocumentIntelligencePage({
   const supabase = await createServerSupabaseClient();
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, title, category, project_id, current_revision, organization_id")
+    .select("id, title, category, project_id, current_revision, organization_id, archived_at")
     .eq("id", id)
     .eq("organization_id", ctx.organization.id)
     .maybeSingle();
@@ -76,7 +76,8 @@ export default async function DocumentIntelligencePage({
   const ai = getDocumentAIConfig();
   const canAnalyze =
     (hasPermission(ctx, "document.upload") || hasPermission(ctx, "document.update")) &&
-    isStorageIntelligenceEligible(version ?? {});
+    isStorageIntelligenceEligible(version ?? {}) &&
+    !doc.archived_at;
   const canVerify = hasPermission(ctx, "document.approve");
   const driveBlocked = version != null && !isStorageIntelligenceEligible(version);
 

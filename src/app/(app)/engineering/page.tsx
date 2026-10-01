@@ -120,6 +120,7 @@ export default async function EngineeringPage({
       .eq("organization_id", ctx.organization.id)
       .eq("is_register_controlled", true)
       .in("official_decision", ["C", "D"])
+      .is("archived_at", null)
       .limit(20),
   ]);
 
