@@ -22,6 +22,8 @@ describe("payroll permissions catalog", () => {
   });
 
   it("grants engineer view_self only", () => {
+    expect(ROLE_PERMISSION_MAP.employee).toEqual(expect.arrayContaining(["payroll.view_self"]));
+    expect(ROLE_PERMISSION_MAP.employee).not.toContain("payroll.view_all");
     expect(ROLE_PERMISSION_MAP.engineer).toEqual(expect.arrayContaining(["payroll.view_self"]));
     expect(ROLE_PERMISSION_MAP.engineer).not.toContain("payroll.view_all");
     expect(ROLE_PERMISSION_MAP.engineer).not.toContain("payroll.prepare");

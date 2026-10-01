@@ -40,7 +40,7 @@ describe("document.archive permission", () => {
   });
 
   it("B. unauthorized roles cannot archive", () => {
-    for (const role of ["engineer", "project_manager", "viewer", "hr_officer", "client", "consultant", "supplier", "subcontractor"] as const) {
+    for (const role of ["engineer", "project_manager", "viewer", "hr_officer", "employee", "client", "consultant", "supplier", "subcontractor"] as const) {
       expect(evaluatePermission([grant(role, ORG_A)], "document.archive", { organizationId: ORG_A })).toBe(false);
     }
   });

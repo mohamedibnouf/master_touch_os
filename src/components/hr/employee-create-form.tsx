@@ -45,10 +45,17 @@ export function EmployeeCreateForm({
               </Field>
             </div>
 
-            <FormSection icon={Briefcase} title="التوظيف" description="المسمى ونوع التعاقد وموقع العمل.">
+            <FormSection icon={Briefcase} title="التوظيف" description="المسمى الوظيفي مهنة الموظف، وليس صلاحية النظام.">
               <div className="grid gap-3 md:grid-cols-2">
-                <Field label="المسمى الوظيفي">
-                  <Input name="job_title_ar" data-testid="employee-create-title" />
+                <Field
+                  label="المسمى الوظيفي"
+                  hint="مهنة أو مسمى وظيفي فقط — ليس صلاحية النظام."
+                >
+                  <Input
+                    name="job_title_ar"
+                    placeholder="مثال: عامل، فني كهرباء، مشرف موقع"
+                    data-testid="employee-create-title"
+                  />
                 </Field>
                 <Field label="نوع التوظيف">
                   <Select name="employment_type" defaultValue="" data-testid="employee-create-type">
@@ -69,7 +76,11 @@ export function EmployeeCreateForm({
               </div>
             </FormSection>
 
-            <FormSection icon={Building2} title="التنظيم" description="الإدارة والدور التشغيلي إن وُجدت صلاحية التعيين.">
+            <FormSection
+              icon={Building2}
+              title="التنظيم"
+              description="الإدارة وصلاحية النظام إن وُجدت صلاحية التعيين. صلاحية النظام ليست المسمى الوظيفي."
+            >
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="الإدارة">
                   <Select name="department_id" defaultValue="" data-testid="employee-create-department">
@@ -82,9 +93,12 @@ export function EmployeeCreateForm({
                   </Select>
                 </Field>
                 {canAssignRole ? (
-                  <Field label="الدور">
+                  <Field
+                    label="صلاحية النظام"
+                    hint="تحدد ما يستطيع الموظف الوصول إليه داخل النظام، ولا تمثل مسماه الوظيفي."
+                  >
                     <Select name="role_id" defaultValue="" data-testid="employee-create-role">
-                      <option value="">بدون</option>
+                      <option value="">بدون — تُعيَّن صلاحية موظف تلقائياً عند تفعيل الدخول</option>
                       {roles
                         .filter((role) =>
                           isOperationalAssignableRole({

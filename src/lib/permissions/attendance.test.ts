@@ -23,7 +23,7 @@ describe("attendance permissions catalog", () => {
   });
 
   it("grants self check-in/out to engineer roles", () => {
-    for (const role of ["engineer", "project_engineer", "document_controller"] as const) {
+    for (const role of ["engineer", "project_engineer", "document_controller", "employee"] as const) {
       expect(ROLE_PERMISSION_MAP[role]).toEqual(
         expect.arrayContaining(["attendance.view_self", "attendance.check_in", "attendance.check_out"]),
       );

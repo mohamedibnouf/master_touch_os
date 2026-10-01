@@ -78,7 +78,7 @@ describe("HR create employee form (البيانات غير مكتملة)", () =>
     const { parsed } = parseForm({ ...required, role_id: "engineer" });
     expect(parsed.success).toBe(false);
     if (parsed.success) return;
-    expect(createEmployeeValidationMessageAr(parsed.error)).toBe("الدور المحدد غير صالح.");
+    expect(createEmployeeValidationMessageAr(parsed.error)).toBe("صلاحية النظام المحددة غير صالحة.");
   });
 
   it("rejects privileged role assignment from the HR path unless platform admin", () => {

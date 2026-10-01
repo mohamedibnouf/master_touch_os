@@ -20,7 +20,7 @@ describe("leave permissions catalog", () => {
   });
 
   it("grants employee self-service leave to engineer roles", () => {
-    for (const role of ["engineer", "project_engineer", "document_controller"] as const) {
+    for (const role of ["engineer", "project_engineer", "document_controller", "employee"] as const) {
       expect(ROLE_PERMISSION_MAP[role]).toEqual(
         expect.arrayContaining(["leave.view_self", "leave.request", "leave.cancel_self"]),
       );

@@ -188,6 +188,7 @@ export const SYSTEM_ROLES = [
   "hse_officer",
   "quality_manager",
   "quality_officer",
+  "employee",
   "viewer",
   "client",
   "consultant",
@@ -205,6 +206,18 @@ export const EXTERNAL_ROLES: readonly SystemRoleCode[] = [
 ];
 
 export const ALL_INTERNAL_PERMISSIONS: readonly PermissionKey[] = PERMISSIONS;
+
+/** Base authenticated self-service. Occupation stays on job_title_*. */
+export const BASE_EMPLOYEE_PERMISSIONS: readonly PermissionKey[] = [
+  "attendance.view_self",
+  "attendance.check_in",
+  "attendance.check_out",
+  "leave.view_self",
+  "leave.request",
+  "leave.cancel_self",
+  "notification.read",
+  "payroll.view_self",
+];
 
 /** Viewer: limited Phase 1 reads only — not every *.read permission. */
 const VIEWER_PERMISSIONS: PermissionKey[] = [
@@ -772,6 +785,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "ncr.create",
     "ncr.read",
   ],
+  employee: BASE_EMPLOYEE_PERMISSIONS,
   viewer: VIEWER_PERMISSIONS,
   client: [],
   consultant: [],

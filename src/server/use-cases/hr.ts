@@ -15,11 +15,17 @@ import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
 import {
+  createEmployeeLoginProvisioned,
   createEmployeeValidationMessageAr,
   hrCreateRoleAssignmentError,
   logCreateEmployeeValidationFailure,
   readCreateEmployeeFormData,
 } from "@/lib/hr/create-employee-form";
+import {
+  BASE_EMPLOYEE_ROLE_CODE,
+  isTrustedBaseEmployeeRole,
+  resolveCreateEmployeeRolePlan,
+} from "@/lib/hr/roles";
 import {
   assertCreateEmployeeAuthRequest,
   buildCreateEmployeeAuthRequest,
@@ -71,7 +77,8 @@ async function syncHrAlerts(employeeId: string) {
  * HR-scoped employee onboard.
  * Auth account creation requires Admin API (service role) — same pattern as createUserAction.
  * Authorization is least-privilege: employee.create (or user.create), NOT broad user admin.
- * Role assignment still requires role.assign separately when a role is selected.
+ * Role assignment requires role.assign when a role is selected.
+ * Login-provisioned creates with an empty role default to the system employee role.
  */
 export async function createEmployeeAction(
   _prev: FormActionState,
@@ -94,20 +101,27 @@ export async function createEmployeeAction(
     );
   }
 
-  if (parsed.data.role_id && !hasPermission(ctx, "role.assign")) {
-    throw new ForbiddenError({ permission: "role.assign" });
-  }
+  const loginProvisioned = createEmployeeLoginProvisioned(parsed.data.initial_password);
+  const rolePlan = resolveCreateEmployeeRolePlan({
+    selectedRoleId: parsed.data.role_id,
+    loginProvisioned,
+  });
 
   const admin = createAdminSupabaseClient();
-  if (parsed.data.role_id) {
+  let roleIdToAssign: string | undefined;
+
+  if (rolePlan.mode === "selected") {
+    if (!hasPermission(ctx, "role.assign")) {
+      throw new ForbiddenError({ permission: "role.assign" });
+    }
     const { data: roleRow } = await admin
       .from("roles")
       .select("code, is_external")
-      .eq("id", parsed.data.role_id)
+      .eq("id", rolePlan.roleId)
       .maybeSingle<{ code: string; is_external: boolean }>();
     const roleBlock = hrCreateRoleAssignmentError({
-      roleId: parsed.data.role_id,
-      canAssignRole: hasPermission(ctx, "role.assign"),
+      roleId: rolePlan.roleId,
+      canAssignRole: true,
       isPlatformAdmin: ctx.profile.is_platform_admin,
       role: roleRow,
     });
@@ -117,6 +131,21 @@ export async function createEmployeeAction(
     if (roleBlock === "privileged") {
       throw new ValidationError("لا يمكن منح هذا الدور من مسار الموارد البشرية.", "That role cannot be assigned from the HR path.");
     }
+    roleIdToAssign = rolePlan.roleId;
+  } else if (rolePlan.mode === "default_employee") {
+    const { data: employeeRole } = await admin
+      .from("roles")
+      .select("id, code, is_external")
+      .eq("code", BASE_EMPLOYEE_ROLE_CODE)
+      .is("organization_id", null)
+      .maybeSingle<{ id: string; code: string; is_external: boolean }>();
+    if (!isTrustedBaseEmployeeRole(employeeRole)) {
+      throw new ValidationError(
+        "تعذر تعيين صلاحية الموظف الأساسية. تأكد من تطبيق تهيئة صلاحية موظف.",
+        "Base employee role is not available.",
+      );
+    }
+    roleIdToAssign = employeeRole.id;
   }
 
   const employeeNumber = parsed.data.employee_number.trim();
@@ -169,11 +198,11 @@ export async function createEmployeeAction(
     if (deptError) mapDepartmentInsertFailure(deptError);
   }
 
-  if (parsed.data.role_id) {
+  if (roleIdToAssign) {
     const { error: roleError } = await admin.from("user_roles").insert({
       organization_id: ctx.organization.id,
       profile_id: profileId,
-      role_id: parsed.data.role_id,
+      role_id: roleIdToAssign,
       scope_type: "organization",
       granted_by: ctx.userId,
     });
@@ -615,6 +644,31 @@ export async function provisionEmployeeLoginAction(
       },
     });
     if (updErr) throw new DatabaseError(updErr);
+
+    const { data: existingGrants } = await admin
+      .from("user_roles")
+      .select("id")
+      .eq("organization_id", ctx.organization.id)
+      .eq("profile_id", emp.profile_id)
+      .limit(1);
+    if (!existingGrants?.length) {
+      const { data: employeeRole } = await admin
+        .from("roles")
+        .select("id, code, is_external")
+        .eq("code", BASE_EMPLOYEE_ROLE_CODE)
+        .is("organization_id", null)
+        .maybeSingle<{ id: string; code: string; is_external: boolean }>();
+      if (isTrustedBaseEmployeeRole(employeeRole)) {
+        const { error: roleError } = await admin.from("user_roles").insert({
+          organization_id: ctx.organization.id,
+          profile_id: emp.profile_id,
+          role_id: employeeRole.id,
+          scope_type: "organization",
+          granted_by: ctx.userId,
+        });
+        if (roleError) mapRoleInsertFailure(roleError);
+      }
+    }
 
     await new AuditService(supabase).log({
       organizationId: ctx.organization.id,

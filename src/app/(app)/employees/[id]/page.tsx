@@ -320,6 +320,7 @@ export default async function EmployeeDetailPage({
                 { label: "الاسم (عربي)", value: (profile as { full_name_ar?: string } | null)?.full_name_ar ?? "—", testId: "emp-name-ar" },
                 { label: "الاسم (إنجليزي)", value: (profile as { full_name_en?: string } | null)?.full_name_en ?? "—", testId: "emp-name-en" },
                 { label: "المسمى الوظيفي (عربي)", value: employee.job_title_ar ?? "—", testId: "emp-job-title-ar" },
+                { label: "المسمى الوظيفي (إنجليزي)", value: employee.job_title_en ?? "—", testId: "emp-job-title-en" },
                 { label: "نوع التوظيف", value: employmentTypeLabel(employee.employment_type), testId: "emp-employment-type" },
                 { label: "تاريخ الانضمام", value: employee.joining_date ?? "—", testId: "emp-joining-date" },
                 { label: "موقع العمل", value: employee.work_location ?? "—", testId: "emp-work-location" },

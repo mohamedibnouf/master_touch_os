@@ -105,7 +105,7 @@ export default async function SettingsPage() {
                       {hasPermission(ctx, "role.assign") ? (
                         <ServerActionForm action={assignRoleAction} className="flex items-end gap-2">
                           <input type="hidden" name="profileId" value={profile.id} />
-                          <Field label="دور">
+                          <Field label="صلاحية النظام">
                             <Select name="roleId" required defaultValue="">
                               <option value="" disabled>
                                 اختر
