@@ -12,6 +12,9 @@ import { hasPermission } from "@/server/policies/authorize";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { isUuid } from "@/lib/utils";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { JobTitleRepository } from "@/server/repositories/job-title.repository";
+import { EmployeeTitleFields } from "@/components/hr/employee-title-fields";
+import { isHistoricalCatalogTitle, isLegacyJobTitle } from "@/lib/hr/job-titles";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   activateEmployeeContractAction,
@@ -121,6 +124,7 @@ export default async function EmployeeDetailPage({
 
   const [
     departments,
+    jobTitles,
     projects,
     compliance,
     audit,
@@ -131,6 +135,7 @@ export default async function EmployeeDetailPage({
     loginStatus,
   ] = await Promise.all([
     repo.listDepartments(ctx.organization.id),
+    new JobTitleRepository(supabase).listByOrganization(ctx.organization.id, { activeOnly: true }),
     repo.listEmployeeProjects(ctx.organization.id, employee.profile_id),
     canCompliance ? repo.getEmployeeCompliance(ctx.organization.id, id) : Promise.resolve(null),
     canManage ? repo.listEmployeeAudit(ctx.organization.id, id) : Promise.resolve([]),
@@ -153,6 +158,26 @@ export default async function EmployeeDetailPage({
 
   const profile = Array.isArray(employee.profiles) ? employee.profiles[0] : employee.profiles;
   const deptLinks = (employee.employee_departments as Array<Record<string, unknown>>) ?? [];
+  const primaryDept = deptLinks.find((d) => d.is_primary) ?? deptLinks[0];
+  const primaryDepartmentId = (primaryDept?.department_id as string | undefined) ?? "";
+  const currentTitleId = (employee.job_title_id as string | null) ?? null;
+  const currentCatalogTitle = currentTitleId
+    ? jobTitles.find((t) => t.id === currentTitleId) ?? {
+        id: currentTitleId,
+        organization_id: ctx.organization.id,
+        department_id: "__other__",
+        code: null,
+        name_ar: employee.job_title_ar ?? "",
+        name_en: employee.job_title_en ?? "",
+        is_active: false,
+        sort_order: 0,
+      }
+    : null;
+  const legacyTitle = isLegacyJobTitle({ jobTitleId: currentTitleId, jobTitleAr: employee.job_title_ar });
+  const historicalTitle = isHistoricalCatalogTitle({
+    title: currentCatalogTitle,
+    departmentId: primaryDepartmentId || undefined,
+  });
   const status = employee.employment_status as EmploymentStatus;
   const empType = employee.employment_type as EmploymentType | null;
   const gender = employee.gender as EmployeeGender | null;
@@ -321,6 +346,11 @@ export default async function EmployeeDetailPage({
                 { label: "الاسم (إنجليزي)", value: (profile as { full_name_en?: string } | null)?.full_name_en ?? "—", testId: "emp-name-en" },
                 { label: "المسمى الوظيفي (عربي)", value: employee.job_title_ar ?? "—", testId: "emp-job-title-ar" },
                 { label: "المسمى الوظيفي (إنجليزي)", value: employee.job_title_en ?? "—", testId: "emp-job-title-en" },
+                {
+                  label: "مصدر المسمى",
+                  value: legacyTitle ? "مسمى قديم" : historicalTitle ? "تاريخي / غير نشط" : "كتالوج",
+                  testId: "emp-job-title-source",
+                },
                 { label: "نوع التوظيف", value: employmentTypeLabel(employee.employment_type), testId: "emp-employment-type" },
                 { label: "تاريخ الانضمام", value: employee.joining_date ?? "—", testId: "emp-joining-date" },
                 { label: "موقع العمل", value: employee.work_location ?? "—", testId: "emp-work-location" },
@@ -344,20 +374,21 @@ export default async function EmployeeDetailPage({
                   />
                 </Field>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="المسمى الوظيفي (عربي)">
-                    <Input
-                      name="job_title_ar"
-                      defaultValue={employee.job_title_ar ?? ""}
-                      data-testid="employee-edit-title"
-                    />
-                  </Field>
-                  <Field label="المسمى الوظيفي (إنجليزي)">
-                    <Input
-                      name="job_title_en"
-                      defaultValue={employee.job_title_en ?? ""}
-                      data-testid="edit-emp-title-en"
-                    />
-                  </Field>
+                  <EmployeeTitleFields
+                    departments={departments}
+                    titles={jobTitles}
+                    canManageTitles={hasPermission(ctx, "job_title.manage")}
+                    departmentTestId="employee-edit-department"
+                    titleTestId="employee-edit-title"
+                    defaultDepartmentId={primaryDepartmentId}
+                    defaultTitleId={currentTitleId ?? ""}
+                    historicalHint={
+                      historicalTitle
+                        ? "المسمى الحالي تاريخي وغير متاح للإدارة المحددة"
+                        : null
+                    }
+                    legacyHint={legacyTitle ? "مسمى قديم — اختر مسمى من الكتالوج للربط" : null}
+                  />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="نوع التوظيف">

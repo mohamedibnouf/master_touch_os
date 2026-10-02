@@ -111,6 +111,7 @@ describe("create employee runtime pipeline", () => {
     expect(row.employment_type).toBeNull();
     expect(row.joining_date).toBeNull();
     expect(row.job_title_ar).toBeNull();
+    expect(row.job_title_id).toBeNull();
     expect(row).not.toHaveProperty("department_id");
     expect(row).not.toHaveProperty("role_id");
   });

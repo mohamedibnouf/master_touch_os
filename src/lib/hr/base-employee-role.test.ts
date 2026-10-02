@@ -78,6 +78,8 @@ describe("base employee system role", () => {
       "leave.view_all",
       "leave.manage",
       "leave.adjust_balance",
+      "job_title.manage",
+      "job_title.read",
       "payroll.view_all",
       "document.archive",
       "document.upload",
@@ -223,9 +225,9 @@ describe("067 base employee role SQL and create UX copy", () => {
   it("AG. role label/helper copy is correct", () => {
     expect(createUi).toContain("صلاحية النظام");
     expect(createUi).toContain("تحدد ما يستطيع الموظف الوصول إليه داخل النظام، ولا تمثل مسماه الوظيفي.");
-    expect(createUi).toContain("مثال: عامل، فني كهرباء، مشرف موقع");
-    expect(createUi).toContain('name="job_title_ar"');
+    expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم صلاحية النظام");
     expect(createUi).not.toMatch(/<Field label="الدور">/);
+    expect(createUi).not.toContain('name="job_title_ar"');
   });
 
   it("067 is additive, grants eight keys, and does not backfill user_roles", () => {

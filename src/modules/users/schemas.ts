@@ -36,6 +36,7 @@ export const createEmployeeSchema = z.object({
   full_name_en: z.string().trim().min(2).max(200),
   email: z.string().email().optional(),
   initial_password: z.string().min(8).max(128).optional(),
+  job_title_id: postgresUuid.optional(),
   job_title_ar: z.string().trim().max(160).optional(),
   job_title_en: z.string().trim().max(160).optional(),
   department_id: postgresUuid.optional(),
@@ -57,8 +58,10 @@ export const provisionEmployeeLoginSchema = z.object({
 export const updateEmployeeEmploymentSchema = z.object({
   employeeId: z.string().uuid(),
   employee_number: z.string().trim().max(64).optional().nullable(),
+  job_title_id: postgresUuid.optional().nullable().or(z.literal("")),
   job_title_ar: z.string().trim().max(160).optional().nullable(),
   job_title_en: z.string().trim().max(160).optional().nullable(),
+  department_id: postgresUuid.optional().nullable().or(z.literal("")),
   employment_type: z
     .enum(["permanent", "fixed_term", "part_time", "temporary", "consultant"])
     .optional()
@@ -93,6 +96,20 @@ export const upsertComplianceSchema = z.object({
   insurance_provider: z.string().trim().max(160).optional().nullable().or(z.literal("")),
   insurance_expiry: z.string().optional().nullable().or(z.literal("")),
   gosi_number: z.string().trim().max(64).optional().nullable().or(z.literal("")),
+});
+
+export const upsertJobTitleSchema = z.object({
+  titleId: postgresUuid.optional(),
+  name_ar: z.string().trim().min(1).max(160),
+  name_en: z.string().trim().min(1).max(160),
+  code: z.string().trim().max(32).optional().or(z.literal("")),
+  department_id: postgresUuid.optional().or(z.literal("")),
+  sort_order: z.coerce.number().int().min(0).max(9999).default(0),
+});
+
+export const setJobTitleActiveSchema = z.object({
+  titleId: postgresUuid,
+  isActive: z.boolean(),
 });
 
 export const upsertDepartmentSchema = z.object({

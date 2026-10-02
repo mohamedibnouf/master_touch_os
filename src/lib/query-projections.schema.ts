@@ -68,6 +68,7 @@ export const SCHEMA_EMPLOYEES = [
   "organization_id",
   "profile_id",
   "employee_number",
+  "job_title_id",
   "job_title_ar",
   "job_title_en",
   "employment_status",
@@ -87,7 +88,21 @@ export const SCHEMA_EMPLOYEES = [
   "employment_type",
 ] as const;
 
-/** 003 employee_departments */
+/** 068 job_titles */
+export const SCHEMA_JOB_TITLES = [
+  "id",
+  "organization_id",
+  "department_id",
+  "code",
+  "name_ar",
+  "name_en",
+  "is_active",
+  "sort_order",
+  "created_by",
+  "created_at",
+  "updated_at",
+] as const;
+
 export const SCHEMA_EMPLOYEE_DEPARTMENTS = [
   "id",
   "organization_id",
@@ -406,6 +421,7 @@ export const SCHEMA_BY_TABLE: Record<string, readonly string[]> = {
   organizations: SCHEMA_ORGANIZATIONS,
   organization_members: SCHEMA_ORGANIZATION_MEMBERS,
   departments: SCHEMA_DEPARTMENTS,
+  job_titles: SCHEMA_JOB_TITLES,
   employees: SCHEMA_EMPLOYEES,
   employee_departments: SCHEMA_EMPLOYEE_DEPARTMENTS,
   roles: SCHEMA_ROLES,

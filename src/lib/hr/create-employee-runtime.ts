@@ -72,6 +72,7 @@ export function buildCreateEmployeeInsertPayload(input: {
   organizationId: string;
   profileId: string;
   employeeNumber: string;
+  jobTitleId?: string | null;
   jobTitleAr?: string;
   jobTitleEn?: string;
   employmentType?: string;
@@ -83,6 +84,7 @@ export function buildCreateEmployeeInsertPayload(input: {
     organization_id: input.organizationId,
     profile_id: input.profileId,
     employee_number: input.employeeNumber,
+    job_title_id: input.jobTitleId ?? null,
     job_title_ar: input.jobTitleAr ?? null,
     job_title_en: input.jobTitleEn ?? null,
     employment_type: input.employmentType ?? null,

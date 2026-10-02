@@ -182,8 +182,9 @@ export function payrollPeriodStatusLabel(
 }
 
 /** Explicit directory columns — never include compensation/banking/ID docs. */
+/** Explicit directory columns — never include compensation/banking/ID docs. */
 export const EMPLOYEE_DIRECTORY_COLUMNS =
-  "id, organization_id, profile_id, employee_number, job_title_ar, job_title_en, employment_status, employment_type, joining_date, contract_start, contract_end, probation_end, direct_manager_employee_id, work_location, nationality, is_active, terminated_at, created_at, updated_at" as const;
+  "id, organization_id, profile_id, employee_number, job_title_id, job_title_ar, job_title_en, employment_status, employment_type, joining_date, contract_start, contract_end, probation_end, direct_manager_employee_id, work_location, nationality, is_active, terminated_at, created_at, updated_at" as const;
 
 /** Detail projection adds optional HR/self fields (still never compensation). */
 export const EMPLOYEE_DETAIL_COLUMNS =

@@ -9,6 +9,7 @@ import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { deriveEmployeeDirectoryStats } from "@/lib/hr/directory-page";
 import { traceEmployeesPageOp } from "@/lib/hr/employees-page-trace";
+import { JobTitleRepository } from "@/server/repositories/job-title.repository";
 import { EmployeeCreateForm } from "@/components/hr/employee-create-form";
 import { EmployeeDirectory } from "@/components/hr/employee-directory";
 
@@ -30,21 +31,25 @@ export default async function EmployeesPage() {
 
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
+  const canCreate = hasPermission(ctx, "employee.create") || hasPermission(ctx, "user.create");
   const employees = await traceEmployeesPageOp("listEmployees", () =>
     repo.listEmployees(ctx.organization.id),
   );
-  const [departments, roles] = await Promise.all([
+  const [departments, roles, titles] = await Promise.all([
     traceEmployeesPageOp("listDepartments", () => repo.listDepartments(ctx.organization.id)),
     canHrDirectory
       ? traceEmployeesPageOp("listRoles", () => repo.listRoles())
+      : Promise.resolve([]),
+    canCreate
+      ? new JobTitleRepository(supabase).listByOrganization(ctx.organization.id, { activeOnly: true })
       : Promise.resolve([]),
   ]);
   const stats = deriveEmployeeDirectoryStats(employees);
 
   const roleRows = roles as RoleRow[];
-  const canCreate = hasPermission(ctx, "employee.create") || hasPermission(ctx, "user.create");
   const canAssignRole = hasPermission(ctx, "role.assign");
   const allowPrivilegedRoles = ctx.profile.is_platform_admin;
+  const canManageTitles = hasPermission(ctx, "job_title.manage");
 
   return (
     <PageContainer data-testid="employees-page" className="space-y-5">
@@ -90,9 +95,11 @@ export default async function EmployeesPage() {
       {canCreate ? (
         <EmployeeCreateForm
           departments={departments}
+          titles={titles}
           roles={roleRows}
           canAssignRole={canAssignRole}
           allowPrivilegedRoles={allowPrivilegedRoles}
+          canManageTitles={canManageTitles}
         />
       ) : null}
 

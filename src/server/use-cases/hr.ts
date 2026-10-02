@@ -50,9 +50,17 @@ import {
   updateEmployeeProfileSchema,
   uploadEmployeeDocumentSchema,
   upsertComplianceSchema,
+  setJobTitleActiveSchema,
   upsertDepartmentSchema,
   upsertEmployeeBankSchema,
+  upsertJobTitleSchema,
 } from "@/modules/users/schemas";
+import { JobTitleRepository } from "@/server/repositories/job-title.repository";
+import {
+  jobTitleAssignmentMessageAr,
+  resolveEmploymentJobTitlePatch,
+  resolveNewJobTitleAssignment,
+} from "@/lib/hr/job-titles";
 
 function emptyToNull(value: string | null | undefined) {
   if (value == null) return null;
@@ -108,6 +116,25 @@ export async function createEmployeeAction(
   });
 
   const admin = createAdminSupabaseClient();
+  let jobTitleId: string | null = null;
+  let jobTitleAr = parsed.data.job_title_ar;
+  let jobTitleEn = parsed.data.job_title_en;
+  if (parsed.data.job_title_id) {
+    const titles = new JobTitleRepository(admin);
+    const title = await titles.getById(ctx.organization.id, parsed.data.job_title_id);
+    const assigned = resolveNewJobTitleAssignment({
+      title,
+      organizationId: ctx.organization.id,
+      departmentId: parsed.data.department_id,
+    });
+    if (!assigned.ok) {
+      throw new ValidationError(jobTitleAssignmentMessageAr(assigned.reason), "Invalid job title.");
+    }
+    jobTitleId = assigned.jobTitleId;
+    jobTitleAr = assigned.jobTitleAr;
+    jobTitleEn = assigned.jobTitleEn;
+  }
+
   let roleIdToAssign: string | undefined;
 
   if (rolePlan.mode === "selected") {
@@ -176,8 +203,9 @@ export async function createEmployeeAction(
         organizationId: ctx.organization.id,
         profileId,
         employeeNumber,
-        jobTitleAr: parsed.data.job_title_ar,
-        jobTitleEn: parsed.data.job_title_en,
+        jobTitleId,
+        jobTitleAr,
+        jobTitleEn,
         employmentType: parsed.data.employment_type,
         nationality: parsed.data.nationality,
         workLocation: parsed.data.work_location,
@@ -253,8 +281,10 @@ export async function updateEmployeeEmploymentAction(
   const parsed = updateEmployeeEmploymentSchema.safeParse({
     employeeId: formData.get("employeeId"),
     employee_number: formData.get("employee_number"),
+    job_title_id: formData.get("job_title_id") || undefined,
     job_title_ar: formData.get("job_title_ar"),
     job_title_en: formData.get("job_title_en"),
+    department_id: formData.get("department_id") || undefined,
     employment_type: formData.get("employment_type") || null,
     employment_status: formData.get("employment_status"),
     joining_date: formData.get("joining_date"),
@@ -272,10 +302,77 @@ export async function updateEmployeeEmploymentAction(
   }
 
   const supabase = await createServerSupabaseClient();
+  const { data: currentEmp, error: currentErr } = await supabase
+    .from("employees")
+    .select("id, job_title_id, job_title_ar, job_title_en")
+    .eq("id", parsed.data.employeeId)
+    .eq("organization_id", ctx.organization.id)
+    .maybeSingle<{
+      id: string;
+      job_title_id: string | null;
+      job_title_ar: string | null;
+      job_title_en: string | null;
+    }>();
+  if (currentErr) throw new DatabaseError(currentErr);
+  if (!currentEmp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
+
+  const submittedDept = emptyToNull(parsed.data.department_id ?? undefined);
+  if (submittedDept) {
+    await supabase
+      .from("employee_departments")
+      .update({ is_primary: false })
+      .eq("organization_id", ctx.organization.id)
+      .eq("employee_id", parsed.data.employeeId);
+    const { error: deptLinkError } = await supabase.from("employee_departments").upsert(
+      {
+        organization_id: ctx.organization.id,
+        employee_id: parsed.data.employeeId,
+        department_id: submittedDept,
+        is_primary: true,
+      },
+      { onConflict: "employee_id,department_id" },
+    );
+    if (deptLinkError) throw new DatabaseError(deptLinkError);
+  }
+
+  const { data: primaryLink } = await supabase
+    .from("employee_departments")
+    .select("department_id")
+    .eq("organization_id", ctx.organization.id)
+    .eq("employee_id", parsed.data.employeeId)
+    .eq("is_primary", true)
+    .maybeSingle<{ department_id: string }>();
+  const primaryDepartmentId = submittedDept ?? primaryLink?.department_id;
+
+  let jobTitleId = currentEmp.job_title_id;
+  let jobTitleAr = emptyToNull(parsed.data.job_title_ar) ?? currentEmp.job_title_ar;
+  let jobTitleEn = emptyToNull(parsed.data.job_title_en) ?? currentEmp.job_title_en;
+  const submittedTitleId = emptyToNull(parsed.data.job_title_id ?? undefined);
+  if (submittedTitleId) {
+    const titleRepo = new JobTitleRepository(supabase);
+    const title = await titleRepo.getById(ctx.organization.id, submittedTitleId);
+    const assigned = resolveEmploymentJobTitlePatch({
+      submittedTitleId,
+      currentTitleId: currentEmp.job_title_id,
+      title,
+      organizationId: ctx.organization.id,
+      departmentId: primaryDepartmentId,
+    });
+    if (!assigned.ok) {
+      throw new ValidationError(jobTitleAssignmentMessageAr(assigned.reason), "Invalid job title.");
+    }
+    if (!("keep" in assigned)) {
+      jobTitleId = assigned.jobTitleId;
+      jobTitleAr = assigned.jobTitleAr;
+      jobTitleEn = assigned.jobTitleEn;
+    }
+  }
+
   const patch = {
     employee_number: emptyToNull(parsed.data.employee_number),
-    job_title_ar: emptyToNull(parsed.data.job_title_ar),
-    job_title_en: emptyToNull(parsed.data.job_title_en),
+    job_title_id: jobTitleId,
+    job_title_ar: jobTitleAr,
+    job_title_en: jobTitleEn,
     employment_type: emptyToNull(parsed.data.employment_type) as string | null,
     employment_status: parsed.data.employment_status,
     joining_date: emptyToNull(parsed.data.joining_date),
@@ -516,6 +613,131 @@ export async function upsertDepartmentAction(
   if (error) throw new DatabaseError(error);
 
   revalidatePath("/departments");
+  revalidatePath("/departments/job-titles");
+  });
+}
+
+function mapJobTitleWriteFailure(error: unknown): never {
+  const raw =
+    error instanceof DatabaseError ? (error.causeError ?? error) : error;
+  const rec = raw && typeof raw === "object" ? (raw as { code?: string; message?: string }) : {};
+  if (rec.code === "23505") {
+    throw new ValidationError("يوجد مسمى وظيفي بنفس الاسم أو الكود في هذا النطاق.", "Job title already exists.");
+  }
+  if (String(rec.message ?? "").includes("JOB_TITLE_CREATED_BY_ORG_MISMATCH")) {
+    throw new ValidationError("لا يمكن نسبة المسمى إلى مستخدم خارج المنشأة.", "created_by must belong to the organization.");
+  }
+  throw error instanceof DatabaseError ? error : new DatabaseError(error);
+}
+
+export async function upsertJobTitleAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ المسمى الوظيفي. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "job_title.manage");
+    const parsed = upsertJobTitleSchema.safeParse({
+      titleId: formData.get("titleId") || undefined,
+      name_ar: formData.get("name_ar"),
+      name_en: formData.get("name_en"),
+      code: formData.get("code") || undefined,
+      department_id: formData.get("department_id") || undefined,
+      sort_order: formData.get("sort_order") || 0,
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات المسمى الوظيفي غير مكتملة.", "Job title data is incomplete.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const repo = new JobTitleRepository(supabase);
+    const departmentId = emptyToNull(parsed.data.department_id);
+    const code = emptyToNull(parsed.data.code);
+
+    try {
+      if (parsed.data.titleId) {
+        const previous = await repo.getById(ctx.organization.id, parsed.data.titleId);
+        if (!previous) throw new ValidationError("المسمى الوظيفي غير موجود.", "Job title not found.");
+        const updated = await repo.update(ctx.organization.id, parsed.data.titleId, {
+          name_ar: parsed.data.name_ar,
+          name_en: parsed.data.name_en,
+          code,
+          department_id: departmentId,
+          sort_order: parsed.data.sort_order,
+        });
+        await new AuditService(supabase).log({
+          organizationId: ctx.organization.id,
+          action: "job_title.updated",
+          entityType: "job_title",
+          entityId: updated.id,
+          previousValues: { name_ar: previous.name_ar, department_id: previous.department_id },
+          newValues: { name_ar: updated.name_ar, department_id: updated.department_id, code: updated.code },
+        });
+      } else {
+        const created = await repo.insert({
+          organization_id: ctx.organization.id,
+          department_id: departmentId,
+          code,
+          name_ar: parsed.data.name_ar,
+          name_en: parsed.data.name_en,
+          sort_order: parsed.data.sort_order,
+          created_by: ctx.userId,
+        });
+        await new AuditService(supabase).log({
+          organizationId: ctx.organization.id,
+          action: "job_title.created",
+          entityType: "job_title",
+          entityId: created.id,
+          newValues: { name_ar: created.name_ar, department_id: created.department_id },
+        });
+      }
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof ForbiddenError) throw error;
+      mapJobTitleWriteFailure(error);
+    }
+
+    revalidatePath("/departments/job-titles");
+    revalidatePath("/departments");
+    revalidatePath("/employees");
+  });
+}
+
+export async function setJobTitleActiveAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تحديث حالة المسمى. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "job_title.manage");
+    const parsed = setJobTitleActiveSchema.safeParse({
+      titleId: formData.get("titleId"),
+      isActive: formData.get("isActive") === "true",
+    });
+    if (!parsed.success) {
+      throw new ValidationError("تعذر تحديث حالة المسمى الوظيفي.", "Could not update job title status.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const repo = new JobTitleRepository(supabase);
+    const previous = await repo.getById(ctx.organization.id, parsed.data.titleId);
+    if (!previous) throw new ValidationError("المسمى الوظيفي غير موجود.", "Job title not found.");
+    try {
+      const updated = await repo.update(ctx.organization.id, parsed.data.titleId, {
+        is_active: parsed.data.isActive,
+      });
+      await new AuditService(supabase).log({
+        organizationId: ctx.organization.id,
+        action: parsed.data.isActive ? "job_title.activated" : "job_title.deactivated",
+        entityType: "job_title",
+        entityId: updated.id,
+        previousValues: { is_active: previous.is_active },
+        newValues: { is_active: updated.is_active, name_ar: updated.name_ar },
+      });
+    } catch (error) {
+      if (error instanceof ValidationError) throw error;
+      mapJobTitleWriteFailure(error);
+    }
+
+    revalidatePath("/departments/job-titles");
+    revalidatePath("/employees");
   });
 }
 

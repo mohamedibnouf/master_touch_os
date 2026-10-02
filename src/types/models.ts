@@ -66,6 +66,7 @@ export type Employee = {
   organization_id: string;
   profile_id: string;
   employee_number: string | null;
+  job_title_id: string | null;
   job_title_ar: string | null;
   job_title_en: string | null;
   employment_status: EmploymentStatus;

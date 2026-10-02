@@ -6,20 +6,26 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createEmployeeAction } from "@/server/use-cases/hr";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
+import { EmployeeTitleFields } from "@/components/hr/employee-title-fields";
+import type { JobTitleRecord } from "@/lib/hr/job-titles";
 
 type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
 type DeptRow = { id: string; name_ar: string };
 
 export function EmployeeCreateForm({
   departments,
+  titles,
   roles,
   canAssignRole,
   allowPrivilegedRoles,
+  canManageTitles,
 }: {
   departments: DeptRow[];
+  titles: JobTitleRecord[];
   roles: RoleRow[];
   canAssignRole: boolean;
   allowPrivilegedRoles: boolean;
+  canManageTitles: boolean;
 }) {
   return (
     <div className="mx-auto w-full max-w-3xl" data-testid="employee-create-card">
@@ -45,53 +51,13 @@ export function EmployeeCreateForm({
               </Field>
             </div>
 
-            <FormSection icon={Briefcase} title="التوظيف" description="المسمى الوظيفي مهنة الموظف، وليس صلاحية النظام.">
+            <FormSection icon={Building2} title="التنظيم" description="الإدارة ثم المسمى الوظيفي ثم صلاحية النظام. المسمى مهنة وليست صلاحية.">
               <div className="grid gap-3 md:grid-cols-2">
-                <Field
-                  label="المسمى الوظيفي"
-                  hint="مهنة أو مسمى وظيفي فقط — ليس صلاحية النظام."
-                >
-                  <Input
-                    name="job_title_ar"
-                    placeholder="مثال: عامل، فني كهرباء، مشرف موقع"
-                    data-testid="employee-create-title"
-                  />
-                </Field>
-                <Field label="نوع التوظيف">
-                  <Select name="employment_type" defaultValue="" data-testid="employee-create-type">
-                    <option value="">غير محدد</option>
-                    {EMPLOYMENT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {EMPLOYMENT_TYPE_LABELS[t].ar}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="تاريخ الالتحاق">
-                  <Input name="joining_date" type="date" />
-                </Field>
-                <Field label="موقع العمل">
-                  <Input name="work_location" />
-                </Field>
-              </div>
-            </FormSection>
-
-            <FormSection
-              icon={Building2}
-              title="التنظيم"
-              description="الإدارة وصلاحية النظام إن وُجدت صلاحية التعيين. صلاحية النظام ليست المسمى الوظيفي."
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="الإدارة">
-                  <Select name="department_id" defaultValue="" data-testid="employee-create-department">
-                    <option value="">بدون</option>
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name_ar}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                <EmployeeTitleFields
+                  departments={departments}
+                  titles={titles}
+                  canManageTitles={canManageTitles}
+                />
                 {canAssignRole ? (
                   <Field
                     label="صلاحية النظام"
@@ -115,6 +81,27 @@ export function EmployeeCreateForm({
                     </Select>
                   </Field>
                 ) : null}
+              </div>
+            </FormSection>
+
+            <FormSection icon={Briefcase} title="التوظيف" description="نوع التعاقد وتاريخ الالتحاق وموقع العمل.">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="نوع التوظيف">
+                  <Select name="employment_type" defaultValue="" data-testid="employee-create-type">
+                    <option value="">غير محدد</option>
+                    {EMPLOYMENT_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {EMPLOYMENT_TYPE_LABELS[t].ar}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="تاريخ الالتحاق">
+                  <Input name="joining_date" type="date" />
+                </Field>
+                <Field label="موقع العمل">
+                  <Input name="work_location" />
+                </Field>
               </div>
             </FormSection>
 

@@ -8,6 +8,7 @@ export const CREATE_EMPLOYEE_FIELD_KEYS = [
   "full_name_en",
   "email",
   "initial_password",
+  "job_title_id",
   "job_title_ar",
   "job_title_en",
   "department_id",
@@ -38,6 +39,7 @@ export function readCreateEmployeeFormData(formData: FormData) {
     full_name_en: formText(formData, "full_name_en"),
     email: optionalTrimmed(formText(formData, "email")),
     initial_password: optionalTrimmed(formText(formData, "initial_password")),
+    job_title_id: optionalTrimmed(formText(formData, "job_title_id")),
     job_title_ar: optionalTrimmed(formText(formData, "job_title_ar")),
     job_title_en: optionalTrimmed(formText(formData, "job_title_en")),
     department_id: optionalTrimmed(formText(formData, "department_id")),
@@ -71,7 +73,9 @@ function issueMessageAr(issue: z.ZodIssue): string {
   if (field === "department_id") return "القسم المحدد غير صالح.";
   if (field === "role_id") return "صلاحية النظام المحددة غير صالحة.";
   if (field === "joining_date") return "تاريخ الالتحاق غير صالح.";
-  if (field === "job_title_ar" || field === "job_title_en") return "المسمى الوظيفي غير صالح.";
+  if (field === "job_title_id" || field === "job_title_ar" || field === "job_title_en") {
+    return "المسمى الوظيفي غير صالح.";
+  }
   if (field === "nationality") return "الجنسية غير صالحة.";
   if (field === "work_location") return "موقع العمل غير صالح.";
   return "تحقق من بيانات الموظف.";

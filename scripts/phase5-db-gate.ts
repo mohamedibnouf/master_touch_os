@@ -7,6 +7,7 @@ loadEnvConfig(process.cwd());
 
 export const EXPECTED_REF = "xjwhnxjdcrcmsxjjstsh";
 export const ORG = "11111111-1111-1111-1111-111111111111";
+export const FILE_068 = "068_job_titles.sql";
 export const FILE_067 = "067_base_employee_role.sql";
 export const FILE_066 = "066_document_lifecycle.sql";
 export const FILE_065 = "065_phase5_document_drive_dual_source.sql";

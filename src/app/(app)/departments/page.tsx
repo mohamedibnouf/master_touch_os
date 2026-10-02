@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Badge, Button, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
@@ -10,6 +11,7 @@ import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertDepartmentAction } from "@/server/use-cases/hr";
+import { JobTitleRepository } from "@/server/repositories/job-title.repository";
 
 export default async function DepartmentsPage() {
   const ctx = await getAuthContext();
@@ -18,6 +20,7 @@ export default async function DepartmentsPage() {
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const departments = await repo.listDepartments(ctx.organization.id);
+  const titleCounts = await new JobTitleRepository(supabase).countUsageByDepartment(ctx.organization.id);
   const employees =
     hasPermission(ctx, "employee.read") || hasPermission(ctx, "department.update")
       ? await repo.listEmployeeNameOptions(ctx.organization.id)
@@ -48,6 +51,9 @@ export default async function DepartmentsPage() {
                   تابع لـ: {byId.get(department.parent_department_id)?.name_ar ?? "—"}
                 </p>
               ) : null}
+              <p className="mt-1 text-xs text-muted">
+                المسميات: {titleCounts.get(department.id) ?? 0}
+              </p>
             </div>
             <Badge tone={department.is_active ? "success" : "neutral"}>
               {department.is_active ? "نشطة" : "موقوفة"}
@@ -117,14 +123,23 @@ export default async function DepartmentsPage() {
         title="الإدارات"
         description="هيكل تنظيمي هرمي قابل للتهيئة — مرتبط بدليل الموظفين"
         actions={
-          canCreate ? (
-            <a
-              href="#department-create-card"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-navy-deep md:min-h-10"
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/departments/job-titles"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-4 text-sm font-medium text-navy md:min-h-10"
+              data-testid="departments-job-titles-link"
             >
-              إنشاء إدارة
-            </a>
-          ) : null
+              المسميات الوظيفية
+            </Link>
+            {canCreate ? (
+              <a
+                href="#department-create-card"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-navy-deep md:min-h-10"
+              >
+                إنشاء إدارة
+              </a>
+            ) : null}
+          </div>
         }
       />
 
