@@ -18,6 +18,7 @@ export const PERMISSIONS = [
   "user.disable",
   "role.read",
   "role.assign",
+  "role.manage",
   "document.upload",
   "document.read",
   "document.update",
@@ -797,6 +798,23 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
   supplier: [],
   subcontractor: [],
 };
+
+/** Cannot be copied into organization custom roles. System roles may still hold them. */
+export const NON_DELEGABLE_PERMISSIONS = [
+  "settings.manage",
+  "role.manage",
+  "role.assign",
+  "user.create",
+  "user.disable",
+  "user.update",
+  "organization.update",
+] as const;
+
+export type NonDelegablePermission = (typeof NON_DELEGABLE_PERMISSIONS)[number];
+
+export function isNonDelegablePermission(value: string): value is NonDelegablePermission {
+  return (NON_DELEGABLE_PERMISSIONS as readonly string[]).includes(value);
+}
 
 export function isPermissionKey(value: string): value is PermissionKey {
   return (PERMISSIONS as readonly string[]).includes(value);

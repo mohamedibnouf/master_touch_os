@@ -34,7 +34,8 @@ export const NOTIFICATION_HEADER_COLUMNS = "id, title, created_at, read_at, enti
 export const DEPARTMENT_LIST_COLUMNS =
   "id, organization_id, code, name_ar, name_en, description, parent_department_id, manager_user_id, is_active" as const;
 
-export const ROLE_LIST_COLUMNS = "id, code, name_ar, name_en, is_system, is_external" as const;
+export const ROLE_LIST_COLUMNS =
+  "id, organization_id, code, name_ar, name_en, is_system, is_external, is_active, department_id, created_at" as const;
 
 export const PAYROLL_PERIOD_LIST_COLUMNS =
   "id, year, month, status, employee_count, total_gross, total_net" as const;

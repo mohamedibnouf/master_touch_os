@@ -47,6 +47,9 @@ import {
   maskIban,
   visibilityScopeLabel,
 } from "@/lib/hr/labels";
+import { assignRoleAction, unassignRoleAction } from "@/server/use-cases/platform";
+import { RoleRepository } from "@/server/repositories/role.repository";
+import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { readEmployeeLoginUiStatus } from "@/server/hr/employee-login-status";
 import { readEmployeeSetupRows } from "@/server/hr/employee-setup-status";
 import { EMPLOYEE_LOGIN_STATUS_LABEL_AR } from "@/lib/auth/employee-login";
@@ -121,6 +124,9 @@ export default async function EmployeeDetailPage({
     canManage;
 
   const canSensitive = hasPermission(ctx, "employee.read_sensitive") || canManage;
+  const canAssignRole = hasPermission(ctx, "role.assign");
+  const canViewRoles = canAssignRole || canManage || hasPermission(ctx, "role.read");
+  const roleRepo = new RoleRepository(supabase);
 
   const [
     departments,
@@ -133,6 +139,8 @@ export default async function EmployeeDetailPage({
     employeeDocs,
     bankAccounts,
     loginStatus,
+    roleGrants,
+    assignableRoles,
   ] = await Promise.all([
     repo.listDepartments(ctx.organization.id),
     new JobTitleRepository(supabase).listByOrganization(ctx.organization.id, { activeOnly: true }),
@@ -154,6 +162,10 @@ export default async function EmployeeDetailPage({
           employeeNumber: employee.employee_number,
         })
       : Promise.resolve(null),
+    canViewRoles
+      ? roleRepo.listGrantsForProfile(ctx.organization.id, employee.profile_id)
+      : Promise.resolve([]),
+    canAssignRole ? repo.listRoles(ctx.organization.id) : Promise.resolve([]),
   ]);
 
   const profile = Array.isArray(employee.profiles) ? employee.profiles[0] : employee.profiles;
@@ -527,6 +539,75 @@ export default async function EmployeeDetailPage({
                   تحديث القسم
                 </Button>
               </ServerActionForm>
+            </Card>
+          ) : null}
+
+          {canViewRoles ? (
+            <Card className="lg:col-span-2" data-testid="employee-roles-card">
+              <h2 className="mb-1 font-semibold text-navy">الدور والصلاحيات</h2>
+              <p className="mb-3 text-xs text-muted">مستقل عن المسمى الوظيفي. يمكن تعيين أكثر من دور.</p>
+              {roleGrants.length === 0 ? (
+                <p className="text-sm text-muted">لا توجد أدوار معيّنة.</p>
+              ) : (
+                <ul className="mb-4 space-y-2">
+                  {roleGrants.map((grant) => (
+                    <li key={grant.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
+                      <div>
+                        <p className="text-sm font-medium text-navy">{grant.roles?.name_ar ?? grant.role_id}</p>
+                        <p className="text-xs text-muted">
+                          {grant.roles?.code}
+                          {grant.roles?.is_system ? " · دور نظام" : ""}
+                          {grant.roles?.is_active === false ? " · موقوف" : ""}
+                        </p>
+                      </div>
+                      {canAssignRole ? (
+                        <ServerActionForm action={unassignRoleAction}>
+                          <input type="hidden" name="profileId" value={employee.profile_id} />
+                          <input type="hidden" name="userRoleId" value={grant.id} />
+                          <Button type="submit" variant="secondary">
+                            إلغاء التعيين
+                          </Button>
+                        </ServerActionForm>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canAssignRole ? (
+                <ServerActionForm action={assignRoleAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="profileId" value={employee.profile_id} />
+                  <Field label="تعيين دور">
+                    <Select name="roleId" required defaultValue="">
+                      <option value="" disabled>
+                        اختر
+                      </option>
+                      {(assignableRoles as Array<{
+                        id: string;
+                        name_ar: string;
+                        code?: string;
+                        is_external?: boolean;
+                        is_system?: boolean;
+                        is_active?: boolean;
+                      }>)
+                        .filter((role) =>
+                          isOperationalAssignableRole({
+                            code: role.code,
+                            is_external: role.is_external,
+                            is_system: role.is_system,
+                            is_active: role.is_active,
+                            allowPrivileged: ctx.profile.is_platform_admin,
+                          }),
+                        )
+                        .map((role) => (
+                          <option key={role.id} value={role.id}>
+                            {role.name_ar}
+                          </option>
+                        ))}
+                    </Select>
+                  </Field>
+                  <Button type="submit">تعيين</Button>
+                </ServerActionForm>
+              ) : null}
             </Card>
           ) : null}
         </div>

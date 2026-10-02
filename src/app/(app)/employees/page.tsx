@@ -13,7 +13,7 @@ import { JobTitleRepository } from "@/server/repositories/job-title.repository";
 import { EmployeeCreateForm } from "@/components/hr/employee-create-form";
 import { EmployeeDirectory } from "@/components/hr/employee-directory";
 
-type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
+type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
 
 export default async function EmployeesPage() {
   const ctx = await getAuthContext();
@@ -38,7 +38,7 @@ export default async function EmployeesPage() {
   const [departments, roles, titles] = await Promise.all([
     traceEmployeesPageOp("listDepartments", () => repo.listDepartments(ctx.organization.id)),
     canHrDirectory
-      ? traceEmployeesPageOp("listRoles", () => repo.listRoles())
+      ? traceEmployeesPageOp("listRoles", () => repo.listRoles(ctx.organization.id))
       : Promise.resolve([]),
     canCreate
       ? new JobTitleRepository(supabase).listByOrganization(ctx.organization.id, { activeOnly: true })

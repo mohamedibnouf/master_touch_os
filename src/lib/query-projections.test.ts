@@ -66,7 +66,7 @@ describe("GPS pending copy", () => {
 
 const AUTH_MEMBERSHIP_SELECT = `organization_id, status, organizations(${AUTH_ORGANIZATION_COLUMNS})`;
 const AUTH_USER_ROLES_SELECT =
-  "organization_id, scope_type, scope_id, roles(code, is_external, role_permissions(permission_key))";
+  "organization_id, scope_type, scope_id, roles(code, is_external, is_system, is_active, role_permissions(permission_key))";
 const EMPLOYEE_DIRECTORY_LIST_SELECT = EMPLOYEE_DIRECTORY_PAGE_COLUMNS;
 const EMPLOYEE_DETAIL_ROW_SELECT = `${EMPLOYEE_DETAIL_COLUMNS}, profiles(id, full_name_ar, full_name_en, phone, locale, is_active, avatar_path, last_seen_at, created_at, updated_at), employee_departments(id, is_primary, department_id, departments(id, code, name_ar, name_en, is_active))`;
 const EMPLOYEE_NAME_OPTIONS_SELECT = "id, profile_id, employee_number, profiles(full_name_ar)";

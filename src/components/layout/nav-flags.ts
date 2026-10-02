@@ -18,5 +18,6 @@ export type AppNavFlags = {
   notifications: boolean;
   search: boolean;
   settings: boolean;
+  roles: boolean;
   analyst: boolean;
 };

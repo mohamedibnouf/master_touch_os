@@ -85,6 +85,7 @@ describe("base employee system role", () => {
       "document.upload",
       "settings.manage",
       "role.assign",
+      "role.manage",
       "reports.management.read",
     ] as const;
     for (const key of denied) {
@@ -223,9 +224,9 @@ describe("067 base employee role SQL and create UX copy", () => {
   );
 
   it("AG. role label/helper copy is correct", () => {
-    expect(createUi).toContain("صلاحية النظام");
+    expect(createUi).toContain("الدور والصلاحيات");
     expect(createUi).toContain("تحدد ما يستطيع الموظف الوصول إليه داخل النظام، ولا تمثل مسماه الوظيفي.");
-    expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم صلاحية النظام");
+    expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم الدور والصلاحيات");
     expect(createUi).not.toMatch(/<Field label="الدور">/);
     expect(createUi).not.toContain('name="job_title_ar"');
   });

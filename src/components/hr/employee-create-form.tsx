@@ -9,7 +9,7 @@ import { EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
 import { EmployeeTitleFields } from "@/components/hr/employee-title-fields";
 import type { JobTitleRecord } from "@/lib/hr/job-titles";
 
-type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
+type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
 type DeptRow = { id: string; name_ar: string };
 
 export function EmployeeCreateForm({
@@ -51,7 +51,7 @@ export function EmployeeCreateForm({
               </Field>
             </div>
 
-            <FormSection icon={Building2} title="التنظيم" description="الإدارة ثم المسمى الوظيفي ثم صلاحية النظام. المسمى مهنة وليست صلاحية.">
+            <FormSection icon={Building2} title="التنظيم" description="الإدارة ثم المسمى الوظيفي ثم الدور والصلاحيات. المسمى مهنة وليست صلاحية.">
               <div className="grid gap-3 md:grid-cols-2">
                 <EmployeeTitleFields
                   departments={departments}
@@ -60,7 +60,7 @@ export function EmployeeCreateForm({
                 />
                 {canAssignRole ? (
                   <Field
-                    label="صلاحية النظام"
+                    label="الدور والصلاحيات"
                     hint="تحدد ما يستطيع الموظف الوصول إليه داخل النظام، ولا تمثل مسماه الوظيفي."
                   >
                     <Select name="role_id" defaultValue="" data-testid="employee-create-role">
@@ -70,6 +70,8 @@ export function EmployeeCreateForm({
                           isOperationalAssignableRole({
                             code: role.code,
                             is_external: role.is_external,
+                            is_system: role.is_system,
+                            is_active: role.is_active,
                             allowPrivileged: allowPrivilegedRoles,
                           }),
                         )

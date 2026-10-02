@@ -112,7 +112,7 @@ export const SCHEMA_EMPLOYEE_DEPARTMENTS = [
   "created_at",
 ] as const;
 
-/** 004 roles */
+/** 004 roles + 069 custom-role lifecycle */
 export const SCHEMA_ROLES = [
   "id",
   "organization_id",
@@ -121,6 +121,9 @@ export const SCHEMA_ROLES = [
   "name_en",
   "is_system",
   "is_external",
+  "is_active",
+  "created_by",
+  "department_id",
   "created_at",
   "updated_at",
 ] as const;

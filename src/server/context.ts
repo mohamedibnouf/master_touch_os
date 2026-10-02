@@ -64,7 +64,7 @@ async function loadAuthContext(): Promise<AuthContext | null> {
       .maybeSingle<Employee>(),
     supabase
       .from("user_roles")
-      .select("organization_id, scope_type, scope_id, roles(code, is_external, role_permissions(permission_key))")
+      .select("organization_id, scope_type, scope_id, roles(code, is_external, is_system, is_active, role_permissions(permission_key))")
       .eq("profile_id", user.id)
       .eq("organization_id", organization.id),
   ]);

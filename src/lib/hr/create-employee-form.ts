@@ -71,7 +71,7 @@ function issueMessageAr(issue: z.ZodIssue): string {
   if (field === "initial_password") return "كلمة المرور يجب أن تتكون من 8 أحرف على الأقل.";
   if (field === "employment_type") return "نوع التوظيف غير صالح.";
   if (field === "department_id") return "القسم المحدد غير صالح.";
-  if (field === "role_id") return "صلاحية النظام المحددة غير صالحة.";
+  if (field === "role_id") return "الدور المحدد غير صالح.";
   if (field === "joining_date") return "تاريخ الالتحاق غير صالح.";
   if (field === "job_title_id" || field === "job_title_ar" || field === "job_title_en") {
     return "المسمى الوظيفي غير صالح.";

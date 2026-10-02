@@ -21,7 +21,8 @@ import {
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
-import { isPrivilegedRoleCode } from "@/lib/hr/roles";
+import { assignmentRejectReason, canUnassignUserRole } from "@/lib/rbac/custom-roles";
+import { unassignRoleSchema } from "@/modules/roles/schemas";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -656,21 +657,41 @@ export async function assignRoleAction(
   const supabase = await createServerSupabaseClient();
   const { data: role } = await supabase
     .from("roles")
-    .select("code, is_external")
+    .select("code, is_external, is_system, is_active, organization_id")
     .eq("id", parsed.data.roleId)
-    .maybeSingle<{ code: string; is_external: boolean }>();
+    .maybeSingle<{
+      code: string;
+      is_external: boolean;
+      is_system: boolean;
+      is_active: boolean;
+      organization_id: string | null;
+    }>();
 
-  if (role?.is_external) {
+  const reject = assignmentRejectReason({
+    role,
+    organizationId: ctx.organization.id,
+    allowPrivileged: ctx.profile.is_platform_admin,
+  });
+  if (reject === "missing") {
+    throw new ValidationError("الدور غير موجود.", "The role was not found.");
+  }
+  if (reject === "external") {
     throw new ValidationError(
       "لا يمكن منح الأدوار الخارجية صلاحية داخلية.",
       "External roles cannot be granted internal access.",
     );
   }
-  if (isPrivilegedRoleCode(role?.code) && !ctx.profile.is_platform_admin) {
+  if (reject === "privileged") {
     throw new ValidationError(
       "لا يمكن منح هذا الدور من مسار الموارد البشرية.",
       "That role cannot be assigned from the HR path.",
     );
+  }
+  if (reject === "inactive") {
+    throw new ValidationError("لا يمكن تعيين دور موقوف.", "Inactive roles cannot be assigned.");
+  }
+  if (reject === "cross_org") {
+    throw new ValidationError("لا يمكن تعيين دور من منشأة أخرى.", "Roles cannot be assigned across organizations.");
   }
 
   const { error } = await supabase.from("user_roles").insert({
@@ -685,12 +706,84 @@ export async function assignRoleAction(
   const audit = new AuditService(supabase);
   await audit.log({
     organizationId: ctx.organization.id,
-    action: "user.role.changed",
+    action: "role.assigned",
     entityType: "profile",
     entityId: parsed.data.profileId,
     newValues: { roleId: parsed.data.roleId },
   });
   revalidatePath("/settings");
+  revalidatePath("/settings/roles");
+  revalidatePath("/employees");
+  });
+}
+
+export async function unassignRoleAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إلغاء الدور. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "role.assign");
+    const parsed = unassignRoleSchema.safeParse({
+      profileId: formData.get("profileId"),
+      userRoleId: formData.get("userRoleId"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("تعذر إلغاء الدور.", "The role could not be unassigned.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: grant, error: grantError } = await supabase
+      .from("user_roles")
+      .select("id, profile_id, role_id, organization_id, roles(code, is_system)")
+      .eq("id", parsed.data.userRoleId)
+      .eq("organization_id", ctx.organization.id)
+      .eq("profile_id", parsed.data.profileId)
+      .maybeSingle<{
+        id: string;
+        profile_id: string;
+        role_id: string;
+        organization_id: string;
+        roles: { code: string; is_system: boolean } | { code: string; is_system: boolean }[] | null;
+      }>();
+    if (grantError) throw new DatabaseError(grantError);
+    if (!grant) {
+      throw new ValidationError("التعيين غير موجود.", "The role assignment was not found.");
+    }
+    const role = Array.isArray(grant.roles) ? grant.roles[0] : grant.roles;
+    const { count, error: countError } = await supabase
+      .from("user_roles")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", ctx.organization.id)
+      .eq("profile_id", parsed.data.profileId);
+    if (countError) throw new DatabaseError(countError);
+    const allowed = canUnassignUserRole({
+      actorIsPlatformAdmin: ctx.profile.is_platform_admin,
+      targetRoleCode: role?.code,
+      remainingRoleCount: count ?? 0,
+    });
+    if (!allowed.ok && allowed.reason === "last_role") {
+      throw new ValidationError("لا يمكن إزالة آخر دور عن المستخدم.", "The last role cannot be removed.");
+    }
+    if (!allowed.ok && allowed.reason === "privileged") {
+      throw new ValidationError(
+        "لا يمكن إلغاء أدوار الإدارة المحمية من هذا المسار.",
+        "Protected management roles cannot be unassigned here.",
+      );
+    }
+
+    const { error } = await supabase.from("user_roles").delete().eq("id", grant.id).eq("organization_id", ctx.organization.id);
+    if (error) throw new DatabaseError(error);
+
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "role.unassigned",
+      entityType: "profile",
+      entityId: parsed.data.profileId,
+      previousValues: { roleId: grant.role_id, code: role?.code },
+    });
+    revalidatePath("/settings");
+    revalidatePath("/settings/roles");
+    revalidatePath("/employees");
   });
 }
 

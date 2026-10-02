@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Field, PageHeader, Select } from "@/components/ui/primitives";
@@ -10,7 +11,7 @@ import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 
-type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean };
+type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
 type MemberRow = {
   profile_id: string;
   status: string;
@@ -36,7 +37,7 @@ export default async function SettingsPage() {
   const repo = new CoreRepository(supabase);
   const [users, roles, audit] = await Promise.all([
     canManageUsers ? repo.listUsers(ctx.organization.id) : Promise.resolve([]),
-    canManageUsers ? repo.listRoles() : Promise.resolve([]),
+    canManageUsers ? repo.listRoles(ctx.organization.id) : Promise.resolve([]),
     hasPermission(ctx, "audit.read") ? repo.listAudit(ctx.organization.id, 15) : Promise.resolve([]),
   ]);
 
@@ -45,7 +46,20 @@ export default async function SettingsPage() {
 
   return (
     <PageContainer className="space-y-5">
-      <PageHeader title="الإعدادات" description="المنشأة وإدارة المستخدمين وسجل التدقيق" />
+      <PageHeader
+        title="الإعدادات"
+        description="المنشأة وإدارة المستخدمين وسجل التدقيق"
+        actions={
+          hasPermission(ctx, "role.read") || hasPermission(ctx, "role.manage") ? (
+            <Link
+              href="/settings/roles"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-4 text-sm font-medium text-navy md:min-h-10"
+            >
+              الأدوار والصلاحيات
+            </Link>
+          ) : null
+        }
+      />
 
       <Card className="mb-6">
         <h2 className="text-base font-semibold text-navy">المنشأة</h2>
@@ -105,7 +119,7 @@ export default async function SettingsPage() {
                       {hasPermission(ctx, "role.assign") ? (
                         <ServerActionForm action={assignRoleAction} className="flex items-end gap-2">
                           <input type="hidden" name="profileId" value={profile.id} />
-                          <Field label="صلاحية النظام">
+                          <Field label="الدور والصلاحيات">
                             <Select name="roleId" required defaultValue="">
                               <option value="" disabled>
                                 اختر
@@ -115,6 +129,8 @@ export default async function SettingsPage() {
                                   isOperationalAssignableRole({
                                     code: role.code,
                                     is_external: role.is_external,
+                                    is_system: role.is_system,
+                                    is_active: role.is_active,
                                     allowPrivileged: ctx.profile.is_platform_admin,
                                   }),
                                 )

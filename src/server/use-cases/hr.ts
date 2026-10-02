@@ -26,6 +26,7 @@ import {
   isTrustedBaseEmployeeRole,
   resolveCreateEmployeeRolePlan,
 } from "@/lib/hr/roles";
+import { assignmentRejectReason } from "@/lib/rbac/custom-roles";
 import {
   assertCreateEmployeeAuthRequest,
   buildCreateEmployeeAuthRequest,
@@ -143,9 +144,15 @@ export async function createEmployeeAction(
     }
     const { data: roleRow } = await admin
       .from("roles")
-      .select("code, is_external")
+      .select("code, is_external, is_system, is_active, organization_id")
       .eq("id", rolePlan.roleId)
-      .maybeSingle<{ code: string; is_external: boolean }>();
+      .maybeSingle<{
+        code: string;
+        is_external: boolean;
+        is_system: boolean;
+        is_active: boolean;
+        organization_id: string | null;
+      }>();
     const roleBlock = hrCreateRoleAssignmentError({
       roleId: rolePlan.roleId,
       canAssignRole: true,
@@ -157,6 +164,17 @@ export async function createEmployeeAction(
     }
     if (roleBlock === "privileged") {
       throw new ValidationError("لا يمكن منح هذا الدور من مسار الموارد البشرية.", "That role cannot be assigned from the HR path.");
+    }
+    const orgReject = assignmentRejectReason({
+      role: roleRow,
+      organizationId: ctx.organization.id,
+      allowPrivileged: ctx.profile.is_platform_admin,
+    });
+    if (orgReject === "inactive") {
+      throw new ValidationError("لا يمكن تعيين دور موقوف.", "Inactive roles cannot be assigned.");
+    }
+    if (orgReject === "cross_org" || orgReject === "missing") {
+      throw new ValidationError("صلاحية النظام المحددة غير صالحة.", "The selected role is not valid.");
     }
     roleIdToAssign = rolePlan.roleId;
   } else if (rolePlan.mode === "default_employee") {

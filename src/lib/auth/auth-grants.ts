@@ -6,6 +6,8 @@ export type AuthRolePermissionRow = { permission_key: string };
 export type AuthRoleEmbed = {
   code: string;
   is_external: boolean;
+  is_system?: boolean;
+  is_active?: boolean;
   role_permissions?: AuthRolePermissionRow[] | null;
 };
 
@@ -24,6 +26,9 @@ export function mapUserRoleRowsToGrants(rows: AuthUserRoleRow[] | null | undefin
   return (rows ?? []).flatMap((raw) => {
     const role = Array.isArray(raw.roles) ? raw.roles[0] : raw.roles;
     if (!role?.code) {
+      return [];
+    }
+    if (role.is_system !== true && role.is_active === false) {
       return [];
     }
     const permissionRows = Array.isArray(role.role_permissions) ? role.role_permissions : [];

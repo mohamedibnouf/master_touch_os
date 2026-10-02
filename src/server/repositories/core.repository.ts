@@ -488,14 +488,22 @@ export class CoreRepository {
     }));
   }
 
-  async listRoles() {
-    const { data, error } = await this.supabase
+  async listRoles(organizationId: string) {
+    const system = await this.supabase
       .from("roles")
       .select(ROLE_LIST_COLUMNS)
       .eq("is_system", true)
       .order("name_ar");
-    if (error) fail(error);
-    return data ?? [];
+    if (system.error) fail(system.error);
+    const custom = await this.supabase
+      .from("roles")
+      .select(ROLE_LIST_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("is_system", false)
+      .eq("is_active", true)
+      .order("name_ar");
+    if (custom.error) fail(custom.error);
+    return [...(system.data ?? []), ...(custom.data ?? [])];
   }
 
   async dashboard(

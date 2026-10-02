@@ -28,6 +28,7 @@ const SIDEBAR_HREFS = [
   "/management",
   "/management/analyst",
   "/settings",
+  "/settings/roles",
 ];
 
 const FINANCE_SUB = [

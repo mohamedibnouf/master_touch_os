@@ -85,6 +85,7 @@ export async function AppShell({
     notifications: g("notification.read"),
     search: g("document.read") || g("project.read") || g("purchase_request.read"),
     settings: g("user.read") || g("settings.manage"),
+    roles: g("role.manage") || g("role.read"),
     analyst: g("reports.management.read"),
   };
 

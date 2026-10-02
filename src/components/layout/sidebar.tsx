@@ -17,6 +17,7 @@ import {
   Stamp,
   Users,
   Wrench,
+  Shield,
   ShoppingCart,
   Wallet,
   Clock,
@@ -90,7 +91,10 @@ const groups: NavGroup[] = [
   {
     id: "system",
     label: "النظام",
-    items: [{ href: "/settings", label: "الإعدادات", icon: Settings, show: "settings" }],
+    items: [
+      { href: "/settings", label: "الإعدادات", icon: Settings, show: "settings" },
+      { href: "/settings/roles", label: "الأدوار والصلاحيات", icon: Shield, show: "roles" },
+    ],
   },
 ];
 

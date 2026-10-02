@@ -230,11 +230,11 @@ describe("job title UI copy", () => {
   const createUi = readFileSync(join(process.cwd(), "src/components/hr/employee-create-form.tsx"), "utf8");
   const titleFields = readFileSync(join(process.cwd(), "src/components/hr/employee-title-fields.tsx"), "utf8");
 
-  it("orders الإدارة then المسمى الوظيفي then صلاحية النظام", () => {
-    expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم صلاحية النظام");
+  it("orders الإدارة then المسمى الوظيفي then الدور والصلاحيات", () => {
+    expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم الدور والصلاحيات");
     expect(titleFields).toContain('label="الإدارة"');
     expect(titleFields).toContain('label="المسمى الوظيفي"');
-    expect(createUi).toContain("صلاحية النظام");
+    expect(createUi).toContain("الدور والصلاحيات");
     expect(createUi).not.toContain('name="job_title_ar"');
   });
 

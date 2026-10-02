@@ -9,9 +9,12 @@ export function isPrivilegedRoleCode(code: string | null | undefined): boolean {
 export function isOperationalAssignableRole(input: {
   code?: string | null;
   is_external?: boolean;
+  is_active?: boolean;
+  is_system?: boolean;
   allowPrivileged: boolean;
 }): boolean {
   if (input.is_external) return false;
+  if (input.is_system === false && input.is_active === false) return false;
   if (isPrivilegedRoleCode(input.code) && !input.allowPrivileged) return false;
   return true;
 }
