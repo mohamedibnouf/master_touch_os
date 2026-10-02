@@ -5,6 +5,7 @@ import { AttendanceRepository } from "@/server/repositories/attendance.repositor
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
+import { homeShowsSelfServiceCard } from "@/lib/home/self-service";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
@@ -18,8 +19,14 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
   const attendanceToday = new Date().toISOString().slice(0, 10);
   const attRepo = new AttendanceRepository(supabase);
 
-  const canViewAttendance = Boolean(ctx.employee && hasPermission(ctx, "attendance.view_self"));
-  const canViewLeave = Boolean(ctx.employee && hasPermission(ctx, "leave.view_self"));
+  const canViewAttendance = homeShowsSelfServiceCard({
+    hasEmployeeRow: Boolean(ctx.employee),
+    permissionGranted: hasPermission(ctx, "attendance.view_self"),
+  });
+  const canViewLeave = homeShowsSelfServiceCard({
+    hasEmployeeRow: Boolean(ctx.employee),
+    permissionGranted: hasPermission(ctx, "leave.view_self"),
+  });
 
   const [record, assignment, geofenceReady, leavePack] = await Promise.all([
     canViewAttendance && ctx.employee
@@ -55,8 +62,8 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
     Boolean(attendance?.check_in_at) &&
     !attendance?.check_out_at;
 
-  const showAttendance = hasPermission(ctx, "attendance.view_self");
-  const showLeave = hasPermission(ctx, "leave.view_self");
+  const showAttendance = canViewAttendance;
+  const showLeave = canViewLeave;
   if (!showAttendance && !showLeave) return null;
 
   const checkedIn = Boolean(attendance?.check_in_at);

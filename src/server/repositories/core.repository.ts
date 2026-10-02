@@ -674,7 +674,7 @@ export class CoreRepository {
       pendingActions.push({
         id: row.id,
         kind: "ncr",
-        title: `${row.ncr_number} — ${row.description.slice(0, 60)}`,
+        title: `${row.ncr_number} — ${(row.description ?? "").slice(0, 60)}`,
         entityType: "ncr",
         entityId: row.id,
         dueAt: row.target_closure_date,

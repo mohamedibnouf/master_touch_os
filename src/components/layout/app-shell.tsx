@@ -3,6 +3,8 @@ import type { AuthContext } from "@/types/models";
 import { can } from "@/lib/permissions/evaluate";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isAppError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import type { AppNavFlags } from "./nav-flags";
 import { AppShellFrame } from "./app-shell-frame";
 import { HeaderNotifications } from "./header-notifications";
@@ -18,9 +20,19 @@ function HeaderBellFallback() {
 }
 
 async function HeaderNotificationsLoader({ userId }: { userId: string }) {
-  const supabase = await createServerSupabaseClient();
-  const repo = new CoreRepository(supabase);
-  const { unreadCount, notices } = await repo.listHeaderNotifications(userId);
+  let unreadCount = 0;
+  let notices: Awaited<ReturnType<CoreRepository["listHeaderNotifications"]>>["notices"] = [];
+  try {
+    const supabase = await createServerSupabaseClient();
+    const repo = new CoreRepository(supabase);
+    const loaded = await repo.listHeaderNotifications(userId);
+    unreadCount = loaded.unreadCount;
+    notices = loaded.notices;
+  } catch (error) {
+    logger.error("header notifications failed", {
+      code: isAppError(error) ? error.code : null,
+    });
+  }
   return <HeaderNotifications unreadCount={unreadCount} items={notices} />;
 }
 

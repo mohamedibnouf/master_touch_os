@@ -2,8 +2,10 @@ import "server-only";
 
 import { cache } from "react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isPermissionKey, type PermissionKey } from "@/lib/permissions/catalog";
-import { listGrantedPermissions, type RoleGrant, type RoleScopeType } from "@/lib/permissions/evaluate";
+import type { PermissionKey } from "@/lib/permissions/catalog";
+import { listGrantedPermissions } from "@/lib/permissions/evaluate";
+import { mapUserRoleRowsToGrants, type AuthUserRoleRow } from "@/lib/auth/auth-grants";
+import { logger } from "@/lib/logger";
 import type { AuthContext, Employee, Organization, Profile } from "@/types/models";
 import type { MembershipStatus } from "@/types/enums";
 import {
@@ -11,17 +13,6 @@ import {
   AUTH_ORGANIZATION_COLUMNS,
   AUTH_PROFILE_COLUMNS,
 } from "@/lib/query-projections";
-
-type RoleRow = {
-  organization_id: string;
-  scope_type: RoleScopeType;
-  scope_id: string | null;
-  roles: {
-    code: string;
-    is_external: boolean;
-    role_permissions: Array<{ permission_key: string }>;
-  } | null;
-};
 
 async function loadAuthContext(): Promise<AuthContext | null> {
   const supabase = await createServerSupabaseClient();
@@ -69,6 +60,7 @@ async function loadAuthContext(): Promise<AuthContext | null> {
       .select(AUTH_EMPLOYEE_COLUMNS)
       .eq("organization_id", organization.id)
       .eq("profile_id", user.id)
+      .limit(1)
       .maybeSingle<Employee>(),
     supabase
       .from("user_roles")
@@ -77,30 +69,12 @@ async function loadAuthContext(): Promise<AuthContext | null> {
       .eq("organization_id", organization.id),
   ]);
 
-  const employee = employeeResult.data;
-  const roleRows = roleResult.data;
+  if (roleResult.error) {
+    logger.error("auth user_roles query failed", { code: roleResult.error.code ?? null });
+  }
 
-  const grants: RoleGrant[] = (roleRows ?? []).flatMap((raw) => {
-    const row = raw as unknown as RoleRow & {
-      roles: RoleRow["roles"] | Array<NonNullable<RoleRow["roles"]>>;
-    };
-    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    if (!role) {
-      return [];
-    }
-    return [
-      {
-        roleCode: role.code,
-        isExternal: role.is_external,
-        organizationId: row.organization_id,
-        scopeType: row.scope_type,
-        scopeId: row.scope_id,
-        permissions: role.role_permissions
-          .map((item) => item.permission_key)
-          .filter(isPermissionKey),
-      },
-    ];
-  });
+  const employee = employeeResult.data ?? null;
+  const grants = mapUserRoleRowsToGrants(roleResult.data as AuthUserRoleRow[] | null);
 
   if (profile.is_platform_admin) {
     const { ALL_INTERNAL_PERMISSIONS } = await import("@/lib/permissions/catalog");

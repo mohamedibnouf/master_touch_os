@@ -5,6 +5,9 @@
 
 export const EMPLOYEE_LOGIN_FAILURE_AR = "الرقم الوظيفي أو كلمة المرور غير صحيحة.";
 
+/** Canonical destination after successful sign-in. Login ignores middleware `next`. */
+export const POST_LOGIN_PATH = "/";
+
 export const LOGIN_RATE_LIMIT_AR = "تعذر إتمام تسجيل الدخول حالياً. حاول بعد قليل.";
 
 export type LoginCandidate = {

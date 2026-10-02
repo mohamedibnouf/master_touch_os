@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/primitives";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
+import { logger } from "@/lib/logger";
 import { commercialEntityHref } from "@/lib/commercial/entity-routes";
 import { pendingActionHref } from "@/lib/work-item-href";
 import { notificationEntityHref } from "@/lib/notifications/href";
@@ -249,9 +250,15 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
 
   procActions.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1));
 
-  const recentNotes = hasPermission(ctx, "notification.read")
-    ? await repo.listNotifications(ctx.userId, 5)
-    : [];
+  let recentNotes: Awaited<ReturnType<CoreRepository["listNotifications"]>> = [];
+  if (hasPermission(ctx, "notification.read")) {
+    try {
+      recentNotes = await repo.listNotifications(ctx.userId, 5);
+    } catch {
+      logger.error("home notifications list failed", { code: "DATABASE" });
+      recentNotes = [];
+    }
+  }
 
   return { dashboard, procActions, recentNotes, showOrgStats, canReadAudit };
 });
@@ -333,7 +340,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
     hasPermission(ctx, "project.read")
       ? { href: "/projects", label: "المشاريع", Icon: FolderKanban }
       : null,
-    hasPermission(ctx, "leave.request")
+    hasPermission(ctx, "leave.request") && ctx.employee
       ? { href: "/leave/new", label: "طلب إجازة", Icon: CalendarPlus }
       : null,
     hasPermission(ctx, "reports.management.read")

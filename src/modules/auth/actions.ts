@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getServerEnv } from "@/lib/env";
@@ -9,6 +10,7 @@ import { bootstrapAdminIfNeeded } from "@/server/use-cases/platform";
 import {
   EMPLOYEE_LOGIN_FAILURE_AR,
   LOGIN_RATE_LIMIT_AR,
+  POST_LOGIN_PATH,
   assertLoginRateLimit,
   isEmailIdentifier,
   isEmployeeLoginAllowed,
@@ -111,7 +113,8 @@ export async function signInAction(
     await bootstrapAdminIfNeeded(email);
   }
 
-  redirect("/");
+  revalidatePath("/", "layout");
+  redirect(POST_LOGIN_PATH);
 }
 
 export async function signOutAction() {
