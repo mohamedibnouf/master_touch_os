@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignRoleAction, setUserActiveAction } from "@/server/use-cases/platform";
+import { saveManagementNotificationEmailAction } from "@/server/use-cases/notification-preferences";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
@@ -33,6 +34,7 @@ export default async function SettingsPage() {
     redirect("/");
   }
 
+  const canManageSettings = hasPermission(ctx, "settings.manage");
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const [users, roles, audit] = await Promise.all([
@@ -40,6 +42,14 @@ export default async function SettingsPage() {
     canManageUsers ? repo.listRoles(ctx.organization.id) : Promise.resolve([]),
     hasPermission(ctx, "audit.read") ? repo.listAudit(ctx.organization.id, 15) : Promise.resolve([]),
   ]);
+
+  const { data: orgSettings } = canManageSettings
+    ? await supabase
+        .from("organizations")
+        .select("management_notification_email")
+        .eq("id", ctx.organization.id)
+        .maybeSingle<{ management_notification_email: string | null }>()
+    : { data: null };
 
   const roleRows = roles as RoleRow[];
   const members = users as unknown as MemberRow[];
@@ -88,6 +98,27 @@ export default async function SettingsPage() {
           </div>
         </dl>
       </Card>
+
+      {canManageSettings ? (
+        <Card className="mb-6" data-testid="management-notification-email">
+          <h2 className="text-base font-semibold text-navy">بريد تنبيهات الإدارة</h2>
+          <p className="mt-2 text-sm text-muted">
+            يُستخدم هذا البريد لاستقبال إشعارات الإدارة عند تفعيل خدمة البريد الإلكتروني. هذا ليس بريد تسجيل الدخول وليس تفضيل الموظف الشخصي. اتركه فارغاً لتعطيل بريد الإدارة.
+          </p>
+          <ServerActionForm action={saveManagementNotificationEmailAction} className="mt-4 max-w-md space-y-3">
+            <Field label="بريد تنبيهات الإدارة" hint="اختياري — مثال: operations@notify.example.com">
+              <Input
+                name="management_notification_email"
+                type="email"
+                dir="ltr"
+                defaultValue={orgSettings?.management_notification_email ?? ""}
+                autoComplete="off"
+              />
+            </Field>
+            <Button type="submit">حفظ</Button>
+          </ServerActionForm>
+        </Card>
+      ) : null}
 
       {canManageUsers ? (
         <Card className="mb-6">

@@ -75,6 +75,7 @@ describe("orchestrator", () => {
     await o.emit(sampleEvent());
     const mail = store.deliveries.find((d) => d.channel === "email");
     expect(mail).toBeUndefined();
+    expect(store.deliveries.some((d) => d.channel === "in_app")).toBe(true);
   });
 
   it("retries transient email failure without duplicating the in-app row", async () => {
@@ -88,10 +89,10 @@ describe("orchestrator", () => {
     const delivery = store.deliveries.find((d) => d.channel === "email");
     expect(delivery).toBeTruthy();
     const first = await o.processDelivery(delivery!);
-    expect(first).toBe("failed");
+    expect(first.status).toBe("failed");
     expect(store.notifications).toHaveLength(1);
     const second = await o.processDelivery({ ...delivery!, attemptCount: 2, status: "failed" });
-    expect(second).toBe("sent");
+    expect(second.status).toBe("sent");
     expect(email.sent).toHaveLength(1);
   });
 });
@@ -262,7 +263,7 @@ describe("mock multi-channel pipeline", () => {
     expect(emitted.notificationIds).toHaveLength(1);
     const emailRow = store.deliveries.find((d) => d.channel === "email")!;
     const sent = await orch.processDelivery(emailRow);
-    expect(sent).toBe("sent");
+    expect(sent.status).toBe("sent");
     expect(email.sent[0]?.text).not.toMatch(/iban|راتب|\d{8,}/i);
     expect(email.sent[0]?.text).toContain("داخل النظام");
   });

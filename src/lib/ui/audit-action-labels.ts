@@ -80,6 +80,7 @@ const ACTION_LABELS: Record<string, string> = {
   "purchase_order.approved": "تم اعتماد أمر شراء",
   "purchase_order.issued": "تم إصدار أمر شراء",
   "notification.preference.changed": "تم تحديث تفضيلات التنبيه",
+  "organization.management_notification_email.changed": "تم تحديث بريد تنبيهات الإدارة",
   "push.subscription.created": "تم تفعيل إشعارات الجهاز",
   "push.subscription.revoked": "أُلغي اشتراك الإشعارات",
 };

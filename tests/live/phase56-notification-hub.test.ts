@@ -767,7 +767,7 @@ describe.skipIf(!configured)("live Phase 5.6 notification hub (062 applied)", ()
     );
     const now = new Date();
     const outcome = await orch.processDelivery(store.deliveries[0]);
-    expect(outcome).toBe("failed");
+    expect(outcome.status).toBe("failed");
     const next = nextRetryAt(row.attempt_count, now);
     const admin = adminClient();
     await admin

@@ -8,7 +8,8 @@ function authorized(req: Request): boolean {
   return isNotificationsCronAuthorized(req.headers.get("authorization"));
 }
 
-export async function POST(req: Request) {
+/** Vercel Cron invokes GET. POST remains for authorized operational/live callers. */
+export async function GET(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -16,6 +17,6 @@ export async function POST(req: Request) {
   return NextResponse.json(result);
 }
 
-export async function GET(req: Request) {
-  return POST(req);
+export async function POST(req: Request) {
+  return GET(req);
 }

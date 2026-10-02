@@ -1,10 +1,13 @@
 import type { NotificationEvent } from "./catalog";
-import { EVENT_CATEGORY, notificationEventSchema } from "./catalog";
+import { notificationEventSchema } from "./catalog";
 import type { ActiveMember, PreferenceRow } from "./catalog";
-import { resolveActiveRecipients, selectChannels } from "./policy";
+import { planDeliveryChannels, resolveActiveRecipients } from "./policy";
 import { assertNoSensitivePayload, redactNotificationText, safeNotificationHref } from "./safety";
 import type { EmailProvider, PushProvider, WhatsAppProvider } from "./providers";
 import { isPermanentProviderError, MAX_DELIVERY_ATTEMPTS, nextRetryAt } from "./schedule";
+import { emailAudienceFor } from "./event-compat";
+import { buildNotificationEmailHref, resolveEmailAppBaseUrl } from "./app-url";
+import { renderOperationalEmail } from "./email-render";
 
 export type HubNotification = {
   id: string;
@@ -26,6 +29,14 @@ export type HubDelivery = {
   channel: "in_app" | "email" | "whatsapp" | "push";
   status: string;
   attemptCount: number;
+  providerMessageId?: string | null;
+  lastErrorCode?: string | null;
+};
+
+export type DeliveryOutcome = {
+  status: "sent" | "failed" | "cancelled";
+  providerMessageId?: string | null;
+  lastErrorCode?: string | null;
 };
 
 export type HubStore = {
@@ -46,10 +57,17 @@ export type HubStore = {
   listActiveMembers(organizationId: string, profileIds: string[]): Promise<ActiveMember[]>;
   listPreferences(organizationId: string, profileIds: string[]): Promise<PreferenceRow[]>;
   getRecipientContact(profileId: string): Promise<{ email: string | null; phone: string | null; name: string | null }>;
+  getNotification(notificationId: string): Promise<HubNotification | null>;
+  getManagementEmail(organizationId: string): Promise<string | null>;
   listPushEndpoints(organizationId: string, profileId: string): Promise<Array<{ endpoint: string }>>;
   markDelivery(
     deliveryId: string,
-    patch: { status: string; lastErrorCode?: string | null; providerMessageId?: string | null; nextAttemptAt?: string | null },
+    patch: {
+      status: string;
+      lastErrorCode?: string | null;
+      providerMessageId?: string | null;
+      nextAttemptAt?: string | null;
+    },
   ): Promise<void>;
   listPendingDeliveries(limit: number): Promise<HubDelivery[]>;
   audit(action: string, entityType: string, entityId: string, organizationId: string): Promise<void>;
@@ -91,17 +109,19 @@ export class NotificationOrchestrator {
     });
     const skipped = event.recipientIds.filter((id) => !recipients.includes(id));
     const prefs = await this.store.listPreferences(event.organizationId, recipients);
-    const category = EVENT_CATEGORY[event.eventType];
     const notificationIds: string[] = [];
     let deliveriesQueued = 0;
 
     for (const recipientId of recipients) {
-      const channels = selectChannels({
-        category,
-        preferences: prefs,
+      const member = members.find((m) => m.profileId === recipientId);
+      const personalEmailAllowed = Boolean(member && member.status === "active" && member.isActive);
+      const channels = planDeliveryChannels({
+        type: event.eventType,
         recipientId,
-        pushAvailable: this.push.enabled,
+        preferences: prefs,
+        personalEmailAllowed,
         emailAvailable: this.email.enabled,
+        pushAvailable: this.push.enabled,
         whatsappAvailable: this.whatsapp.enabled,
       });
       const row = await this.store.upsertNotification({
@@ -128,34 +148,25 @@ export class NotificationOrchestrator {
     return { notificationIds, skipped, deliveriesQueued };
   }
 
-  async processDelivery(delivery: HubDelivery): Promise<"sent" | "failed" | "cancelled"> {
+  async processDelivery(delivery: HubDelivery): Promise<DeliveryOutcome> {
     if (delivery.attemptCount > MAX_DELIVERY_ATTEMPTS) {
       await this.store.markDelivery(delivery.id, { status: "cancelled", lastErrorCode: "max_attempts" });
-      return "cancelled";
+      return { status: "cancelled", lastErrorCode: "max_attempts" };
     }
     if (delivery.channel === "in_app") {
       await this.store.markDelivery(delivery.id, { status: "delivered" });
-      return "sent";
+      return { status: "sent" };
     }
 
     const contact = await this.store.getRecipientContact(delivery.recipientId);
     let result: { ok: true; providerMessageId?: string } | { ok: false; code: string; retry: boolean };
 
     if (delivery.channel === "email") {
-      if (!this.email.enabled || !contact.email) {
-        await this.store.markDelivery(delivery.id, { status: "cancelled", lastErrorCode: "disabled" });
-        return "cancelled";
-      }
-      result = await this.email.send({
-        to: contact.email,
-        subject: "Master Touch OS",
-        text: "يوجد تنبيه تشغيلي يحتاج متابعتك داخل النظام.",
-        href: this.appBaseUrl,
-      });
+      result = await this.sendEmail(delivery, contact.email);
     } else if (delivery.channel === "whatsapp") {
       if (!this.whatsapp.enabled || !contact.phone) {
         await this.store.markDelivery(delivery.id, { status: "cancelled", lastErrorCode: "disabled" });
-        return "cancelled";
+        return { status: "cancelled", lastErrorCode: "disabled" };
       }
       result = await this.whatsapp.send({
         toE164: contact.phone,
@@ -166,7 +177,7 @@ export class NotificationOrchestrator {
       const endpoints = await this.store.listPushEndpoints(delivery.organizationId, delivery.recipientId);
       if (!this.push.enabled || endpoints.length === 0) {
         await this.store.markDelivery(delivery.id, { status: "cancelled", lastErrorCode: "disabled" });
-        return "cancelled";
+        return { status: "cancelled", lastErrorCode: "disabled" };
       }
       result = await this.push.send({
         endpoint: endpoints[0].endpoint,
@@ -180,14 +191,25 @@ export class NotificationOrchestrator {
       await this.store.markDelivery(delivery.id, {
         status: delivery.channel === "email" ? "sent" : "delivered",
         providerMessageId: result.providerMessageId ?? null,
+        lastErrorCode: null,
       });
       await this.store.audit("notification.delivery.sent", "notification_delivery", delivery.id, delivery.organizationId);
-      return "sent";
+      return { status: "sent", providerMessageId: result.providerMessageId ?? null };
     }
     if (!result.retry || isPermanentProviderError(result.code)) {
-      await this.store.markDelivery(delivery.id, { status: "failed", lastErrorCode: result.code, nextAttemptAt: null });
+      await this.store.markDelivery(delivery.id, {
+        status: result.code === "disabled" || result.code === "missing_management_destination" || result.code === "missing_email" ? "cancelled" : "failed",
+        lastErrorCode: result.code,
+        nextAttemptAt: null,
+      });
       await this.store.audit("notification.delivery.failed", "notification_delivery", delivery.id, delivery.organizationId);
-      return "failed";
+      const terminal =
+        result.code === "disabled" ||
+        result.code === "missing_management_destination" ||
+        result.code === "missing_email"
+          ? "cancelled"
+          : "failed";
+      return { status: terminal, lastErrorCode: result.code };
     }
     const next = nextRetryAt(delivery.attemptCount);
     await this.store.markDelivery(delivery.id, {
@@ -196,6 +218,42 @@ export class NotificationOrchestrator {
       nextAttemptAt: next ? next.toISOString() : null,
     });
     await this.store.audit("notification.delivery.retried", "notification_delivery", delivery.id, delivery.organizationId);
-    return "failed";
+    return { status: "failed", lastErrorCode: result.code };
+  }
+
+  private async sendEmail(
+    delivery: HubDelivery,
+    personalEmail: string | null,
+  ): Promise<{ ok: true; providerMessageId?: string } | { ok: false; code: string; retry: boolean }> {
+    if (!this.email.enabled) return { ok: false, code: "disabled", retry: false };
+    const notification = await this.store.getNotification(delivery.notificationId);
+    const type = notification?.eventType ?? "";
+    const audience = emailAudienceFor(type);
+    let to: string | null = null;
+    if (audience === "management") {
+      to = await this.store.getManagementEmail(delivery.organizationId);
+      if (!to) return { ok: false, code: "missing_management_destination", retry: false };
+    } else {
+      to = personalEmail;
+      if (!to) return { ok: false, code: "missing_email", retry: false };
+    }
+    const requireHttps = this.email.name === "resend";
+    const base = resolveEmailAppBaseUrl(this.appBaseUrl, { requirePublicHttps: requireHttps });
+    if (!base.ok) return { ok: false, code: base.code, retry: false };
+    const href = buildNotificationEmailHref(base.url, notification?.href);
+    const rendered = renderOperationalEmail({
+      title: notification?.title ?? "تنبيه تشغيلي",
+      body: notification?.body ?? "يوجد تنبيه يحتاج متابعتك داخل النظام.",
+      href,
+    });
+    const replyTo = process.env.NOTIFICATION_EMAIL_REPLY_TO?.trim() || null;
+    return this.email.send({
+      to,
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html,
+      href,
+      replyTo,
+    });
   }
 }

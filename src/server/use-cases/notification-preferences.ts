@@ -8,6 +8,7 @@ import { ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { canDisablePreference } from "@/modules/notifications/policy";
+import { normalizeManagementNotificationEmail, managementNotificationEmailCheckPasses } from "@/modules/notifications/management-email";
 import type { NotificationCategory } from "@/modules/notifications/catalog";
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CHANNELS } from "@/modules/notifications/catalog";
 import { validatePushSubscription } from "@/modules/notifications/safety";
@@ -57,6 +58,46 @@ export async function saveNotificationPreferenceAction(
     newValues: { category, channel, enabled },
   });
   revalidatePath("/notifications/preferences");
+  });
+}
+
+export async function saveManagementNotificationEmailAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ بريد الإدارة. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "settings.manage");
+    const value = normalizeManagementNotificationEmail(String(formData.get("management_notification_email") ?? ""));
+    if (value && !managementNotificationEmailCheckPasses(value)) {
+      throw new ValidationError("البريد غير صالح.", "The email is not valid.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: previous } = await supabase
+      .from("organizations")
+      .select("management_notification_email")
+      .eq("id", ctx.organization.id)
+      .maybeSingle<{ management_notification_email: string | null }>();
+    const previousNorm = normalizeManagementNotificationEmail(previous?.management_notification_email);
+    if (previousNorm === value) {
+      revalidatePath("/settings");
+      return;
+    }
+    const { error } = await supabase
+      .from("organizations")
+      .update({ management_notification_email: value })
+      .eq("id", ctx.organization.id);
+    if (error) {
+      throw new ValidationError("تعذر حفظ البريد.", "Could not save the email.");
+    }
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "organization.management_notification_email.changed",
+      entityType: "organization",
+      entityId: ctx.organization.id,
+      previousValues: { set: previousNorm !== null },
+      newValues: { set: value !== null },
+    });
+    revalidatePath("/settings");
   });
 }
 

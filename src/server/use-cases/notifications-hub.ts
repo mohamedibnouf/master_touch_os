@@ -140,7 +140,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       createEmailProvider(),
       createWhatsAppProvider(),
       createPushProvider(),
-      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+      process.env.NEXT_PUBLIC_APP_URL ?? "",
     );
     for (const row of claimed as Array<{
       id: string;
@@ -159,6 +159,37 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
         deliveries += 1;
         continue;
       }
+      const { data: note } = await admin
+        .from("notifications")
+        .select("id, organization_id, recipient_profile_id, event_type, type, title, message, href, dedup_key")
+        .eq("id", row.notification_id)
+        .eq("organization_id", row.organization_id)
+        .maybeSingle();
+      store.notifications = note
+        ? [
+            {
+              id: note.id as string,
+              organizationId: note.organization_id as string,
+              recipientId: note.recipient_profile_id as string,
+              eventType: String(note.event_type ?? note.type ?? ""),
+              dedupKey: String(note.dedup_key ?? ""),
+              title: String(note.title ?? ""),
+              body: String(note.message ?? ""),
+              href: (note.href as string | null) ?? null,
+              created: false,
+            },
+          ]
+        : [];
+      const destRes = await admin
+        .from("organizations")
+        .select("management_notification_email")
+        .eq("id", row.organization_id)
+        .maybeSingle();
+      const managementEmail =
+        destRes.error || typeof destRes.data?.management_notification_email !== "string"
+          ? null
+          : destRes.data.management_notification_email;
+      store.managementEmail.set(row.organization_id, managementEmail);
       store.deliveries = [
         {
           id: row.id,
@@ -192,20 +223,22 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       }
       const outcome = await orch.processDelivery(store.deliveries[0]);
       const patch: Record<string, unknown> = { updated_at: now.toISOString() };
-      if (outcome === "sent") {
+      if (outcome.status === "sent") {
         patch.status = row.channel === "email" ? "sent" : "delivered";
         if (row.channel === "email") patch.sent_at = now.toISOString();
         else patch.delivered_at = now.toISOString();
         patch.next_attempt_at = null;
-      } else if (outcome === "cancelled") {
+        patch.last_error_code = null;
+        if (outcome.providerMessageId) patch.provider_message_id = outcome.providerMessageId;
+      } else if (outcome.status === "cancelled") {
         patch.status = "cancelled";
         patch.next_attempt_at = null;
-        patch.last_error_code = "disabled";
+        patch.last_error_code = outcome.lastErrorCode ?? "disabled";
       } else {
         patch.status = "failed";
         const next = nextRetryAt(row.attempt_count, now);
         patch.next_attempt_at = next ? next.toISOString() : null;
-        patch.last_error_code = "transient";
+        patch.last_error_code = outcome.lastErrorCode ?? "transient";
       }
       await admin.from("notification_deliveries").update(patch).eq("id", row.id);
       deliveries += 1;

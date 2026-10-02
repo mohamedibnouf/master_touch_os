@@ -1,5 +1,6 @@
 import type { ActiveMember, HubChannel, NotificationCategory, PreferenceRow } from "./catalog";
 import { MANDATORY_IN_APP_CATEGORIES, SENSITIVE_CATEGORIES } from "./catalog";
+import { categoryForNotificationType, emailAudienceFor } from "./event-compat";
 
 export function resolveActiveRecipients(input: {
   organizationId: string;
@@ -62,4 +63,35 @@ export function selectChannels(input: {
 export function canDisablePreference(category: NotificationCategory, channel: HubChannel, enabled: boolean): boolean {
   if (channel === "in_app" && !enabled && MANDATORY_IN_APP_CATEGORIES.has(category)) return false;
   return true;
+}
+
+/** Queue-time channel plan. Email rows are created only when the email provider is enabled. */
+export function planDeliveryChannels(input: {
+  type: string;
+  recipientId: string;
+  preferences: PreferenceRow[];
+  personalEmailAllowed: boolean;
+  emailAvailable: boolean;
+  pushAvailable: boolean;
+  whatsappAvailable: boolean;
+}): HubChannel[] {
+  const category = categoryForNotificationType(input.type);
+  const selected = selectChannels({
+    category,
+    preferences: input.preferences,
+    recipientId: input.recipientId,
+    pushAvailable: input.pushAvailable,
+    emailAvailable: input.emailAvailable,
+    whatsappAvailable: input.whatsappAvailable,
+  });
+  const audience = emailAudienceFor(input.type);
+  const channels: HubChannel[] = selected.filter((c) => c !== "email");
+  if (!input.emailAvailable) return channels;
+  if (audience === "personal" && selected.includes("email") && input.personalEmailAllowed) {
+    channels.push("email");
+  }
+  if (audience === "management") {
+    channels.push("email");
+  }
+  return channels;
 }

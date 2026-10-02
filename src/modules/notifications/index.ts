@@ -4,4 +4,4 @@ export { NotificationOrchestrator } from "./orchestrator";
 export { redactNotificationText, safeNotificationHref, validatePushSubscription } from "./safety";
 export { createEmailProvider, createWhatsAppProvider, createPushProvider } from "./providers";
 export { buildDeterministicDigest, maybeAiDigestSummary } from "./digest";
-export { canDisablePreference } from "./policy";
+export { canDisablePreference, planDeliveryChannels, selectChannels } from "./policy";

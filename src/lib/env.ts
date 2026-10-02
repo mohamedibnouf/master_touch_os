@@ -35,8 +35,36 @@ const serverSchema = publicSchema.extend({
   NOTIFICATION_PUSH_PROVIDER: z.enum(["none", "mock"]).optional(),
   RESEND_API_KEY: z.string().min(8).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().optional(),
+  NOTIFICATION_EMAIL_REPLY_TO: z.preprocess(
+    (value) => (value === "" || value === undefined || value === null ? undefined : value),
+    z.string().email().optional(),
+  ),
+  RESEND_TIMEOUT_MS: z.string().optional(),
   NOTIFICATIONS_CRON_SECRET: z.string().min(16).optional(),
+  CRON_SECRET: z.string().min(16).optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.NOTIFICATION_EMAIL_PROVIDER !== "resend") return;
+  if (!data.RESEND_API_KEY || data.RESEND_API_KEY.length < 8) {
+    ctx.addIssue({ code: "custom", path: ["RESEND_API_KEY"] });
+  }
+  if (!data.NOTIFICATION_EMAIL_FROM || !data.NOTIFICATION_EMAIL_FROM.includes("@")) {
+    ctx.addIssue({ code: "custom", path: ["NOTIFICATION_EMAIL_FROM"] });
+  }
+  try {
+    const url = new URL(data.NEXT_PUBLIC_APP_URL ?? "");
+    const host = url.hostname.toLowerCase();
+    if (
+      url.protocol !== "https:" ||
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.endsWith(".local")
+    ) {
+      ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_APP_URL"] });
+    }
+  } catch {
+    ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_APP_URL"] });
+  }
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;
@@ -62,7 +90,10 @@ export const GET_SERVER_ENV_KEYS = [
   "NOTIFICATION_PUSH_PROVIDER",
   "RESEND_API_KEY",
   "NOTIFICATION_EMAIL_FROM",
+  "NOTIFICATION_EMAIL_REPLY_TO",
+  "RESEND_TIMEOUT_MS",
   "NOTIFICATIONS_CRON_SECRET",
+  "CRON_SECRET",
   "VAPID_PRIVATE_KEY",
 ] as const;
 
@@ -107,7 +138,10 @@ export function readServerEnvRecordFromProcess(): Record<string, string | undefi
     NOTIFICATION_PUSH_PROVIDER: process.env.NOTIFICATION_PUSH_PROVIDER,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     NOTIFICATION_EMAIL_FROM: process.env.NOTIFICATION_EMAIL_FROM,
+    NOTIFICATION_EMAIL_REPLY_TO: process.env.NOTIFICATION_EMAIL_REPLY_TO,
+    RESEND_TIMEOUT_MS: process.env.RESEND_TIMEOUT_MS,
     NOTIFICATIONS_CRON_SECRET: process.env.NOTIFICATIONS_CRON_SECRET,
+    CRON_SECRET: process.env.CRON_SECRET,
     VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
@@ -282,6 +316,18 @@ export const ENV_CATALOG: readonly EnvClassification[] = [
     description: "From address for operational email",
   },
   {
+    name: "NOTIFICATION_EMAIL_REPLY_TO",
+    scope: "server",
+    required: false,
+    description: "Optional Reply-To (not a login identity)",
+  },
+  {
+    name: "RESEND_TIMEOUT_MS",
+    scope: "server",
+    required: false,
+    description: "Resend fetch timeout milliseconds (default 8000)",
+  },
+  {
     name: "NOTIFICATION_WHATSAPP_PROVIDER",
     scope: "server",
     required: false,
@@ -309,7 +355,13 @@ export const ENV_CATALOG: readonly EnvClassification[] = [
     name: "NOTIFICATIONS_CRON_SECRET",
     scope: "server",
     required: false,
-    description: "Bearer secret for /api/internal/notifications/run",
+    description: "Optional alias bearer for /api/internal/notifications/run",
+  },
+  {
+    name: "CRON_SECRET",
+    scope: "server",
+    required: false,
+    description: "Vercel Cron Authorization Bearer secret (≥16). Preferred cron contract.",
   },
   {
     name: "NEXT_PUBLIC_GOOGLE_PICKER_ENABLED",

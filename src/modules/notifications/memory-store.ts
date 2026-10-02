@@ -8,6 +8,7 @@ export class MemoryHubStore implements HubStore {
   preferences: PreferenceRow[] = [];
   contacts = new Map<string, { email: string | null; phone: string | null; name: string | null }>();
   push = new Map<string, Array<{ endpoint: string }>>();
+  managementEmail = new Map<string, string | null>();
   audits: string[] = [];
   deliverySeq = 0;
 
@@ -56,13 +57,33 @@ export class MemoryHubStore implements HubStore {
     return this.contacts.get(profileId) ?? { email: null, phone: null, name: null };
   }
 
+  async getNotification(notificationId: string) {
+    return this.notifications.find((n) => n.id === notificationId) ?? null;
+  }
+
+  async getManagementEmail(organizationId: string) {
+    return this.managementEmail.get(organizationId) ?? null;
+  }
+
   async listPushEndpoints(organizationId: string, profileId: string) {
     return this.push.get(`${organizationId}:${profileId}`) ?? [];
   }
 
-  async markDelivery(deliveryId: string, patch: { status: string }) {
+  async markDelivery(
+    deliveryId: string,
+    patch: {
+      status: string;
+      lastErrorCode?: string | null;
+      providerMessageId?: string | null;
+      nextAttemptAt?: string | null;
+    },
+  ) {
     const row = this.deliveries.find((d) => d.id === deliveryId);
-    if (row) row.status = patch.status;
+    if (row) {
+      row.status = patch.status;
+      if (patch.lastErrorCode !== undefined) row.lastErrorCode = patch.lastErrorCode;
+      if (patch.providerMessageId !== undefined) row.providerMessageId = patch.providerMessageId;
+    }
   }
 
   async listPendingDeliveries(limit: number): Promise<HubDelivery[]> {

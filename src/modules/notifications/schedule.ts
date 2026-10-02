@@ -8,7 +8,17 @@ export function nextRetryAt(attemptCount: number, now = new Date()): Date | null
 
 export function isPermanentProviderError(code: string | null | undefined): boolean {
   if (!code) return false;
-  return ["auth", "forbidden", "invalid_recipient", "unsupported", "template_rejected"].includes(code);
+  return [
+    "auth",
+    "forbidden",
+    "invalid_recipient",
+    "unsupported",
+    "template_rejected",
+    "invalid_app_url",
+    "missing_management_destination",
+    "missing_email",
+    "disabled",
+  ].includes(code);
 }
 
 export function reminderWindowReached(dueAtIso: string, now = new Date(), hoursBefore = 24): boolean {

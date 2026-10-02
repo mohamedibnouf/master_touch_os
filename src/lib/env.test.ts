@@ -14,11 +14,11 @@ const validBase = {
 };
 
 describe("getServerEnv parse keys vs Vercel-visible names", () => {
-  it("does not parse CRON_SECRET, LIVE_TEST_ENABLED, or LIVE_TEST_PASSWORD_PREFIX", () => {
-    expect(GET_SERVER_ENV_KEYS).not.toContain("CRON_SECRET");
+  it("parses CRON_SECRET as the Vercel Cron contract and omits live-test keys", () => {
+    expect(GET_SERVER_ENV_KEYS).toContain("CRON_SECRET");
+    expect(GET_SERVER_ENV_KEYS).toContain("NOTIFICATIONS_CRON_SECRET");
     expect(GET_SERVER_ENV_KEYS).not.toContain("LIVE_TEST_ENABLED");
     expect(GET_SERVER_ENV_KEYS).not.toContain("LIVE_TEST_PASSWORD_PREFIX");
-    expect(Object.keys(readServerEnvRecordFromProcess())).not.toContain("CRON_SECRET");
     expect(Object.keys(readServerEnvRecordFromProcess())).not.toContain("LIVE_TEST_ENABLED");
     expect(Object.keys(readServerEnvRecordFromProcess())).not.toContain("LIVE_TEST_PASSWORD_PREFIX");
   });
@@ -127,5 +127,32 @@ describe("emitServerEnvValidationFailed", () => {
     expect(blob).toContain("invalid_format");
     expect(blob).not.toContain("not-an-email-value");
     expect(blob).not.toMatch(/@mastertouch|eyJ|sk-/i);
+  });
+});
+
+describe("resend env contract", () => {
+  it("rejects resend without key, from, or public https app URL and does not echo secrets", () => {
+    const parsed = parseServerEnvRecord({
+      ...validBase,
+      NOTIFICATION_EMAIL_PROVIDER: "resend",
+      RESEND_API_KEY: "re_test_xxxxxxxx",
+      NOTIFICATION_EMAIL_FROM: "Master Touch OS <noreply@notify.example.com>",
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    const issues = serverEnvIssueDiagnostics(parsed.error);
+    expect(issues.some((row) => row.name === "NEXT_PUBLIC_APP_URL")).toBe(true);
+    expect(JSON.stringify(issues)).not.toMatch(/re_test|noreply@notify/i);
+  });
+
+  it("accepts complete resend configuration with public https URL", () => {
+    const parsed = parseServerEnvRecord({
+      ...validBase,
+      NEXT_PUBLIC_APP_URL: "https://app.mastertouch-ksa.com",
+      NOTIFICATION_EMAIL_PROVIDER: "resend",
+      RESEND_API_KEY: "re_test_xxxxxxxx",
+      NOTIFICATION_EMAIL_FROM: "Master Touch OS <noreply@notify.example.com>",
+    });
+    expect(parsed.success).toBe(true);
   });
 });

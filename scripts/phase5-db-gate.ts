@@ -7,6 +7,7 @@ loadEnvConfig(process.cwd());
 
 export const EXPECTED_REF = "xjwhnxjdcrcmsxjjstsh";
 export const ORG = "11111111-1111-1111-1111-111111111111";
+export const FILE_071 = "071_organization_management_notification_email.sql";
 export const FILE_070 = "070_custom_role_rpc_execute_hardening.sql";
 export const FILE_069 = "069_organization_custom_roles.sql";
 export const FILE_068 = "068_job_titles.sql";
