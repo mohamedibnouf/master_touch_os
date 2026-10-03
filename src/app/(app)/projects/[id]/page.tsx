@@ -1,7 +1,8 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, Select, TableScroll } from "@/components/ui/primitives";
+import { EntityHeader } from "@/components/ui/entity-header";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -11,8 +12,8 @@ import {
   assignProjectMemberAction,
   createApprovalAction,
   startWorkflowAction,
-  updateProjectStageAction,
 } from "@/server/use-cases/platform";
+import { loadProjectWorkflowProjection } from "@/server/use-cases/project-workflow";
 import { DocumentSourceForm } from "@/components/documents/document-source-form";
 import {
   DocumentDetailsLink,
@@ -20,7 +21,14 @@ import {
   DocumentSourceBadge,
 } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl } from "@/components/documents/document-lifecycle-controls";
-import { documentStatusLabel } from "@/lib/ui/operational-labels";
+import { documentStatusLabel, projectRiskLabel, projectStatusLabel } from "@/lib/ui/operational-labels";
+import { ProjectProgress } from "@/components/projects/project-progress";
+import { ProjectAttentionCard } from "@/components/projects/project-attention-card";
+import { ProjectWorkflowTimeline } from "@/components/projects/project-workflow-timeline";
+import { WorkflowStageDetails } from "@/components/projects/workflow-stage-details";
+import { ProjectActivityTimeline } from "@/components/projects/project-activity-timeline";
+import { activityNarrative } from "@/modules/projects/approval-workflow-gate";
+import { AUDIT_FEED_COLUMNS } from "@/lib/query-projections";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات", "الذكاء الاصطناعي"];
 
@@ -29,13 +37,13 @@ export default async function ProjectDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; stage?: string }>;
 }) {
   const ctx = await getAuthContext();
   if (!ctx || !hasPermission(ctx, "project.read")) redirect("/login");
 
   const { id } = await params;
-  const { tab = "overview" } = await searchParams;
+  const { tab = "overview", stage: selectedStageParam } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const project = await repo.getProject(ctx.organization.id, id);
@@ -46,7 +54,7 @@ export default async function ProjectDetailPage({
     repo.listProjectMembers(project.id),
     repo.listDocuments(ctx.organization.id, project.id),
     repo.listUsers(ctx.organization.id),
-    supabase.from("workflow_definitions").select("id, name_ar").eq("status", "published"),
+    supabase.from("workflow_definitions").select("id, name_ar").eq("status", "published").eq("entity_type", "project"),
     supabase.rpc("compute_project_health", { p_project_id: project.id }),
   ]);
 
@@ -58,6 +66,61 @@ export default async function ProjectDetailPage({
   const canUploadDocs = hasPermission(ctx, "document.upload");
   const canOpenStorage = hasPermission(ctx, "document.read");
   const canArchiveDocs = hasPermission(ctx, "document.archive");
+
+  const profileNames = new Map<string, string>();
+  for (const row of users) {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const name = profile?.full_name_ar || profile?.full_name_en;
+    if (name) profileNames.set(row.profile_id, name);
+  }
+  const { data: roleRows } = await supabase
+    .from("roles")
+    .select("id, name_ar")
+    .or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`);
+  const roleNames = new Map((roleRows ?? []).map((r) => [r.id as string, r.name_ar as string]));
+
+  const workflow = await loadProjectWorkflowProjection({
+    supabase,
+    ctx,
+    projectId: project.id,
+    stages,
+    profileNames,
+    roleNames,
+  });
+  const approverOptions = users.flatMap((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const employees = Array.isArray(row.employees) ? row.employees : [];
+    const memberActive = row.status === "active";
+    const profileActive = profile?.is_active !== false;
+    const employeeOk = employees.length === 0 || employees.some((emp) => emp.is_active === true);
+    if (!memberActive || !profileActive || !employeeOk) return [];
+    return [{ id: row.profile_id, name: profile?.full_name_ar || row.profile_id }];
+  });
+  const selectedNode =
+    workflow.nodes.find((n) => n.id === selectedStageParam) ??
+    workflow.nodes.find((n) => n.id === workflow.currentNodeId) ??
+    workflow.nodes[0] ??
+    null;
+  const managerName = project.project_manager_id ? (profileNames.get(project.project_manager_id) ?? null) : null;
+
+  const activityIds = [project.id, workflow.instanceId, ...workflow.nodes.map((n) => n.id)].filter(
+    (value): value is string => Boolean(value),
+  );
+  const { data: activityRows } = await supabase
+    .from("audit_logs")
+    .select(AUDIT_FEED_COLUMNS)
+    .eq("organization_id", ctx.organization.id)
+    .in("entity_id", activityIds)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const activityItems = (activityRows ?? []).map((row) => ({
+    id: row.id as string,
+    action: row.action as string,
+    entityType: row.entity_type as string,
+    createdAt: row.created_at as string,
+    actorLabel: row.actor_id ? (profileNames.get(row.actor_id as string) ?? null) : null,
+    automaticDetail: activityNarrative(row.action as string, row.new_values),
+  }));
 
   const canSeeFinance =
     hasPermission(ctx, "finance.read") || hasPermission(ctx, "commercial_reports.read");
@@ -156,17 +219,37 @@ export default async function ProjectDetailPage({
 
   return (
     <PageContainer className="space-y-5">
-      <PageHeader
+      <EntityHeader
+        initials={project.project_code.slice(0, 2)}
         title={project.name_ar}
-        description={`${project.project_code} · ${project.name_en}`}
+        subtitle={`${project.project_code} · ${project.name_en}`}
+        meta={
+          <span>
+            المرحلة الحالية: {workflow.nodes.find((n) => n.id === workflow.currentNodeId)?.nameAr ?? "—"}
+            {managerName ? ` · المسؤول: ${managerName}` : ""}
+          </span>
+        }
+        badges={
+          <>
+            <Badge tone="navy">{projectStatusLabel(project.status)}</Badge>
+            <Badge tone={project.risk_level === "high" || project.risk_level === "critical" ? "danger" : "neutral"}>
+              المخاطر: {projectRiskLabel(project.risk_level)}
+            </Badge>
+            <Badge tone={healthTone as "danger" | "warning" | "success"}>صحة المشروع: {healthLabel}</Badge>
+            {project.planned_end_date ? <Badge>الاستحقاق: {project.planned_end_date}</Badge> : null}
+          </>
+        }
       />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Badge tone="navy">{project.status}</Badge>
-        <Badge tone={project.risk_level === "high" || project.risk_level === "critical" ? "danger" : "neutral"}>
-          المخاطر: {project.risk_level}
-        </Badge>
-        <Badge>{project.progress_percentage}%</Badge>
-        <Badge tone={healthTone as "danger" | "warning" | "success"}>صحة المشروع: {healthLabel}</Badge>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.8fr)]">
+        <Card>
+          <ProjectProgress
+            percent={workflow.progress.percent}
+            completed={workflow.progress.completed}
+            total={workflow.progress.total}
+          />
+          <p className="mt-3 text-sm text-muted">الإجراء المطلوب: {workflow.nextRequiredAction}</p>
+        </Card>
+        <ProjectAttentionCard attention={workflow.attention} />
       </div>
 
       <div className="mb-6 min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
@@ -225,55 +308,53 @@ export default async function ProjectDetailPage({
       ) : null}
 
       {tab === "stages" ? (
-        <Card className="p-0">
-          {stages.length === 0 ? (
-            <EmptyState title="لم تُنشأ مراحل لهذا المشروع." />
+        <div className="space-y-4">
+          {workflow.mode === "empty" ? (
+            <EmptyState title="لا توجد مراحل ولا مسار عمل لهذا المشروع." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm">
-                <thead className="bg-paper text-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-right">#</th>
-                    <th className="px-4 py-3 text-right">المرحلة</th>
-                    <th className="px-4 py-3 text-right">الحالة</th>
-                    <th className="px-4 py-3 text-right">تحديث</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stages.map((stage) => (
-                    <tr key={stage.id} className="border-t border-line">
-                      <td className="px-4 py-3">{stage.sequence}</td>
-                      <td className="px-4 py-3">
-                        {stage.name_ar}
-                        <p className="text-xs text-muted">{stage.name_en}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge>{stage.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {hasPermission(ctx, "project.update") ? (
-                          <ServerActionForm action={updateProjectStageAction} className="flex min-w-[220px] flex-col gap-2 sm:flex-row">
-                            <input type="hidden" name="stageId" value={stage.id} />
-                            <Select name="status" defaultValue={stage.status}>
-                              <option value="not_started">لم تبدأ</option>
-                              <option value="in_progress">جارية</option>
-                              <option value="blocked">معلقة</option>
-                              <option value="completed">مكتملة</option>
-                              <option value="skipped">متجاوزة</option>
-                            </Select>
-                            <Button type="submit" variant="secondary">
-                              حفظ
-                            </Button>
-                          </ServerActionForm>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <Card>
+                <p className="mb-4 text-sm text-muted">
+                  {workflow.definitionName
+                    ? `المسار: ${workflow.definitionName}`
+                    : "عرض مراحل المشروع الحالية. إكمال المرحلة يفعّل التالية تلقائياً."}
+                </p>
+                <ProjectWorkflowTimeline
+                  projectId={project.id}
+                  nodes={workflow.nodes}
+                  selectedId={selectedNode?.id ?? null}
+                />
+              </Card>
+              {selectedNode ? (
+                <WorkflowStageDetails
+                  node={selectedNode}
+                  projectId={project.id}
+                  projectCode={project.project_code}
+                  approvers={approverOptions}
+                />
+              ) : null}
+            </>
           )}
-        </Card>
+          {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
+            <Card>
+              <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
+              <ServerActionForm action={startWorkflowAction} className="space-y-3">
+                <input type="hidden" name="entityType" value="project" />
+                <input type="hidden" name="entityId" value={project.id} />
+                <Field label="القالب">
+                  <Select name="definitionId" required>
+                    {(definitions.data ?? []).map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name_ar}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button type="submit">بدء المسار</Button>
+              </ServerActionForm>
+            </Card>
+          ) : null}
+        </div>
       ) : null}
 
       {tab === "team" ? (
@@ -649,6 +730,7 @@ export default async function ProjectDetailPage({
               <ServerActionForm action={createApprovalAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
+                <input type="hidden" name="projectId" value={project.id} />
                 <Field label="العنوان">
                   <Input name="title" defaultValue={`موافقة مشروع ${project.project_code}`} required />
                 </Field>
@@ -690,13 +772,7 @@ export default async function ProjectDetailPage({
         </div>
       ) : null}
 
-      {tab === "activity" ? (
-        <Card>
-          <p className="text-sm text-muted">
-            النشاط التفصيلي يظهر في السجل العام عند توفر صلاحية التدقيق، مع الحفاظ على الطوابع الزمنية التاريخية.
-          </p>
-        </Card>
-      ) : null}
+      {tab === "activity" ? <ProjectActivityTimeline items={activityItems} /> : null}
     </PageContainer>
   );
 }

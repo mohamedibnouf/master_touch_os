@@ -19,6 +19,7 @@ import {
   startWorkflowSchema,
 } from "@/modules/approvals/schemas";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
+import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { assignmentRejectReason, canUnassignUserRole } from "@/lib/rbac/custom-roles";
@@ -43,6 +44,65 @@ function nextRevision(current: string): string {
   }
   const letters = match[1] ?? "A";
   return String.fromCharCode(letters.charCodeAt(0) + 1);
+}
+
+function revalidateProjectWorkflow(projectId: string | null) {
+  revalidatePath("/approvals");
+  revalidatePath("/");
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+  }
+}
+
+async function notifyWorkflowReadyAssignees(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  organizationId: string;
+  instanceId: string;
+  projectId: string | null;
+}) {
+  const { data: ready } = await input.supabase
+    .from("workflow_instance_steps")
+    .select("id, assigned_user_id, workflow_steps(name_ar)")
+    .eq("instance_id", input.instanceId)
+    .eq("status", "ready");
+  const href = input.projectId ? `/projects/${input.projectId}?tab=stages` : null;
+  const notifications = createNotificationService(input.supabase);
+  for (const row of ready ?? []) {
+    const userId = row.assigned_user_id as string | null;
+    if (!userId) continue;
+    const stepRel = row.workflow_steps as { name_ar: string } | { name_ar: string }[] | null;
+    const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
+    await notifications.notify({
+      organizationId: input.organizationId,
+      recipientProfileId: userId,
+      type: "workflow.step.activated",
+      title: "مرحلة جديدة جاهزة",
+      message: name ? `تم تفعيل مرحلة «${name}».` : "تم تفعيل مرحلة تالية في مسار العمل.",
+      entityType: input.projectId ? "project" : "workflow_instance_step",
+      entityId: input.projectId ?? (row.id as string),
+      href,
+      priority: "normal",
+      dedupKey: `workflow.step.activated:${row.id}:${userId}`,
+    });
+  }
+}
+
+function throwMappedWorkflowRpc(error: { message?: string }): never {
+  const mapped = mapWorkflowRpcError(error.message ?? "");
+  if (mapped.kind === "CONFLICT") {
+    throw new ConflictError(mapped.ar, mapped.en);
+  }
+  if (mapped.kind === "FORBIDDEN") {
+    throw new ForbiddenError();
+  }
+  if (mapped.kind === "NOT_FOUND") {
+    throw new NotFoundError("العنصر", "Item");
+  }
+  if (mapped.kind === "VALIDATION") {
+    throw new ValidationError(mapped.ar, mapped.en);
+  }
+  throw new DatabaseError(error);
 }
 
 export async function createProjectAction(
@@ -180,6 +240,48 @@ export async function updateProjectStageAction(
   });
 }
 
+export async function completeProjectStageAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إكمال المرحلة. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "project.update");
+    const stageId = String(formData.get("stageId") ?? "");
+    const projectId = String(formData.get("projectId") ?? "");
+    if (!stageId) {
+      throw new ValidationError("المرحلة غير محددة.", "Stage id is required.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: stage } = await supabase
+      .from("project_stages")
+      .select("id, project_id, organization_id")
+      .eq("id", stageId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{ id: string; project_id: string; organization_id: string }>();
+    if (!stage) {
+      throw new NotFoundError("المرحلة", "Stage");
+    }
+
+    const { error } = await supabase.rpc("complete_project_stage", { p_stage_id: stageId });
+    if (error) throwMappedWorkflowRpc(error);
+
+    const events = new EventService(supabase);
+    await events.publish({
+      type: "project.stage.completed",
+      organizationId: ctx.organization.id,
+      actorId: ctx.userId,
+      entityType: "project_stage",
+      entityId: stageId,
+      payload: { projectId: stage.project_id },
+      correlationId: generateCorrelationId(),
+      occurredAt: new Date().toISOString(),
+    });
+
+    revalidateProjectWorkflow(projectId || stage.project_id);
+  });
+}
+
 export async function startWorkflowAction(
   _prev: FormActionState,
   formData: FormData,
@@ -206,9 +308,29 @@ export async function startWorkflowAction(
     if (error.message.includes("CONFLICT")) {
       throw new ConflictError("يوجد مسار عمل نشط بالفعل.", "An active workflow already exists.");
     }
-    throw new DatabaseError(error);
+    throwMappedWorkflowRpc(error);
   }
-  revalidatePath("/approvals");
+
+  const { data: instance } = await supabase
+    .from("workflow_instances")
+    .select("id")
+    .eq("organization_id", ctx.organization.id)
+    .eq("entity_type", parsed.data.entityType)
+    .eq("entity_id", parsed.data.entityId)
+    .in("status", ["pending", "in_progress"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (instance) {
+    await notifyWorkflowReadyAssignees({
+      supabase,
+      organizationId: ctx.organization.id,
+      instanceId: instance.id,
+      projectId: parsed.data.entityType === "project" ? parsed.data.entityId : null,
+    });
+  }
+
+  revalidateProjectWorkflow(parsed.data.entityType === "project" ? parsed.data.entityId : null);
   });
 }
 
@@ -225,18 +347,40 @@ export async function completeWorkflowStepAction(
   if (!parsed.success) {
     throw new ValidationError("بيانات خطوة مسار العمل غير صحيحة.", "Invalid workflow step data.");
   }
+  const projectIdRaw = String(formData.get("projectId") ?? "");
+  const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.rpc("complete_workflow_step", {
     p_instance_step_id: parsed.data.instanceStepId,
     p_outcome: parsed.data.outcome,
   });
-  if (error) {
-    if (error.message.includes("CONFLICT")) {
-      throw new ConflictError("تم إكمال هذه الخطوة مسبقاً.", "This step was already completed.");
+  if (error) throwMappedWorkflowRpc(error);
+
+  const { data: step } = await supabase
+    .from("workflow_instance_steps")
+    .select("instance_id, organization_id")
+    .eq("id", parsed.data.instanceStepId)
+    .maybeSingle<{ instance_id: string; organization_id: string }>();
+  if (step) {
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const { data: instance } = await supabase
+        .from("workflow_instances")
+        .select("entity_type, entity_id")
+        .eq("id", step.instance_id)
+        .maybeSingle<{ entity_type: string; entity_id: string }>();
+      if (instance?.entity_type === "project") resolvedProjectId = instance.entity_id;
     }
-    throw new DatabaseError(error);
+    await notifyWorkflowReadyAssignees({
+      supabase,
+      organizationId: step.organization_id,
+      instanceId: step.instance_id,
+      projectId: resolvedProjectId,
+    });
+    revalidateProjectWorkflow(resolvedProjectId);
+  } else {
+    revalidateProjectWorkflow(projectId);
   }
-  revalidatePath("/");
   });
 }
 
@@ -257,7 +401,82 @@ export async function createApprovalAction(
     throw new ValidationError("بيانات الموافقة غير مكتملة.", "Approval data is incomplete.");
   }
 
+  const projectIdRaw = String(formData.get("projectId") ?? "");
+  const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
   const supabase = await createServerSupabaseClient();
+
+  const { data: existingOpen } = await supabase
+    .from("approval_requests")
+    .select("id")
+    .eq("organization_id", ctx.organization.id)
+    .eq("entity_type", parsed.data.entityType)
+    .eq("entity_id", parsed.data.entityId)
+    .in("status", ["pending", "in_progress"])
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (existingOpen) {
+    throw new ConflictError("يوجد طلب اعتماد مفتوح لهذه المرحلة.", "An open approval already exists.");
+  }
+
+  if (parsed.data.entityType === "workflow_instance_step") {
+    const { data: wfStep } = await supabase
+      .from("workflow_instance_steps")
+      .select("id, organization_id, status, instance_id")
+      .eq("id", parsed.data.entityId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{ id: string; organization_id: string; status: string; instance_id: string }>();
+    if (!wfStep) {
+      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
+    }
+    const { data: instance } = await supabase
+      .from("workflow_instances")
+      .select("id, organization_id, status, entity_type, entity_id")
+      .eq("id", wfStep.instance_id)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{
+        id: string;
+        organization_id: string;
+        status: string;
+        entity_type: string;
+        entity_id: string;
+      }>();
+    if (!instance || instance.status === "completed" || instance.status === "cancelled") {
+      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
+    }
+    if (projectId && (instance.entity_type !== "project" || instance.entity_id !== projectId)) {
+      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
+    }
+    if (!["ready", "in_progress"].includes(wfStep.status)) {
+      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
+    }
+  }
+
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("profile_id, status")
+    .eq("organization_id", ctx.organization.id)
+    .eq("profile_id", parsed.data.approverProfileId)
+    .maybeSingle<{ profile_id: string; status: string }>();
+  if (!member || member.status !== "active") {
+    throw new ValidationError("المعتمد المختار غير صالح.", "The selected approver is not eligible.");
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, is_active")
+    .eq("id", parsed.data.approverProfileId)
+    .maybeSingle<{ id: string; is_active: boolean }>();
+  if (!profile?.is_active) {
+    throw new ValidationError("المعتمد المختار غير صالح.", "The selected approver is not eligible.");
+  }
+  const { data: employees } = await supabase
+    .from("employees")
+    .select("is_active")
+    .eq("organization_id", ctx.organization.id)
+    .eq("profile_id", parsed.data.approverProfileId);
+  if ((employees ?? []).length > 0 && !(employees ?? []).some((row) => row.is_active === true)) {
+    throw new ValidationError("المعتمد المختار غير صالح.", "The selected approver is not eligible.");
+  }
+
   const dueAt = parsed.data.dueAt
     ? new Date(parsed.data.dueAt).toISOString()
     : new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
@@ -300,9 +519,11 @@ export async function createApprovalAction(
     entityType: "approval_request",
     entityId: request.id,
     priority: "high",
+    href: projectId ? `/projects/${projectId}?tab=stages` : "/approvals",
+    dedupKey: `approval.created:${request.id}:${parsed.data.approverProfileId}`,
   });
 
-  revalidatePath("/approvals");
+  revalidateProjectWorkflow(projectId);
   });
 }
 
@@ -321,25 +542,90 @@ export async function decideApprovalAction(
   }
 
   const permission = parsed.data.officialCode === "D" ? "approval.reject" : "approval.approve";
-  authorize(await getAuthContext(), permission);
+  const ctx = authorize(await getAuthContext(), permission);
 
+  const projectIdRaw = String(formData.get("projectId") ?? "");
+  const projectIdFromForm = projectIdRaw.length > 0 ? projectIdRaw : null;
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.rpc("submit_approval_decision", {
     p_step_id: parsed.data.stepId,
     p_official_code: parsed.data.officialCode,
     p_comment: parsed.data.comment ?? null,
   });
-  if (error) {
-    if (error.message.includes("CONFLICT")) {
-      throw new ConflictError("تم اتخاذ قرار على هذه الخطوة مسبقاً.", "This approval step was already decided.");
-    }
-    if (error.message.includes("FORBIDDEN")) {
-      throw new ValidationError("ليست لديك صلاحية الاعتماد.", "You cannot decide this approval.");
-    }
-    throw new DatabaseError(error);
+  if (error) throwMappedWorkflowRpc(error);
+
+  const { data: approvalStep } = await supabase
+    .from("approval_steps")
+    .select("request_id")
+    .eq("id", parsed.data.stepId)
+    .maybeSingle<{ request_id: string }>();
+  const { data: request } = approvalStep
+    ? await supabase
+        .from("approval_requests")
+        .select("entity_type, entity_id, requested_by")
+        .eq("id", approvalStep.request_id)
+        .maybeSingle<{ entity_type: string; entity_id: string; requested_by: string | null }>()
+    : { data: null };
+
+  let projectId = projectIdFromForm;
+  if (!projectId && request?.entity_type === "project") {
+    projectId = request.entity_id;
   }
-  revalidatePath("/approvals");
-  revalidatePath("/");
+  if (!projectId && request?.entity_type === "workflow_instance_step") {
+    const { data: wfStep } = await supabase
+      .from("workflow_instance_steps")
+      .select("instance_id")
+      .eq("id", request.entity_id)
+      .maybeSingle<{ instance_id: string }>();
+    if (wfStep) {
+      const { data: instance } = await supabase
+        .from("workflow_instances")
+        .select("entity_type, entity_id")
+        .eq("id", wfStep.instance_id)
+        .maybeSingle<{ entity_type: string; entity_id: string }>();
+      if (instance?.entity_type === "project") projectId = instance.entity_id;
+    }
+  }
+
+  if (request?.entity_type === "workflow_instance_step") {
+    const { data: wfStep } = await supabase
+      .from("workflow_instance_steps")
+      .select("instance_id, organization_id")
+      .eq("id", request.entity_id)
+      .maybeSingle<{ instance_id: string; organization_id: string }>();
+    if (wfStep) {
+      await notifyWorkflowReadyAssignees({
+        supabase,
+        organizationId: wfStep.organization_id,
+        instanceId: wfStep.instance_id,
+        projectId,
+      });
+    }
+  }
+
+  if (request?.requested_by && request.requested_by !== ctx.userId) {
+    const notifications = createNotificationService(supabase);
+    const decidedTitle =
+      parsed.data.officialCode === "C"
+        ? "طُلب تعديل على الاعتماد"
+        : parsed.data.officialCode === "D"
+          ? "رُفض طلب الاعتماد"
+          : "تم تسجيل قرار اعتماد";
+    await notifications.notify({
+      organizationId: ctx.organization.id,
+      recipientProfileId: request.requested_by,
+      type: "approval.decided",
+      title: decidedTitle,
+      message: parsed.data.comment || decidedTitle,
+      entityType: "approval_request",
+      entityId: approvalStep?.request_id ?? parsed.data.stepId,
+      href: projectId ? `/projects/${projectId}?tab=stages` : "/approvals",
+      priority: parsed.data.officialCode === "D" ? "high" : "normal",
+      dedupKey: `approval.decided:${parsed.data.stepId}:${request.requested_by}`,
+    });
+  }
+
+  revalidateProjectWorkflow(projectId);
   });
 }
 

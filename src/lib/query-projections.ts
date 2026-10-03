@@ -49,7 +49,7 @@ export const LEAVE_BALANCE_LIST_COLUMNS =
 export const ATTENDANCE_RECORD_LIST_COLUMNS =
   "id, organization_id, employee_id, attendance_date, attendance_status, check_in_at, check_out_at, worked_minutes, late_minutes, source, check_in_distance_meters, check_out_distance_meters, check_in_location_verified, check_out_location_verified" as const;
 
-export const AUDIT_FEED_COLUMNS = "id, action, entity_type, entity_id, created_at, actor_id" as const;
+export const AUDIT_FEED_COLUMNS = "id, action, entity_type, entity_id, created_at, actor_id, new_values" as const;
 
 export const PROJECT_MEMBER_COLUMNS =
   "id, profile_id, role_label, is_active, assigned_at, unassigned_at, profiles(id, full_name_ar, full_name_en, is_active)" as const;
