@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
-
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+import { isNotificationsCronPath, requiresInteractiveLogin } from "@/lib/http/session-gate";
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
+  if (isNotificationsCronPath(request.nextUrl.pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
   const env = getPublicEnv();
 
@@ -30,7 +33,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.has(pathname) || pathname.startsWith("/auth/");
+  const isPublic = !requiresInteractiveLogin(pathname);
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
