@@ -9,6 +9,12 @@ import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { AuditService } from "@/server/services/audit.service";
 import { canDisablePreference } from "@/modules/notifications/policy";
 import { normalizeManagementNotificationEmail, managementNotificationEmailCheckPasses } from "@/modules/notifications/management-email";
+import {
+  parseManagementNotificationWhatsapp,
+  managementNotificationWhatsappCheckPasses,
+  managementWhatsappAuditPayload,
+} from "@/modules/notifications/management-whatsapp";
+import { normalizePhoneToE164, isValidE164 } from "@/lib/phone/e164";
 import type { NotificationCategory } from "@/modules/notifications/catalog";
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CHANNELS } from "@/modules/notifications/catalog";
 import { validatePushSubscription } from "@/modules/notifications/safety";
@@ -98,6 +104,120 @@ export async function saveManagementNotificationEmailAction(
       newValues: { set: value !== null },
     });
     revalidatePath("/settings");
+  });
+}
+
+export async function saveManagementNotificationWhatsappAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ واتساب الإدارة. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "settings.manage");
+    const parsed = parseManagementNotificationWhatsapp(String(formData.get("management_notification_whatsapp") ?? ""));
+    if (!parsed.ok) {
+      throw new ValidationError("رقم واتساب الإدارة غير صالح.", "The management WhatsApp number is not valid E.164.");
+    }
+    const value = parsed.value;
+    if (value && !managementNotificationWhatsappCheckPasses(value)) {
+      throw new ValidationError("رقم واتساب الإدارة غير صالح.", "The management WhatsApp number is not valid E.164.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: previous } = await supabase
+      .from("organizations")
+      .select("management_notification_whatsapp")
+      .eq("id", ctx.organization.id)
+      .maybeSingle<{ management_notification_whatsapp: string | null }>();
+    const previousParsed = parseManagementNotificationWhatsapp(previous?.management_notification_whatsapp);
+    const previousNorm = previousParsed.ok ? previousParsed.value : null;
+    if (previousNorm === value) {
+      revalidatePath("/settings");
+      return;
+    }
+    const { error } = await supabase
+      .from("organizations")
+      .update({ management_notification_whatsapp: value })
+      .eq("id", ctx.organization.id);
+    if (error) {
+      throw new ValidationError("تعذر حفظ الرقم.", "Could not save the number.");
+    }
+    const auditFields = managementWhatsappAuditPayload(previousNorm, value);
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "organization.management_notification_whatsapp.changed",
+      entityType: "organization",
+      entityId: ctx.organization.id,
+      previousValues: auditFields.previousValues,
+      newValues: auditFields.newValues,
+    });
+    revalidatePath("/settings");
+  });
+}
+
+export async function saveOwnContactPhoneAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ رقم الجوال. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "notification.read");
+    const phoneResult = normalizePhoneToE164(String(formData.get("phone") ?? ""));
+    if (!phoneResult.ok) {
+      throw new ValidationError("رقم الجوال غير صالح.", "The mobile number is not a valid E.164 contact.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const patch: { phone: string | null; whatsapp_opt_in?: boolean } = { phone: phoneResult.e164 };
+    if (phoneResult.e164 === null) {
+      patch.whatsapp_opt_in = false;
+    }
+    const { error } = await supabase.from("profiles").update(patch).eq("id", ctx.userId);
+    if (error) {
+      throw new ValidationError("تعذر حفظ رقم الجوال.", "Could not save the mobile number.");
+    }
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "profile.phone.changed",
+      entityType: "profile",
+      entityId: ctx.userId,
+      newValues: { set: phoneResult.e164 !== null },
+    });
+    revalidatePath("/notifications/preferences");
+  });
+}
+
+export async function saveWhatsAppOptInAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر حفظ موافقة واتساب. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "notification.read");
+    const enabled = formData.get("whatsapp_opt_in") === "true" || formData.get("whatsapp_opt_in") === "on";
+    const supabase = await createServerSupabaseClient();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("phone, whatsapp_opt_in")
+      .eq("id", ctx.userId)
+      .maybeSingle<{ phone: string | null; whatsapp_opt_in: boolean }>();
+    const phone = profile?.phone ?? null;
+    if (enabled && (!phone || !isValidE164(phone))) {
+      throw new ValidationError(
+        "أضف رقم جوال صالحاً أولاً لتفعيل إشعارات واتساب.",
+        "Add a valid mobile number before enabling WhatsApp.",
+      );
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ whatsapp_opt_in: enabled })
+      .eq("id", ctx.userId);
+    if (error) {
+      throw new ValidationError("تعذر حفظ موافقة واتساب.", "Could not save WhatsApp consent.");
+    }
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "profile.whatsapp_opt_in.changed",
+      entityType: "profile",
+      entityId: ctx.userId,
+      newValues: { enabled },
+    });
+    revalidatePath("/notifications/preferences");
   });
 }
 

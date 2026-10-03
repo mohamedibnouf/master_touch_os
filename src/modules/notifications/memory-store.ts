@@ -6,9 +6,13 @@ export class MemoryHubStore implements HubStore {
   deliveries: HubDelivery[] = [];
   members: ActiveMember[] = [];
   preferences: PreferenceRow[] = [];
-  contacts = new Map<string, { email: string | null; phone: string | null; name: string | null }>();
+  contacts = new Map<
+    string,
+    { email: string | null; phone: string | null; name: string | null; whatsappOptIn?: boolean }
+  >();
   push = new Map<string, Array<{ endpoint: string }>>();
   managementEmail = new Map<string, string | null>();
+  managementWhatsApp = new Map<string, string | null>();
   audits: string[] = [];
   deliverySeq = 0;
 
@@ -54,7 +58,7 @@ export class MemoryHubStore implements HubStore {
   }
 
   async getRecipientContact(profileId: string) {
-    return this.contacts.get(profileId) ?? { email: null, phone: null, name: null };
+    return this.contacts.get(profileId) ?? { email: null, phone: null, name: null, whatsappOptIn: false };
   }
 
   async getNotification(notificationId: string) {
@@ -63,6 +67,10 @@ export class MemoryHubStore implements HubStore {
 
   async getManagementEmail(organizationId: string) {
     return this.managementEmail.get(organizationId) ?? null;
+  }
+
+  async getManagementWhatsApp(organizationId: string) {
+    return this.managementWhatsApp.get(organizationId) ?? null;
   }
 
   async listPushEndpoints(organizationId: string, profileId: string) {

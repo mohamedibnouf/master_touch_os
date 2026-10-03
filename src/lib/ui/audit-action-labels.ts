@@ -81,6 +81,9 @@ const ACTION_LABELS: Record<string, string> = {
   "purchase_order.issued": "تم إصدار أمر شراء",
   "notification.preference.changed": "تم تحديث تفضيلات التنبيه",
   "organization.management_notification_email.changed": "تم تحديث بريد تنبيهات الإدارة",
+  "organization.management_notification_whatsapp.changed": "تم تحديث واتساب تنبيهات الإدارة",
+  "profile.phone.changed": "تم تحديث رقم الجوال",
+  "profile.whatsapp_opt_in.changed": "تم تحديث موافقة واتساب التشغيلية",
   "push.subscription.created": "تم تفعيل إشعارات الجهاز",
   "push.subscription.revoked": "أُلغي اشتراك الإشعارات",
 };

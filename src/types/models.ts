@@ -29,6 +29,8 @@ export type Organization = {
   default_currency: string;
   status: OrganizationStatus;
   leave_day_basis?: "calendar" | "working";
+  management_notification_email?: string | null;
+  management_notification_whatsapp?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -59,6 +61,8 @@ export type Profile = {
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
+  whatsapp_opt_in?: boolean;
+  whatsapp_opt_in_at?: string | null;
 };
 
 export type Employee = {

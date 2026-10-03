@@ -1,5 +1,5 @@
 /**
- * Column allowlists from CREATE/ALTER in migrations 001–071.
+ * Column allowlists from CREATE/ALTER in migrations 001–072.
  * Used to keep PostgREST projections from selecting non-existent columns.
  */
 
@@ -16,6 +16,8 @@ export const SCHEMA_PROFILES = [
   "last_seen_at",
   "created_at",
   "updated_at",
+  "whatsapp_opt_in",
+  "whatsapp_opt_in_at",
 ] as const;
 
 /** 002_organizations.sql + 056 leave_day_basis */
@@ -35,6 +37,7 @@ export const SCHEMA_ORGANIZATIONS = [
   "updated_at",
   "leave_day_basis",
   "management_notification_email",
+  "management_notification_whatsapp",
 ] as const;
 
 /** 003 organization_members */

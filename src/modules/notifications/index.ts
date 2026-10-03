@@ -5,3 +5,4 @@ export { redactNotificationText, safeNotificationHref, validatePushSubscription 
 export { createEmailProvider, createWhatsAppProvider, createPushProvider } from "./providers";
 export { buildDeterministicDigest, maybeAiDigestSummary } from "./digest";
 export { canDisablePreference, planDeliveryChannels, selectChannels } from "./policy";
+export { whatsappAudienceFor, PERSONAL_WHATSAPP_TYPES, MANAGEMENT_WHATSAPP_TYPES } from "./whatsapp-policy";

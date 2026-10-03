@@ -25,6 +25,7 @@ import {
   setEmployeeActiveAction,
   provisionEmployeeLoginAction,
   updateEmployeeEmploymentAction,
+  updateEmployeeProfileAction,
   uploadEmployeeDocumentAction,
   upsertEmployeeBankAction,
   upsertEmployeeComplianceAction,
@@ -372,6 +373,44 @@ export default async function EmployeeDetailPage({
               ]}
             />
           </Card>
+
+          {canManage ? (
+            <Card data-testid="employee-edit-profile-card">
+              <h2 className="mb-3 text-sm font-semibold text-navy">تحديث الاسم ورقم الجوال</h2>
+              <p className="mb-3 text-sm text-muted">رقم الجوال يُحفظ بصيغة دولية ويُستخدم لإشعارات واتساب فقط بعد موافقة الموظف الصريحة.</p>
+              <ServerActionForm action={updateEmployeeProfileAction} className="grid gap-3 md:grid-cols-2">
+                <input type="hidden" name="employeeId" value={employee.id} />
+                <Field label="الاسم (عربي)">
+                  <Input
+                    name="full_name_ar"
+                    required
+                    minLength={2}
+                    defaultValue={(profile as { full_name_ar?: string } | null)?.full_name_ar ?? ""}
+                  />
+                </Field>
+                <Field label="الاسم (إنجليزي)">
+                  <Input
+                    name="full_name_en"
+                    required
+                    minLength={2}
+                    defaultValue={(profile as { full_name_en?: string } | null)?.full_name_en ?? ""}
+                  />
+                </Field>
+                <Field label="رقم الجوال" hint="اختياري — مثال 05XXXXXXXX">
+                  <Input
+                    name="phone"
+                    type="tel"
+                    dir="ltr"
+                    defaultValue={(profile as { phone?: string | null } | null)?.phone ?? ""}
+                    data-testid="employee-phone-input"
+                  />
+                </Field>
+                <div className="md:col-span-2">
+                  <Button type="submit">حفظ الهوية</Button>
+                </div>
+              </ServerActionForm>
+            </Card>
+          ) : null}
 
           {canManage ? (
             <Card data-testid="employee-edit-employment-card">

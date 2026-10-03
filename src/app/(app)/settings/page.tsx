@@ -7,7 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { assignRoleAction, setUserActiveAction } from "@/server/use-cases/platform";
-import { saveManagementNotificationEmailAction } from "@/server/use-cases/notification-preferences";
+import { saveManagementNotificationEmailAction, saveManagementNotificationWhatsappAction } from "@/server/use-cases/notification-preferences";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
@@ -46,9 +46,9 @@ export default async function SettingsPage() {
   const { data: orgSettings } = canManageSettings
     ? await supabase
         .from("organizations")
-        .select("management_notification_email")
+        .select("management_notification_email, management_notification_whatsapp")
         .eq("id", ctx.organization.id)
-        .maybeSingle<{ management_notification_email: string | null }>()
+        .maybeSingle<{ management_notification_email: string | null; management_notification_whatsapp: string | null }>()
     : { data: null };
 
   const roleRows = roles as RoleRow[];
@@ -112,6 +112,27 @@ export default async function SettingsPage() {
                 type="email"
                 dir="ltr"
                 defaultValue={orgSettings?.management_notification_email ?? ""}
+                autoComplete="off"
+              />
+            </Field>
+            <Button type="submit">حفظ</Button>
+          </ServerActionForm>
+        </Card>
+      ) : null}
+
+      {canManageSettings ? (
+        <Card className="mb-6" data-testid="management-notification-whatsapp">
+          <h2 className="text-base font-semibold text-navy">واتساب تنبيهات الإدارة</h2>
+          <p className="mt-2 text-sm text-muted">
+            رقم تشغيلي واحد لاستقبال تنبيهات الإدارة عبر واتساب بعد تفعيل المزوّد لاحقاً. يجب أن يكون مخوّلاً من المنشأة. لا يُستنتج من رقم المدير أو البريد. اتركه فارغاً لتعطيل واتساب الإدارة. ليس رسائل تسويقية.
+          </p>
+          <ServerActionForm action={saveManagementNotificationWhatsappAction} className="mt-4 max-w-md space-y-3">
+            <Field label="رقم واتساب الإدارة" hint="اختياري — صيغة دولية مثل 05XXXXXXXX أو +9665XXXXXXXX">
+              <Input
+                name="management_notification_whatsapp"
+                type="tel"
+                dir="ltr"
+                defaultValue={orgSettings?.management_notification_whatsapp ?? ""}
                 autoComplete="off"
               />
             </Field>

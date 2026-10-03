@@ -1,6 +1,7 @@
 import type { ActiveMember, HubChannel, NotificationCategory, PreferenceRow } from "./catalog";
 import { MANDATORY_IN_APP_CATEGORIES, SENSITIVE_CATEGORIES } from "./catalog";
 import { categoryForNotificationType, emailAudienceFor } from "./event-compat";
+import { whatsappAudienceFor } from "./whatsapp-policy";
 
 export function resolveActiveRecipients(input: {
   organizationId: string;
@@ -65,7 +66,7 @@ export function canDisablePreference(category: NotificationCategory, channel: Hu
   return true;
 }
 
-/** Queue-time channel plan. Email rows are created only when the email provider is enabled. */
+/** Queue-time channel plan. External rows are created only when that provider is enabled. */
 export function planDeliveryChannels(input: {
   type: string;
   recipientId: string;
@@ -74,6 +75,7 @@ export function planDeliveryChannels(input: {
   emailAvailable: boolean;
   pushAvailable: boolean;
   whatsappAvailable: boolean;
+  personalWhatsAppAllowed?: boolean;
 }): HubChannel[] {
   const category = categoryForNotificationType(input.type);
   const selected = selectChannels({
@@ -84,14 +86,24 @@ export function planDeliveryChannels(input: {
     emailAvailable: input.emailAvailable,
     whatsappAvailable: input.whatsappAvailable,
   });
-  const audience = emailAudienceFor(input.type);
-  const channels: HubChannel[] = selected.filter((c) => c !== "email");
-  if (!input.emailAvailable) return channels;
-  if (audience === "personal" && selected.includes("email") && input.personalEmailAllowed) {
-    channels.push("email");
+  const emailAudience = emailAudienceFor(input.type);
+  const waAudience = whatsappAudienceFor(input.type);
+  const channels: HubChannel[] = selected.filter((c) => c !== "email" && c !== "whatsapp");
+  if (input.emailAvailable) {
+    if (emailAudience === "personal" && selected.includes("email") && input.personalEmailAllowed) {
+      channels.push("email");
+    }
+    if (emailAudience === "management") {
+      channels.push("email");
+    }
   }
-  if (audience === "management") {
-    channels.push("email");
+  if (input.whatsappAvailable) {
+    if (waAudience === "personal" && selected.includes("whatsapp") && input.personalWhatsAppAllowed) {
+      channels.push("whatsapp");
+    }
+    if (waAudience === "management") {
+      channels.push("whatsapp");
+    }
   }
   return channels;
 }

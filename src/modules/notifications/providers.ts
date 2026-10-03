@@ -10,7 +10,9 @@ export type EmailMessage = {
 export type WhatsAppMessage = {
   toE164: string;
   templateId: string;
+  language?: string;
   parameters: string[];
+  href?: string | null;
 };
 
 export type PushMessage = {

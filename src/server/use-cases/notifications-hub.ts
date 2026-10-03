@@ -11,6 +11,12 @@ import { nextRetryAt } from "@/modules/notifications/schedule";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { logger } from "@/lib/logger";
 
+/**
+ * Daily cron remains retry/recovery (`0 6 * * *`). W3 WhatsApp near-real-time
+ * should await a bounded in-process claim/process for the persisted
+ * notification_id (same admin client, SKIP LOCKED). Do not fire-and-forget HTTP.
+ */
+
 function isHubSchemaError(message: string | undefined): boolean {
   return /does not exist|schema cache|notification_preferences|upsert_operational/i.test(message ?? "");
 }
@@ -180,16 +186,29 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
             },
           ]
         : [];
-      const destRes = await admin
+      let destRes = await admin
         .from("organizations")
-        .select("management_notification_email")
+        .select("management_notification_email, management_notification_whatsapp")
         .eq("id", row.organization_id)
         .maybeSingle();
+      if (destRes.error && /management_notification_whatsapp|schema cache|column/i.test(destRes.error.message ?? "")) {
+        destRes = await admin
+          .from("organizations")
+          .select("management_notification_email")
+          .eq("id", row.organization_id)
+          .maybeSingle();
+      }
       const managementEmail =
         destRes.error || typeof destRes.data?.management_notification_email !== "string"
           ? null
           : destRes.data.management_notification_email;
+      const destWhatsapp = destRes.data as { management_notification_whatsapp?: string | null } | null;
+      const managementWhatsApp =
+        destRes.error || typeof destWhatsapp?.management_notification_whatsapp !== "string"
+          ? null
+          : destWhatsapp.management_notification_whatsapp;
       store.managementEmail.set(row.organization_id, managementEmail);
+      store.managementWhatsApp.set(row.organization_id, managementWhatsApp);
       store.deliveries = [
         {
           id: row.id,
@@ -201,15 +220,26 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
           attemptCount: row.attempt_count,
         },
       ];
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("full_name_ar, phone")
-        .eq("id", row.recipient_profile_id)
-        .maybeSingle();
+      let profile = (
+        await admin
+          .from("profiles")
+          .select("full_name_ar, phone, whatsapp_opt_in")
+          .eq("id", row.recipient_profile_id)
+          .maybeSingle()
+      ).data as { full_name_ar?: string | null; phone?: string | null; whatsapp_opt_in?: boolean } | null;
+      if (!profile) {
+        const fallback = await admin
+          .from("profiles")
+          .select("full_name_ar, phone")
+          .eq("id", row.recipient_profile_id)
+          .maybeSingle();
+        profile = fallback.data;
+      }
       store.contacts.set(row.recipient_profile_id, {
         email: null,
         phone: profile?.phone ?? null,
         name: profile?.full_name_ar ?? null,
+        whatsappOptIn: profile?.whatsapp_opt_in === true,
       });
       try {
         const user = await admin.auth.admin.getUserById(row.recipient_profile_id);
@@ -217,6 +247,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
           email: user.data.user?.email ?? null,
           phone: profile?.phone ?? null,
           name: profile?.full_name_ar ?? null,
+          whatsappOptIn: profile?.whatsapp_opt_in === true,
         });
       } catch {
         /* email lookup is best-effort */

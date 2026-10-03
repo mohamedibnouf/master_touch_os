@@ -14,6 +14,7 @@ import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
+import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import {
   createEmployeeLoginProvisioned,
   createEmployeeValidationMessageAr,
@@ -445,6 +446,11 @@ export async function updateEmployeeProfileAction(
     throw new ValidationError("بيانات الهوية غير مكتملة.", "Profile data is incomplete.");
   }
 
+  const phoneResult = normalizePhoneToE164(parsed.data.phone);
+  if (!phoneResult.ok) {
+    throw new ValidationError("رقم الجوال غير صالح.", "The mobile number is not a valid E.164 contact.");
+  }
+
   const supabase = await createServerSupabaseClient();
   const { data: emp, error: empErr } = await supabase
     .from("employees")
@@ -455,13 +461,18 @@ export async function updateEmployeeProfileAction(
   if (empErr) throw new DatabaseError(empErr);
   if (!emp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
 
+  const patch: { full_name_ar: string; full_name_en: string; phone: string | null; whatsapp_opt_in?: boolean } = {
+    full_name_ar: parsed.data.full_name_ar,
+    full_name_en: parsed.data.full_name_en,
+    phone: phoneResult.e164,
+  };
+  if (phoneResult.e164 === null) {
+    patch.whatsapp_opt_in = false;
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .update({
-      full_name_ar: parsed.data.full_name_ar,
-      full_name_en: parsed.data.full_name_en,
-      phone: emptyToNull(parsed.data.phone),
-    })
+    .update(patch)
     .eq("id", emp.profile_id);
   if (error) throw new DatabaseError(error);
 

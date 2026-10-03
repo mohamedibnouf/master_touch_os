@@ -1,13 +1,18 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CHANNELS } from "@/modules/notifications/catalog";
-import { saveNotificationPreferenceAction } from "@/server/use-cases/notification-preferences";
+import {
+  saveNotificationPreferenceAction,
+  saveOwnContactPhoneAction,
+  saveWhatsAppOptInAction,
+} from "@/server/use-cases/notification-preferences";
 import { PushOptInButton } from "@/components/notifications/push-opt-in";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { isValidE164, maskE164 } from "@/lib/phone/e164";
 
 export default async function NotificationPreferencesPage() {
   const ctx = await getAuthContext();
@@ -23,12 +28,45 @@ export default async function NotificationPreferencesPage() {
   const hubReady = !error;
   const prefs = new Map((data ?? []).map((p) => [`${p.category}:${p.channel}`, p.enabled as boolean]));
 
+  const { data: contact } = await supabase
+    .from("profiles")
+    .select("phone, whatsapp_opt_in")
+    .eq("id", ctx.userId)
+    .maybeSingle<{ phone: string | null; whatsapp_opt_in: boolean }>();
+  const phone = contact?.phone ?? null;
+  const hasValidPhone = Boolean(phone && isValidE164(phone));
+  const optIn = contact?.whatsapp_opt_in === true;
+
   return (
     <PageContainer data-testid="notification-preferences" className="space-y-5">
       <PageHeader
         title="تفضيلات التنبيه"
-        description="التحكم بالقنوات لا يلغي صلاحياتك. التنبيه داخل التطبيق إلزامي للعمل والموافقات والرواتب."
+        description="التحكم بالقنوات لا يلغي صلاحياتك. التنبيه داخل التطبيق إلزامي للعمل والموافقات والرواتب. واتساب التشغيلي يتطلب موافقة صريحة بالإضافة إلى تفضيل الفئة."
       />
+      <Card data-testid="whatsapp-operational-opt-in">
+        <h2 className="mb-2 font-semibold text-navy">إشعارات واتساب التشغيلية</h2>
+        <p className="mb-3 text-sm text-muted">
+          موافقة تشغيلية فقط — ليست تسويقاً. لا تُفعَّل تلقائياً. يلزم رقم جوال صالح وتفضيل الفئة ومزوّد مفعّل لاحقاً.
+        </p>
+        <ServerActionForm action={saveOwnContactPhoneAction} className="mb-4 max-w-md space-y-3">
+          <Field label="رقم الجوال" hint={hasValidPhone && phone ? `المحفوظ: ${maskE164(phone)}` : "أضف رقم جوال صالحاً أولاً لتفعيل إشعارات واتساب."}>
+            <Input name="phone" type="tel" dir="ltr" defaultValue={phone ?? ""} autoComplete="tel" />
+          </Field>
+          <Button type="submit">حفظ الرقم</Button>
+        </ServerActionForm>
+        {hasValidPhone ? (
+          <ServerActionForm action={saveWhatsAppOptInAction}>
+            <input type="hidden" name="whatsapp_opt_in" value={optIn ? "false" : "true"} />
+            <Button type="submit" variant={optIn ? "primary" : "secondary"} data-testid="whatsapp-opt-in-toggle">
+              {optIn ? "واتساب التشغيلي: مفعّل" : "تفعيل واتساب التشغيلي"}
+            </Button>
+          </ServerActionForm>
+        ) : (
+          <p className="text-sm text-muted" data-testid="whatsapp-opt-in-blocked">
+            أضف رقم جوال صالحاً أولاً لتفعيل إشعارات واتساب.
+          </p>
+        )}
+      </Card>
       {!hubReady ? (
         <EmptyState
           title="مركز القنوات غير مفعّل بعد"

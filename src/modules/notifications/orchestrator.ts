@@ -8,6 +8,9 @@ import { isPermanentProviderError, MAX_DELIVERY_ATTEMPTS, nextRetryAt } from "./
 import { emailAudienceFor } from "./event-compat";
 import { buildNotificationEmailHref, resolveEmailAppBaseUrl } from "./app-url";
 import { renderOperationalEmail } from "./email-render";
+import { whatsappAudienceFor } from "./whatsapp-policy";
+import { resolveManagementWhatsAppE164, resolvePersonalWhatsAppE164 } from "./whatsapp-recipients";
+import { buildWhatsAppParameters, whatsappTemplateIdForEvent } from "./whatsapp-templates";
 
 export type HubNotification = {
   id: string;
@@ -56,9 +59,15 @@ export type HubStore = {
   }): Promise<HubNotification>;
   listActiveMembers(organizationId: string, profileIds: string[]): Promise<ActiveMember[]>;
   listPreferences(organizationId: string, profileIds: string[]): Promise<PreferenceRow[]>;
-  getRecipientContact(profileId: string): Promise<{ email: string | null; phone: string | null; name: string | null }>;
+  getRecipientContact(profileId: string): Promise<{
+    email: string | null;
+    phone: string | null;
+    name: string | null;
+    whatsappOptIn?: boolean;
+  }>;
   getNotification(notificationId: string): Promise<HubNotification | null>;
   getManagementEmail(organizationId: string): Promise<string | null>;
+  getManagementWhatsApp(organizationId: string): Promise<string | null>;
   listPushEndpoints(organizationId: string, profileId: string): Promise<Array<{ endpoint: string }>>;
   markDelivery(
     deliveryId: string,
@@ -115,11 +124,19 @@ export class NotificationOrchestrator {
     for (const recipientId of recipients) {
       const member = members.find((m) => m.profileId === recipientId);
       const personalEmailAllowed = Boolean(member && member.status === "active" && member.isActive);
+      const contact = await this.store.getRecipientContact(recipientId);
+      const personalWhatsAppAllowed = Boolean(
+        member &&
+          member.status === "active" &&
+          member.isActive &&
+          resolvePersonalWhatsAppE164({ phone: contact.phone, optIn: contact.whatsappOptIn === true }),
+      );
       const channels = planDeliveryChannels({
         type: event.eventType,
         recipientId,
         preferences: prefs,
         personalEmailAllowed,
+        personalWhatsAppAllowed,
         emailAvailable: this.email.enabled,
         pushAvailable: this.push.enabled,
         whatsappAvailable: this.whatsapp.enabled,
@@ -164,15 +181,7 @@ export class NotificationOrchestrator {
     if (delivery.channel === "email") {
       result = await this.sendEmail(delivery, contact.email);
     } else if (delivery.channel === "whatsapp") {
-      if (!this.whatsapp.enabled || !contact.phone) {
-        await this.store.markDelivery(delivery.id, { status: "cancelled", lastErrorCode: "disabled" });
-        return { status: "cancelled", lastErrorCode: "disabled" };
-      }
-      result = await this.whatsapp.send({
-        toE164: contact.phone,
-        templateId: "mt_operational_alert",
-        parameters: [contact.name ?? ""],
-      });
+      result = await this.sendWhatsApp(delivery, contact);
     } else {
       const endpoints = await this.store.listPushEndpoints(delivery.organizationId, delivery.recipientId);
       if (!this.push.enabled || endpoints.length === 0) {
@@ -198,7 +207,14 @@ export class NotificationOrchestrator {
     }
     if (!result.retry || isPermanentProviderError(result.code)) {
       await this.store.markDelivery(delivery.id, {
-        status: result.code === "disabled" || result.code === "missing_management_destination" || result.code === "missing_email" ? "cancelled" : "failed",
+        status:
+          result.code === "disabled" ||
+          result.code === "missing_management_destination" ||
+          result.code === "missing_email" ||
+          result.code === "missing_whatsapp_destination" ||
+          result.code === "not_allowlisted"
+            ? "cancelled"
+            : "failed",
         lastErrorCode: result.code,
         nextAttemptAt: null,
       });
@@ -206,7 +222,9 @@ export class NotificationOrchestrator {
       const terminal =
         result.code === "disabled" ||
         result.code === "missing_management_destination" ||
-        result.code === "missing_email"
+        result.code === "missing_email" ||
+        result.code === "missing_whatsapp_destination" ||
+        result.code === "not_allowlisted"
           ? "cancelled"
           : "failed";
       return { status: terminal, lastErrorCode: result.code };
@@ -254,6 +272,40 @@ export class NotificationOrchestrator {
       html: rendered.html,
       href,
       replyTo,
+    });
+  }
+
+  private async sendWhatsApp(
+    delivery: HubDelivery,
+    contact: { phone: string | null; whatsappOptIn?: boolean },
+  ): Promise<{ ok: true; providerMessageId?: string } | { ok: false; code: string; retry: boolean }> {
+    if (!this.whatsapp.enabled) return { ok: false, code: "disabled", retry: false };
+    const notification = await this.store.getNotification(delivery.notificationId);
+    const type = notification?.eventType ?? "";
+    const audience = whatsappAudienceFor(type);
+    if (audience === "none") return { ok: false, code: "not_allowlisted", retry: false };
+    let to: string | null = null;
+    if (audience === "management") {
+      to = resolveManagementWhatsAppE164(await this.store.getManagementWhatsApp(delivery.organizationId));
+      if (!to) return { ok: false, code: "missing_management_destination", retry: false };
+    } else {
+      to = resolvePersonalWhatsAppE164({ phone: contact.phone, optIn: contact.whatsappOptIn === true });
+      if (!to) return { ok: false, code: "missing_whatsapp_destination", retry: false };
+    }
+    const templateId = whatsappTemplateIdForEvent(type);
+    if (!templateId) return { ok: false, code: "not_allowlisted", retry: false };
+    const params = buildWhatsAppParameters({
+      title: notification?.title ?? "تنبيه تشغيلي",
+      body: notification?.body ?? "يوجد تنبيه يحتاج متابعتك داخل النظام.",
+      href: notification?.href,
+      appBaseUrl: this.appBaseUrl,
+    });
+    return this.whatsapp.send({
+      toE164: to,
+      templateId,
+      language: "ar",
+      parameters: [params.title, params.context, params.href],
+      href: params.href,
     });
   }
 }

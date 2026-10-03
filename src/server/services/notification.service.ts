@@ -7,6 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { planDeliveryChannels } from "@/modules/notifications/policy";
 import type { PreferenceRow } from "@/modules/notifications/catalog";
 import { createEmailProvider, createPushProvider, createWhatsAppProvider } from "@/modules/notifications/providers";
+import { personalWhatsAppDestinationAllowed } from "@/modules/notifications/whatsapp-recipients";
 
 export type NotificationPayload = {
   organizationId: string;
@@ -71,20 +72,32 @@ async function resolveNotifyChannels(
   writer: SupabaseClient,
   payload: NotificationPayload,
 ): Promise<Array<"in_app" | "email" | "whatsapp" | "push">> {
-  const [memberRes, profileRes, prefsRes] = await Promise.all([
+  const [memberRes, prefsRes] = await Promise.all([
     writer
       .from("organization_members")
       .select("status")
       .eq("organization_id", payload.organizationId)
       .eq("profile_id", payload.recipientProfileId)
       .maybeSingle<{ status: string }>(),
-    writer.from("profiles").select("is_active").eq("id", payload.recipientProfileId).maybeSingle<{ is_active: boolean }>(),
     writer
       .from("notification_preferences")
       .select("category, channel, enabled")
       .eq("organization_id", payload.organizationId)
       .eq("profile_id", payload.recipientProfileId),
   ]);
+
+  let profileRes = await writer
+    .from("profiles")
+    .select("is_active, phone, whatsapp_opt_in")
+    .eq("id", payload.recipientProfileId)
+    .maybeSingle<{ is_active: boolean; phone: string | null; whatsapp_opt_in?: boolean }>();
+  if (profileRes.error && /whatsapp_opt_in|schema cache|column/i.test(profileRes.error.message ?? "")) {
+    profileRes = await writer
+      .from("profiles")
+      .select("is_active, phone")
+      .eq("id", payload.recipientProfileId)
+      .maybeSingle<{ is_active: boolean; phone: string | null; whatsapp_opt_in?: boolean }>();
+  }
 
   const preferences: PreferenceRow[] = ((prefsRes.data ?? []) as Array<{
     category: PreferenceRow["category"];
@@ -98,12 +111,18 @@ async function resolveNotifyChannels(
   }));
 
   const personalEmailAllowed = memberRes.data?.status === "active" && profileRes.data?.is_active === true;
+  const personalWhatsAppAllowed = personalWhatsAppDestinationAllowed({
+    phone: profileRes.data?.phone ?? null,
+    optIn: profileRes.data?.whatsapp_opt_in === true,
+    memberActive: personalEmailAllowed,
+  });
 
   return planDeliveryChannels({
     type: payload.type,
     recipientId: payload.recipientProfileId,
     preferences,
     personalEmailAllowed,
+    personalWhatsAppAllowed,
     emailAvailable: createEmailProvider().enabled,
     pushAvailable: createPushProvider().enabled,
     whatsappAvailable: createWhatsAppProvider().enabled,
