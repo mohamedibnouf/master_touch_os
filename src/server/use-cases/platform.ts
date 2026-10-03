@@ -16,10 +16,15 @@ import {
   completeWorkflowStepSchema,
   createApprovalSchema,
   decideApprovalSchema,
-  startWorkflowSchema,
 } from "@/modules/approvals/schemas";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
+import {
+  mapStartWorkflowRpcError,
+  parseStartWorkflowForm,
+  startWorkflowValidationMessage,
+} from "@/modules/projects/start-workflow-input";
+import { logger } from "@/lib/logger";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { assignmentRejectReason, canUnassignUserRole } from "@/lib/rbac/custom-roles";
@@ -288,13 +293,15 @@ export async function startWorkflowAction(
 ): Promise<FormActionState> {
   return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "workflow.start");
-  const parsed = startWorkflowSchema.safeParse({
+  const parsed = parseStartWorkflowForm({
     definitionId: formData.get("definitionId"),
     entityType: formData.get("entityType"),
     entityId: formData.get("entityId"),
   });
-  if (!parsed.success) {
-    throw new ValidationError("تعذر بدء مسار العمل.", "Could not start the workflow.");
+  if (!parsed.ok) {
+    logger.warn("start_workflow form validation failed", { operation: "start_workflow", field: parsed.field });
+    const copy = startWorkflowValidationMessage(parsed.field);
+    throw new ValidationError(copy.ar, copy.en);
   }
 
   const supabase = await createServerSupabaseClient();
@@ -305,10 +312,19 @@ export async function startWorkflowAction(
     p_entity_id: parsed.data.entityId,
   });
   if (error) {
-    if (error.message.includes("CONFLICT")) {
-      throw new ConflictError("يوجد مسار عمل نشط بالفعل.", "An active workflow already exists.");
+    logger.warn("start_workflow rpc failed", {
+      operation: "start_workflow",
+      code: "code" in error ? error.code : undefined,
+      errorMessage: error.message,
+    });
+    const mapped = mapStartWorkflowRpcError(error.message);
+    if (mapped.kind === "CONFLICT") {
+      throw new ConflictError(mapped.ar, mapped.en);
     }
-    throwMappedWorkflowRpc(error);
+    if (mapped.kind === "DATABASE") {
+      throw new DatabaseError(error);
+    }
+    throw new ValidationError(mapped.ar, mapped.en);
   }
 
   const { data: instance } = await supabase

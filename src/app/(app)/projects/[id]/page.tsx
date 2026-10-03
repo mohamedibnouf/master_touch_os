@@ -338,6 +338,9 @@ export default async function ProjectDetailPage({
           {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
+              {(definitions.data ?? []).length === 0 ? (
+                <p className="text-sm text-muted">لا يوجد قالب مسار عمل منشور للمشاريع.</p>
+              ) : (
               <ServerActionForm action={startWorkflowAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
@@ -352,6 +355,7 @@ export default async function ProjectDetailPage({
                 </Field>
                 <Button type="submit">بدء المسار</Button>
               </ServerActionForm>
+              )}
             </Card>
           ) : null}
         </div>
@@ -753,6 +757,9 @@ export default async function ProjectDetailPage({
           {hasPermission(ctx, "workflow.start") ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
+              {(definitions.data ?? []).length === 0 ? (
+                <p className="text-sm text-muted">لا يوجد قالب مسار عمل منشور للمشاريع.</p>
+              ) : (
               <ServerActionForm action={startWorkflowAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
@@ -767,6 +774,7 @@ export default async function ProjectDetailPage({
                 </Field>
                 <Button type="submit">بدء</Button>
               </ServerActionForm>
+              )}
             </Card>
           ) : null}
         </div>

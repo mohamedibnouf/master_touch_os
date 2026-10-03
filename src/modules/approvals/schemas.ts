@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { isPostgresUuid } from "@/lib/postgres-uuid";
+
+/** Seed workflow IDs are PostgreSQL uuids, not RFC 4122. Zod 4 `.uuid()` rejects them. */
+const postgresUuid = z.string().refine(isPostgresUuid, { message: "Invalid uuid" });
 
 export const createApprovalSchema = z.object({
   title: z.string().trim().min(2).max(240),
@@ -15,9 +19,9 @@ export const decideApprovalSchema = z.object({
 });
 
 export const startWorkflowSchema = z.object({
-  definitionId: z.string().uuid(),
+  definitionId: postgresUuid,
   entityType: z.string().min(2).max(60),
-  entityId: z.string().uuid(),
+  entityId: postgresUuid,
 });
 
 export const completeWorkflowStepSchema = z.object({
