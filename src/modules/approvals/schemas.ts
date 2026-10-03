@@ -28,3 +28,8 @@ export const completeWorkflowStepSchema = z.object({
   instanceStepId: z.string().uuid(),
   outcome: z.enum(["complete", "reject", "resubmit"]),
 });
+
+export const updateWorkflowStepDeadlineSchema = z.object({
+  instanceStepId: postgresUuid,
+  dueAtLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+});

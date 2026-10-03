@@ -1,6 +1,7 @@
 import { Badge, Button, Card, Field, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { ApprovalActionPanel } from "@/components/projects/approval-action-panel";
+import { WorkflowDeadlinePanel } from "@/components/projects/workflow-deadline-panel";
 import {
   completeProjectStageAction,
   completeWorkflowStepAction,
@@ -65,7 +66,7 @@ export function WorkflowStageDetails({
           <dd>{formatStamp(node.startedAt)}</dd>
         </div>
         <div>
-          <dt className="text-muted">الاستحقاق</dt>
+          <dt className="text-muted">موعد الإغلاق</dt>
           <dd>{formatStamp(node.dueAt)}</dd>
         </div>
         <div>
@@ -77,6 +78,7 @@ export function WorkflowStageDetails({
           <dd>{node.completedByLabel ?? "—"}</dd>
         </div>
       </dl>
+      <WorkflowDeadlinePanel node={node} projectId={projectId} />
       {node.blockReason ? (
         <p className="rounded-[var(--radius-control)] border border-line bg-paper px-3 py-2 text-sm">{node.blockReason}</p>
       ) : null}

@@ -239,9 +239,10 @@ describe("activity + notifications policy", () => {
     expect(activityNarrative("approval.approved", { official_code: "A" })).toBeNull();
   });
 
-  it("keeps next-step activation in-app only and WhatsApp provider disabled", () => {
-    expect(emailAudienceFor("workflow.step.activated")).toBe("none");
+  it("emails activation and approvals while keeping WhatsApp disabled", () => {
+    expect(emailAudienceFor("workflow.step.activated")).toBe("personal");
     expect(emailAudienceFor("approval.created")).toBe("personal");
+    expect(emailAudienceFor("workflow.step.completed")).toBe("none");
     expect(createWhatsAppProvider().enabled).toBe(false);
   });
 });

@@ -263,6 +263,7 @@ export class NotificationOrchestrator {
       title: notification?.title ?? "تنبيه تشغيلي",
       body: notification?.body ?? "يوجد تنبيه يحتاج متابعتك داخل النظام.",
       href,
+      ctaLabel: type.startsWith("approval") ? "عرض طلب الموافقة" : "عرض المشروع",
     });
     const replyTo = process.env.NOTIFICATION_EMAIL_REPLY_TO?.trim() || null;
     return this.email.send({

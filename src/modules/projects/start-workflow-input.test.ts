@@ -79,7 +79,7 @@ describe("parseStartWorkflowForm", () => {
 describe("startWorkflowAction authorization contract", () => {
   it("requires workflow.start and does not add workflow.manage", () => {
     const src = readFileSync("src/server/use-cases/platform.ts", "utf8");
-    const start = src.slice(src.indexOf("export async function startWorkflowAction"), src.indexOf("export async function completeWorkflowStepAction"));
+    const start = src.slice(src.indexOf("export async function startWorkflowAction"), src.indexOf("export async function updateWorkflowStepDeadlineAction"));
     expect(start).toContain('authorize(await getAuthContext(), "workflow.start")');
     expect(start).not.toContain("workflow.manage");
     expect(start).toContain('p_entity_type: parsed.data.entityType');

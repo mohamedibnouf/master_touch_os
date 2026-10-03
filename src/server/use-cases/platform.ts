@@ -16,7 +16,14 @@ import {
   completeWorkflowStepSchema,
   createApprovalSchema,
   decideApprovalSchema,
+  updateWorkflowStepDeadlineSchema,
 } from "@/modules/approvals/schemas";
+import {
+  formatRiyadhDateTimeAr,
+  riyadhLocalDateTimeToUtcIso,
+  uniqueProfileIds,
+  validateDeadlineChange,
+} from "@/modules/projects/deadline";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
 import {
@@ -60,6 +67,28 @@ function revalidateProjectWorkflow(projectId: string | null) {
   }
 }
 
+async function activeRoleHolderIds(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  organizationId: string,
+  roleId: string | null,
+): Promise<string[]> {
+  if (!roleId) return [];
+  const { data: grants } = await supabase
+    .from("user_roles")
+    .select("profile_id")
+    .eq("organization_id", organizationId)
+    .eq("role_id", roleId);
+  const ids = uniqueProfileIds((grants ?? []).map((row) => row.profile_id as string));
+  if (ids.length === 0) return [];
+  const { data: members } = await supabase
+    .from("organization_members")
+    .select("profile_id, status")
+    .eq("organization_id", organizationId)
+    .in("profile_id", ids)
+    .eq("status", "active");
+  return uniqueProfileIds((members ?? []).map((row) => row.profile_id as string));
+}
+
 async function notifyWorkflowReadyAssignees(input: {
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
   organizationId: string;
@@ -68,29 +97,78 @@ async function notifyWorkflowReadyAssignees(input: {
 }) {
   const { data: ready } = await input.supabase
     .from("workflow_instance_steps")
-    .select("id, assigned_user_id, workflow_steps(name_ar)")
+    .select("id, assigned_user_id, assigned_role_id, due_at, workflow_steps(name_ar)")
     .eq("instance_id", input.instanceId)
     .eq("status", "ready");
   const href = input.projectId ? `/projects/${input.projectId}?tab=stages` : null;
   const notifications = createNotificationService(input.supabase);
   for (const row of ready ?? []) {
-    const userId = row.assigned_user_id as string | null;
-    if (!userId) continue;
     const stepRel = row.workflow_steps as { name_ar: string } | { name_ar: string }[] | null;
     const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
-    await notifications.notify({
-      organizationId: input.organizationId,
-      recipientProfileId: userId,
-      type: "workflow.step.activated",
-      title: "مرحلة جديدة جاهزة",
-      message: name ? `تم تفعيل مرحلة «${name}».` : "تم تفعيل مرحلة تالية في مسار العمل.",
-      entityType: input.projectId ? "project" : "workflow_instance_step",
-      entityId: input.projectId ?? (row.id as string),
-      href,
-      priority: "normal",
-      dedupKey: `workflow.step.activated:${row.id}:${userId}`,
-    });
+    const dueLabel = row.due_at ? formatRiyadhDateTimeAr(row.due_at as string) : null;
+    const recipients = uniqueProfileIds([
+      row.assigned_user_id as string | null,
+      ...(await activeRoleHolderIds(input.supabase, input.organizationId, (row.assigned_role_id as string | null) ?? null)),
+    ]);
+    for (const userId of recipients) {
+      await notifications.notify({
+        organizationId: input.organizationId,
+        recipientProfileId: userId,
+        type: "workflow.step.activated",
+        title: "تم إسناد مرحلة جديدة إليك",
+        message: [
+          name ? `المرحلة: ${name}` : "تم تفعيل مرحلة تالية في مسار العمل.",
+          dueLabel ? `موعد الإغلاق: ${dueLabel}` : null,
+        ]
+          .filter(Boolean)
+          .join(" — "),
+        entityType: input.projectId ? "project" : "workflow_instance_step",
+        entityId: input.projectId ?? (row.id as string),
+        href,
+        priority: "normal",
+        dedupKey: `workflow.step.activated:${row.id}:${userId}`,
+      });
+    }
   }
+}
+
+async function notifyWorkflowCompleted(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  organizationId: string;
+  instanceId: string;
+  projectId: string | null;
+}) {
+  const { data: instance } = await input.supabase
+    .from("workflow_instances")
+    .select("status, entity_type, entity_id, started_by")
+    .eq("id", input.instanceId)
+    .maybeSingle<{ status: string; entity_type: string; entity_id: string; started_by: string }>();
+  if (instance?.status !== "completed") return;
+  const projectId = input.projectId ?? (instance.entity_type === "project" ? instance.entity_id : null);
+  let managerId: string | null = null;
+  if (projectId) {
+    const { data: project } = await input.supabase
+      .from("projects")
+      .select("project_manager_id")
+      .eq("id", projectId)
+      .maybeSingle<{ project_manager_id: string | null }>();
+    managerId = project?.project_manager_id ?? null;
+  }
+  const recipient = managerId ?? instance.started_by;
+  if (!recipient) return;
+  const notifications = createNotificationService(input.supabase);
+  await notifications.notify({
+    organizationId: input.organizationId,
+    recipientProfileId: recipient,
+    type: "workflow.completed",
+    title: "اكتمل مسار عمل المشروع",
+    message: "اكتملت جميع مراحل مسار العمل.",
+    entityType: projectId ? "project" : "workflow_instance",
+    entityId: projectId ?? input.instanceId,
+    href: projectId ? `/projects/${projectId}?tab=stages` : null,
+    priority: "high",
+    dedupKey: `workflow.completed:${input.instanceId}`,
+  });
 }
 
 function throwMappedWorkflowRpc(error: { message?: string }): never {
@@ -350,6 +428,90 @@ export async function startWorkflowAction(
   });
 }
 
+export async function updateWorkflowStepDeadlineAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تحديث موعد المرحلة.", async () => {
+    const ctx = authorize(await getAuthContext(), "workflow.manage");
+    const parsed = updateWorkflowStepDeadlineSchema.safeParse({
+      instanceStepId: formData.get("instanceStepId"),
+      dueAtLocal: formData.get("dueAtLocal"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("موعد المرحلة غير صالح.", "The stage deadline is invalid.");
+    }
+    const dueAt = riyadhLocalDateTimeToUtcIso(parsed.data.dueAtLocal);
+    if (!dueAt) {
+      throw new ValidationError("موعد المرحلة غير صالح.", "The stage deadline is invalid.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { data: current } = await supabase
+      .from("workflow_instance_steps")
+      .select("id, organization_id, instance_id, status, started_at, due_at, assigned_user_id, assigned_role_id, workflow_steps(name_ar)")
+      .eq("id", parsed.data.instanceStepId)
+      .maybeSingle<{
+        id: string;
+        organization_id: string;
+        instance_id: string;
+        status: string;
+        started_at: string | null;
+        due_at: string | null;
+        assigned_user_id: string | null;
+        assigned_role_id: string | null;
+        workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
+      }>();
+    if (!current || current.organization_id !== ctx.organization.id) {
+      throw new NotFoundError("المرحلة", "Stage");
+    }
+    const validity = validateDeadlineChange({
+      startedAt: current.started_at,
+      currentDueAt: current.due_at,
+      nextDueAt: dueAt,
+      nowIso: new Date().toISOString(),
+    });
+    if (validity !== "ok") {
+      throw new ValidationError(
+        validity === "before_activation"
+          ? "لا يمكن تعيين موعد قبل بدء المرحلة."
+          : "لا يمكن تعيين موعد في الماضي لهذه المرحلة.",
+        "The deadline is not valid for this stage.",
+      );
+    }
+    const { error } = await supabase.rpc("update_workflow_step_deadline", {
+      p_instance_step_id: parsed.data.instanceStepId,
+      p_due_at: dueAt,
+    });
+    if (error) throwMappedWorkflowRpc(error);
+
+    const projectIdRaw = String(formData.get("projectId") ?? "");
+    const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
+    const nameRel = current.workflow_steps;
+    const name = Array.isArray(nameRel) ? nameRel[0]?.name_ar : nameRel?.name_ar;
+    const recipients = uniqueProfileIds([
+      current.assigned_user_id,
+      ...(await activeRoleHolderIds(supabase, current.organization_id, current.assigned_role_id)),
+    ]).filter((id) => id !== ctx.userId);
+    const notifications = createNotificationService(supabase);
+    const dueLabel = formatRiyadhDateTimeAr(dueAt);
+    for (const userId of recipients) {
+      await notifications.notify({
+        organizationId: current.organization_id,
+        recipientProfileId: userId,
+        type: "workflow.step.deadline_changed",
+        title: name ? `تم تحديث موعد مرحلة «${name}»` : "تم تحديث موعد المرحلة",
+        message: `الموعد الجديد: ${dueLabel}`,
+        entityType: projectId ? "project" : "workflow_instance_step",
+        entityId: projectId ?? current.id,
+        href: projectId ? `/projects/${projectId}?tab=stages` : null,
+        priority: "normal",
+        dedupKey: `workflow.step.deadline_changed:${current.id}:${dueAt}:${userId}`,
+      });
+    }
+    revalidateProjectWorkflow(projectId);
+  });
+}
+
 export async function completeWorkflowStepAction(
   _prev: FormActionState,
   formData: FormData,
@@ -388,6 +550,12 @@ export async function completeWorkflowStepAction(
       if (instance?.entity_type === "project") resolvedProjectId = instance.entity_id;
     }
     await notifyWorkflowReadyAssignees({
+      supabase,
+      organizationId: step.organization_id,
+      instanceId: step.instance_id,
+      projectId: resolvedProjectId,
+    });
+    await notifyWorkflowCompleted({
       supabase,
       organizationId: step.organization_id,
       instanceId: step.instance_id,
@@ -611,6 +779,12 @@ export async function decideApprovalAction(
       .maybeSingle<{ instance_id: string; organization_id: string }>();
     if (wfStep) {
       await notifyWorkflowReadyAssignees({
+        supabase,
+        organizationId: wfStep.organization_id,
+        instanceId: wfStep.instance_id,
+        projectId,
+      });
+      await notifyWorkflowCompleted({
         supabase,
         organizationId: wfStep.organization_id,
         instanceId: wfStep.instance_id,

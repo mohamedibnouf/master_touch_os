@@ -18,6 +18,12 @@ import {
   type WorkflowGateKind,
   type WorkflowVisualState,
 } from "@/modules/projects/workflow-view";
+import {
+  deriveDeadlineState,
+  formatOverdueSinceAr,
+  formatRemainingAr,
+  type DeadlineState,
+} from "@/modules/projects/deadline";
 
 function asOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -51,6 +57,11 @@ export type WorkflowViewNode = {
   canComplete: boolean;
   canSubmitApproval: boolean;
   canDecideApproval: boolean;
+  canEditDeadline: boolean;
+  warningHours: number | null;
+  deadlineState: DeadlineState;
+  remainingLabel: string | null;
+  overdueSinceLabel: string | null;
 };
 
 export type ProjectWorkflowProjection = {
@@ -70,6 +81,8 @@ type StepDef = {
   name_en: string;
   requires_approval: boolean;
   assigned_role_id: string | null;
+  warning_hours: number | null;
+  sla_hours: number | null;
 };
 
 type InstanceStepRow = {
@@ -138,7 +151,7 @@ export async function loadProjectWorkflowProjection(input: {
       supabase
         .from("workflow_instance_steps")
         .select(
-          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id)",
+          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id, warning_hours, sla_hours)",
         )
         .eq("instance_id", instance.id)
         .order("sequence"),
@@ -244,6 +257,15 @@ export async function loadProjectWorkflowProjection(input: {
       );
       const canSubmitApproval = Boolean(canAct && canCreateApproval && requiresApproval && !openApproval && isActive);
       const canComplete = Boolean(canAct && isActive && !openApproval && (!requiresApproval || latestOfficialCode === "A" || latestOfficialCode === "B"));
+      const warningHours = def?.warning_hours ?? null;
+      const deadlineState = deriveDeadlineState({
+        engineStatus: step.status,
+        dueAt: step.due_at,
+        warningHours,
+        nowIso,
+      });
+      const remainingLabel = step.due_at ? formatRemainingAr(step.due_at, nowIso) : null;
+      const overdueSinceLabel = step.due_at ? formatOverdueSinceAr(step.due_at, nowIso) : null;
 
       const prev = steps[index - 1];
       let activationHint: string | null = null;
@@ -291,6 +313,11 @@ export async function loadProjectWorkflowProjection(input: {
         canComplete,
         canSubmitApproval,
         canDecideApproval,
+        canEditDeadline: Boolean(isActive && canManage && (step.status === "ready" || step.status === "in_progress")),
+        warningHours,
+        deadlineState,
+        remainingLabel,
+        overdueSinceLabel,
       };
     });
 
@@ -377,6 +404,16 @@ export async function loadProjectWorkflowProjection(input: {
       canComplete: false,
       canSubmitApproval: false,
       canDecideApproval: false,
+      canEditDeadline: false,
+      warningHours: null,
+      deadlineState: deriveDeadlineState({
+        engineStatus: stage.status === "not_started" ? "pending" : stage.status,
+        dueAt: stage.due_at ?? stage.planned_end,
+        warningHours: null,
+        nowIso,
+      }),
+      remainingLabel: stage.due_at || stage.planned_end ? formatRemainingAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
+      overdueSinceLabel: stage.due_at || stage.planned_end ? formatOverdueSinceAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
     };
   });
 

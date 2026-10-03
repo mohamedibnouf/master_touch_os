@@ -11,17 +11,19 @@ export function renderOperationalEmail(input: {
   body: string;
   href: string;
   organizationNameAr?: string | null;
+  ctaLabel?: string | null;
 }): OperationalEmailContent {
   const title = input.title.trim() || "تنبيه تشغيلي";
   const body = input.body.trim() || "يوجد تنبيه يحتاج متابعتك داخل النظام.";
   const brand = input.organizationNameAr?.trim() || "ماستر تاتش";
+  const cta = input.ctaLabel?.trim() || "فتح التنبيه في ماستر تاتش";
   const subject = `${brand} — ${title}`.slice(0, 200);
   const text = [
     title,
     "",
     body,
     "",
-    `فتح التنبيه: ${input.href}`,
+    `${cta}: ${input.href}`,
     "",
     "هذه رسالة تشغيلية من نظام ماستر تاتش. لا تتضمن تفاصيل سرية.",
   ].join("\n");
@@ -42,7 +44,7 @@ export function renderOperationalEmail(input: {
     <tr><td style="padding:20px 24px;">
       <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${escapeHtml(body)}</p>
       <p style="margin:0;">
-        <a href="${escapeHtml(input.href)}" style="display:inline-block;background:#1a365d;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:14px;">فتح التنبيه في ماستر تاتش</a>
+        <a href="${escapeHtml(input.href)}" style="display:inline-block;background:#1a365d;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:14px;">${escapeHtml(cta)}</a>
       </p>
     </td></tr>
     <tr><td style="padding:12px 24px 20px;font-size:12px;color:#5c564c;">

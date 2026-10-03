@@ -6,6 +6,13 @@ import { createEmailProvider, createPushProvider, createWhatsAppProvider } from 
 import { NotificationOrchestrator } from "@/modules/notifications/orchestrator";
 import { MemoryHubStore } from "@/modules/notifications/memory-store";
 import { buildApprovalReminderEvents, buildProjectDeadlineEvents } from "@/modules/notifications/scan";
+import {
+  buildWorkflowDeadlineEvents,
+  formatOverdueSinceAr,
+  formatRemainingAr,
+  formatRiyadhDateTimeAr,
+  uniqueProfileIds,
+} from "@/modules/projects/deadline";
 import { maybeAiDigestSummary, type DigestFacts } from "@/modules/notifications/digest";
 import { nextRetryAt } from "@/modules/notifications/schedule";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
@@ -133,6 +140,149 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       priority: "high",
       dedupKey: ev.dedupKey,
       href: `/projects/${ev.entityId}`,
+    });
+    reminders += 1;
+  }
+
+  const { data: wfSteps } = await admin
+    .from("workflow_instance_steps")
+    .select(
+      "id, organization_id, instance_id, status, due_at, assigned_user_id, assigned_role_id, workflow_steps(name_ar, warning_hours)",
+    )
+    .in("status", ["ready", "in_progress"])
+    .not("due_at", "is", null)
+    .limit(200);
+
+  const instanceIds = [...new Set((wfSteps ?? []).map((s) => s.instance_id as string))];
+  const instanceById = new Map<string, { entity_type: string; entity_id: string; status: string }>();
+  if (instanceIds.length) {
+    const { data: instances } = await admin
+      .from("workflow_instances")
+      .select("id, entity_type, entity_id, status")
+      .in("id", instanceIds);
+    for (const inst of instances ?? []) {
+      instanceById.set(inst.id as string, {
+        entity_type: inst.entity_type as string,
+        entity_id: inst.entity_id as string,
+        status: inst.status as string,
+      });
+    }
+  }
+
+  const roleIds = [
+    ...new Set(
+      (wfSteps ?? [])
+        .map((s) => s.assigned_role_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const holdersByRole = new Map<string, string[]>();
+  if (roleIds.length) {
+    const { data: grants } = await admin
+      .from("user_roles")
+      .select("role_id, profile_id, organization_id")
+      .in("role_id", roleIds);
+    const memberIds = [...new Set((grants ?? []).map((g) => g.profile_id as string))];
+    const active = new Set<string>();
+    if (memberIds.length) {
+      const { data: members } = await admin
+        .from("organization_members")
+        .select("profile_id, organization_id, status")
+        .in("profile_id", memberIds)
+        .eq("status", "active");
+      for (const m of members ?? []) active.add(`${m.organization_id}:${m.profile_id}`);
+    }
+    for (const g of grants ?? []) {
+      const key = `${g.organization_id}:${g.profile_id}`;
+      if (!active.has(key)) continue;
+      const list = holdersByRole.get(g.role_id as string) ?? [];
+      list.push(g.profile_id as string);
+      holdersByRole.set(g.role_id as string, list);
+    }
+  }
+
+  const projectIds = [
+    ...new Set(
+      (wfSteps ?? [])
+        .map((s) => {
+          const row = instanceById.get(s.instance_id as string);
+          return row?.entity_type === "project" ? row.entity_id : null;
+        })
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const managerByProject = new Map<string, string | null>();
+  if (projectIds.length) {
+    const { data: projects } = await admin.from("projects").select("id, project_manager_id").in("id", projectIds);
+    for (const p of projects ?? []) managerByProject.set(p.id as string, (p.project_manager_id as string | null) ?? null);
+  }
+
+  const nowIso = now.toISOString();
+  const wfEvents = buildWorkflowDeadlineEvents(
+    (wfSteps ?? []).flatMap((s) => {
+      const row = instanceById.get(s.instance_id as string);
+      if (row?.status === "completed" || row?.status === "cancelled") return [];
+      const projectId = row?.entity_type === "project" ? row.entity_id : null;
+      const def = s.workflow_steps as { name_ar?: string; warning_hours?: number | null } | { name_ar?: string; warning_hours?: number | null }[] | null;
+      const defOne = Array.isArray(def) ? def[0] : def;
+      const roleHolders = s.assigned_role_id ? (holdersByRole.get(s.assigned_role_id as string) ?? []) : [];
+      return [
+        {
+          id: s.id as string,
+          organizationId: s.organization_id as string,
+          projectId,
+          nameAr: defOne?.name_ar ?? "مرحلة",
+          status: s.status as string,
+          dueAt: (s.due_at as string | null) ?? null,
+          warningHours: defOne?.warning_hours ?? null,
+          recipientIds: uniqueProfileIds([
+            s.assigned_user_id as string | null,
+            ...roleHolders,
+            projectId ? managerByProject.get(projectId) ?? null : null,
+          ]),
+        },
+      ];
+    }),
+    nowIso,
+  );
+
+  for (const ev of wfEvents) {
+    const dueLabel = formatRiyadhDateTimeAr(ev.dueAt);
+    const remaining = formatRemainingAr(ev.dueAt, nowIso);
+    const late = formatOverdueSinceAr(ev.dueAt, nowIso);
+    const warning = ev.eventType === "workflow.step.deadline_warning";
+    await notify.notify({
+      organizationId: ev.organizationId,
+      recipientProfileId: ev.recipientId,
+      type: ev.eventType,
+      title: warning ? "تنبيه: اقترب موعد انتهاء مرحلة" : "تنبيه تأخير مرحلة",
+      message: warning
+        ? `المرحلة: ${ev.nameAr} — موعد الإغلاق: ${dueLabel}${remaining ? ` — متبقي ${remaining}` : ""}`
+        : `المرحلة: ${ev.nameAr} — كان موعد الإغلاق: ${dueLabel}${late ? ` — متأخرة منذ ${late}` : ""}`,
+      entityType: ev.projectId ? "project" : "workflow_instance_step",
+      entityId: ev.projectId ?? ev.entityId,
+      href: ev.projectId ? `/projects/${ev.projectId}?tab=stages` : null,
+      priority: warning ? "high" : "urgent",
+      dedupKey: ev.dedupKey,
+    });
+    reminders += 1;
+  }
+
+  const overdueOrgs = [...new Set(wfEvents.filter((e) => e.eventType === "workflow.step.overdue").map((e) => e.organizationId))];
+  for (const organizationId of overdueOrgs) {
+    const sample = wfEvents.find((e) => e.organizationId === organizationId && e.eventType === "workflow.step.overdue");
+    if (!sample) continue;
+    await notify.notify({
+      organizationId,
+      recipientProfileId: sample.recipientId,
+      type: "workflow.step.overdue.management",
+      title: "تنبيه تأخير مرحلة",
+      message: `المرحلة: ${sample.nameAr} — كان موعد الإغلاق: ${formatRiyadhDateTimeAr(sample.dueAt)}`,
+      entityType: sample.projectId ? "project" : "workflow_instance_step",
+      entityId: sample.projectId ?? sample.entityId,
+      href: sample.projectId ? `/projects/${sample.projectId}?tab=stages` : null,
+      priority: "urgent",
+      dedupKey: `workflow.step.overdue.management:${sample.entityId}:${sample.dueAt}`,
     });
     reminders += 1;
   }
