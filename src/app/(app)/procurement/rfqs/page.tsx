@@ -37,7 +37,7 @@ export default async function RfqsPage({
         description="RFQ — إرسال طلبات الأسعار للموردين"
         actions={
           hasPermission(ctx, "rfq.create") ? (
-            <Link href="/procurement/rfqs/new" className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90">
+            <Link href="/procurement/rfqs/new" className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90">
               + طلب عرض أسعار
             </Link>
           ) : null
@@ -60,7 +60,7 @@ export default async function RfqsPage({
             <option value="under_comparison">قيد المقارنة</option>
             <option value="awarded">مرسّى</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

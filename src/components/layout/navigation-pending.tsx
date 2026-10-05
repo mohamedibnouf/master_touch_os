@@ -50,7 +50,7 @@ export function NavigationPendingBar() {
       aria-hidden={!active}
       aria-label={active ? "جارٍ الانتقال" : undefined}
     >
-      <div className={cn("h-full w-full origin-right bg-bronze", active && "animate-nav-indeterminate")} />
+      <div className={cn("h-full w-full origin-right bg-primary", active && "animate-nav-indeterminate")} />
     </div>
   );
 }

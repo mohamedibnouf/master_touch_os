@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { leaveStatusLabel } from "@/lib/hr/labels";
+import { leaveRequestTone } from "@/lib/ui/operational-labels";
 
 export default async function LeaveDashboardPage() {
   const ctx = await getAuthContext();
@@ -106,7 +107,7 @@ export default async function LeaveDashboardPage() {
                 <Link href={`/leave/${r.id}`} className="font-medium text-navy underline">
                   {typeMap.get(r.leave_type_id)?.name_ar ?? "إجازة"} · {r.start_date} → {r.end_date}
                 </Link>
-                <Badge tone="warning">{leaveStatusLabel(r.status)}</Badge>
+                <Badge tone={leaveRequestTone(r.status)}>{leaveStatusLabel(r.status)}</Badge>
               </li>
             ))}
           </ul>
@@ -143,7 +144,7 @@ export default async function LeaveDashboardPage() {
                   <td className="px-4 py-3">{r.end_date}</td>
                   <td className="px-4 py-3">{r.total_days}</td>
                   <td className="px-4 py-3">
-                    <Badge>{leaveStatusLabel(r.status)}</Badge>
+                    <Badge tone={leaveRequestTone(r.status)}>{leaveStatusLabel(r.status)}</Badge>
                   </td>
                 </tr>
               ))}

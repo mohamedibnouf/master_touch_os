@@ -108,7 +108,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           {hasPermission(ctx, "quotation.create") ? (
             <Link
               href={`/procurement/rfqs/${id}/quotations/new`}
-              className="inline-flex items-center rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               + تسجيل عرض سعر
             </Link>
@@ -116,7 +116,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           {(quotations ?? []).length >= 1 && hasPermission(ctx, "quotation.compare") ? (
             <Link
               href={`/procurement/rfqs/${id}/comparison`}
-              className="inline-flex items-center rounded-md border border-navy px-4 py-2 text-sm font-medium text-navy hover:bg-navy/5"
+              className="inline-flex items-center rounded-md border border-primary px-4 py-2 text-sm font-medium text-navy hover:bg-primary/5"
             >
               مقارنة العروض →
             </Link>

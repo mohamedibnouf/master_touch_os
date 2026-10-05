@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1B2A4A",
+  themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -49,7 +49,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ar" dir="rtl" className={`${ibmArabic.variable} ${ibmSans.variable} h-full`}>
-      <body className="min-h-full bg-paper font-sans text-ink antialiased">
+      <body className="min-h-full bg-white font-sans text-ink antialiased">
         <PwaRegister />
         {children}
       </body>

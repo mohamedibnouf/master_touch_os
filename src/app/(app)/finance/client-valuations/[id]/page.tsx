@@ -286,7 +286,7 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
           <h2 className="mb-3 font-semibold text-navy">إنشاء فاتورة</h2>
           <Link
             href={`/finance/client-invoices/new?valuationId=${valuation.id}`}
-            className="inline-flex rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white"
+            className="inline-flex rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white"
             data-testid="valuation-create-invoice-link"
           >
             فاتورة من هذا المستخلص →

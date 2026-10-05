@@ -1,9 +1,16 @@
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
-const optionalPublicString = z.preprocess(
+const optionalEmpty = z.preprocess(
   (value) => (value === "" || value === undefined || value === null ? undefined : value),
   z.string().min(1).optional(),
+);
+
+const optionalPublicString = optionalEmpty;
+
+const optionalKey = z.preprocess(
+  (value) => (value === "" || value === undefined || value === null ? undefined : value),
+  z.string().min(8).optional(),
 );
 
 const publicSchema = z.object({
@@ -30,6 +37,17 @@ const serverSchema = publicSchema.extend({
   MANAGEMENT_AI_API_KEY: z.string().min(8).optional(),
   MANAGEMENT_AI_MODEL: z.string().min(1).optional(),
   MANAGEMENT_AI_BASE_URL: z.string().url().optional(),
+  AI_ENABLED: z.preprocess(
+    (value) => (value === "" || value === undefined || value === null ? undefined : value),
+    z.enum(["true", "false", "1", "0"]).optional(),
+  ),
+  AI_PROVIDER: z.preprocess(
+    (value) => (value === "" || value === undefined || value === null ? undefined : value),
+    z.enum(["none", "mock", "openai"]).optional(),
+  ),
+  OPENAI_API_KEY: optionalKey,
+  AI_MODEL: optionalEmpty,
+  AI_DOCUMENT_MODEL: optionalEmpty,
   NOTIFICATION_EMAIL_PROVIDER: z.enum(["none", "mock", "resend"]).optional(),
   NOTIFICATION_WHATSAPP_PROVIDER: z.enum(["none", "mock"]).optional(),
   NOTIFICATION_PUSH_PROVIDER: z.enum(["none", "mock"]).optional(),
@@ -85,6 +103,11 @@ export const GET_SERVER_ENV_KEYS = [
   "MANAGEMENT_AI_API_KEY",
   "MANAGEMENT_AI_MODEL",
   "MANAGEMENT_AI_BASE_URL",
+  "AI_ENABLED",
+  "AI_PROVIDER",
+  "OPENAI_API_KEY",
+  "AI_MODEL",
+  "AI_DOCUMENT_MODEL",
   "NOTIFICATION_EMAIL_PROVIDER",
   "NOTIFICATION_WHATSAPP_PROVIDER",
   "NOTIFICATION_PUSH_PROVIDER",
@@ -133,6 +156,11 @@ export function readServerEnvRecordFromProcess(): Record<string, string | undefi
     MANAGEMENT_AI_API_KEY: process.env.MANAGEMENT_AI_API_KEY,
     MANAGEMENT_AI_MODEL: process.env.MANAGEMENT_AI_MODEL,
     MANAGEMENT_AI_BASE_URL: process.env.MANAGEMENT_AI_BASE_URL,
+    AI_ENABLED: process.env.AI_ENABLED,
+    AI_PROVIDER: process.env.AI_PROVIDER,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+    AI_DOCUMENT_MODEL: process.env.AI_DOCUMENT_MODEL,
     NOTIFICATION_EMAIL_PROVIDER: process.env.NOTIFICATION_EMAIL_PROVIDER,
     NOTIFICATION_WHATSAPP_PROVIDER: process.env.NOTIFICATION_WHATSAPP_PROVIDER,
     NOTIFICATION_PUSH_PROVIDER: process.env.NOTIFICATION_PUSH_PROVIDER,
@@ -296,6 +324,36 @@ export const ENV_CATALOG: readonly EnvClassification[] = [
     scope: "server",
     required: false,
     description: "OpenAI-compatible API base URL (optional)",
+  },
+  {
+    name: "AI_ENABLED",
+    scope: "server",
+    required: false,
+    description: "Kill switch for Master Touch Intelligence (true|false). false disables all AI including mock.",
+  },
+  {
+    name: "AI_PROVIDER",
+    scope: "server",
+    required: false,
+    description: "Unified AI provider: none | mock | openai",
+  },
+  {
+    name: "OPENAI_API_KEY",
+    scope: "server",
+    required: false,
+    description: "Server-only OpenAI API key (never NEXT_PUBLIC_*)",
+  },
+  {
+    name: "AI_MODEL",
+    scope: "server",
+    required: false,
+    description: "Configured OpenAI model id (do not hardcode in application code)",
+  },
+  {
+    name: "AI_DOCUMENT_MODEL",
+    scope: "server",
+    required: false,
+    description: "Optional document-analysis model override",
   },
   {
     name: "NOTIFICATION_EMAIL_PROVIDER",

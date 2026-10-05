@@ -10,11 +10,13 @@ import {
   formatOverdueDurationAr,
   mapEngineStatusToVisual,
   pickCurrentNodeId,
+  resolveStageAssignment,
   waitingApprovalPhrase,
   workflowVisualLabel,
   type OfficialApprovalCode,
   type OpenApprovalSnapshot,
   type ProjectAttention,
+  type StageAssignmentKind,
   type WorkflowGateKind,
   type WorkflowVisualState,
 } from "@/modules/projects/workflow-view";
@@ -42,6 +44,8 @@ export type WorkflowViewNode = {
   gate: WorkflowGateKind;
   requiresApproval: boolean;
   responsibleLabel: string | null;
+  assignmentKind: StageAssignmentKind;
+  assignmentSubtitle: string | null;
   approverLabel: string | null;
   startedAt: string | null;
   dueAt: string | null;
@@ -81,6 +85,7 @@ type StepDef = {
   name_en: string;
   requires_approval: boolean;
   assigned_role_id: string | null;
+  assigned_department_id: string | null;
   warning_hours: number | null;
   sla_hours: number | null;
 };
@@ -94,6 +99,7 @@ type InstanceStepRow = {
   completed_by: string | null;
   assigned_user_id: string | null;
   assigned_role_id: string | null;
+  assigned_department_id: string | null;
   due_at: string | null;
   step_key: string;
   step_id: string;
@@ -126,9 +132,13 @@ export async function loadProjectWorkflowProjection(input: {
   stages: ProjectStage[];
   profileNames: Map<string, string>;
   roleNames: Map<string, string>;
+  departmentNames?: Map<string, string>;
+  jobTitles?: Map<string, string>;
 }): Promise<ProjectWorkflowProjection> {
   const nowIso = new Date().toISOString();
   const { supabase, ctx, projectId, stages, profileNames, roleNames } = input;
+  const departmentNames = input.departmentNames ?? new Map<string, string>();
+  const jobTitles = input.jobTitles ?? new Map<string, string>();
 
   const { data: instance } = await supabase
     .from("workflow_instances")
@@ -151,7 +161,7 @@ export async function loadProjectWorkflowProjection(input: {
       supabase
         .from("workflow_instance_steps")
         .select(
-          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id, warning_hours, sla_hours)",
+          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, assigned_department_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id, assigned_department_id, warning_hours, sla_hours)",
         )
         .eq("instance_id", instance.id)
         .order("sequence"),
@@ -243,9 +253,19 @@ export async function loadProjectWorkflowProjection(input: {
       });
       const overdueLabel = step.due_at ? formatOverdueDurationAr(step.due_at, nowIso) : null;
       const roleId = step.assigned_role_id ?? def?.assigned_role_id ?? null;
-      const responsibleLabel =
-        (step.assigned_user_id ? profileNames.get(step.assigned_user_id) : null) ??
-        (roleId ? roleNames.get(roleId) ?? null : null);
+      const departmentId = step.assigned_department_id ?? def?.assigned_department_id ?? null;
+      const assignment = resolveStageAssignment({
+        assignedUserId: step.assigned_user_id,
+        assignedRoleId: roleId,
+        assignedDepartmentId: departmentId,
+        profileNames,
+        roleNames,
+        departmentNames,
+        jobTitles,
+      });
+      const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
+      const assignmentKind = assignment.kind;
+      const assignmentSubtitle = assignment.subtitle;
       const approverLabel = openApproval?.approverLabel ?? (requiresApproval ? responsibleLabel : null);
       const isActive = step.id === activeEngine?.id;
       const canAct = Boolean(isActive && canAdvance && canActOnActive);
@@ -291,6 +311,8 @@ export async function loadProjectWorkflowProjection(input: {
         gate: requiresApproval ? "APPROVAL" : "MANUAL_COMPLETION",
         requiresApproval,
         responsibleLabel,
+        assignmentKind,
+        assignmentSubtitle,
         approverLabel,
         startedAt: step.started_at,
         dueAt: step.due_at,
@@ -369,7 +391,16 @@ export async function loadProjectWorkflowProjection(input: {
       latestOfficialCode: null,
     });
     const overdueLabel = stage.due_at ? formatOverdueDurationAr(stage.due_at, nowIso) : null;
-    const responsibleLabel = stage.owner_user_id ? (profileNames.get(stage.owner_user_id) ?? null) : null;
+    const assignment = resolveStageAssignment({
+      assignedUserId: stage.owner_user_id,
+      assignedRoleId: null,
+      assignedDepartmentId: null,
+      profileNames,
+      roleNames,
+      departmentNames,
+      jobTitles,
+    });
+    const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
     return {
       id: stage.id,
       source: "legacy",
@@ -382,6 +413,8 @@ export async function loadProjectWorkflowProjection(input: {
       gate: "MANUAL_COMPLETION",
       requiresApproval: Boolean(stage.requires_approval),
       responsibleLabel,
+      assignmentKind: assignment.kind,
+      assignmentSubtitle: assignment.subtitle,
       approverLabel: null,
       startedAt: stage.actual_start,
       dueAt: stage.due_at ?? stage.planned_end,

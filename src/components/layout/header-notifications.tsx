@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { formatRiyadhDateTimeAr } from "@/modules/projects/deadline";
 
 export type HeaderNotice = {
   id: string;
@@ -21,7 +22,7 @@ export function HeaderNotifications({
   return (
     <details className="relative" data-testid="header-notifications">
       <summary
-        className="mt-icon-btn mt-icon-btn-inverse relative cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden"
+        className="mt-icon-btn relative cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden"
         aria-label={unreadCount > 0 ? `التنبيهات، ${unreadCount} غير مقروء` : "التنبيهات"}
       >
         <Bell className="h-4 w-4" aria-hidden />
@@ -43,23 +44,23 @@ export function HeaderNotifications({
               <li key={item.id}>
                 <Link
                   href={item.href ?? "/notifications"}
-                  className="block rounded-[var(--radius-control)] px-3 py-2 duration-150 hover:bg-paper"
+                  className="block rounded-[var(--radius-control)] px-3 py-2 duration-150 hover:bg-surface-muted"
                 >
                   <p
-                    className={`text-sm ${item.read_at ? "text-muted" : "font-medium text-navy"}`}
+                    className={`text-sm ${item.read_at ? "text-muted" : "font-medium text-ink"}`}
                     dir="auto"
                   >
                     {item.title}
                   </p>
                   <p className="text-xs text-muted">
-                    {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                    {formatRiyadhDateTimeAr(item.created_at)}
                   </p>
                 </Link>
               </li>
             ))}
           </ul>
         )}
-        <Link href="/notifications" className="mt-2 block rounded-[var(--radius-control)] px-3 py-2 text-center text-sm font-medium text-navy duration-150 hover:bg-paper">
+        <Link href="/notifications" className="mt-2 block rounded-[var(--radius-control)] px-3 py-2 text-center text-sm font-medium text-primary duration-150 hover:bg-surface-muted">
           كل التنبيهات
         </Link>
       </div>

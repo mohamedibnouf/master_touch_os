@@ -16,15 +16,16 @@ export function ApprovalActionPanel({
       <p className="text-sm text-muted">
         بعد الموافقة سينتقل المشروع تلقائياً إلى المرحلة التالية. لا تحتاج صلاحية مسار عمل منفصلة لإكمال البوابة.
       </p>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {(
           [
-            ["A", "موافقة", "primary"],
-            ["C", "طلب تعديل", "secondary"],
+            ["A", "موافقة", "success"],
+            ["B", "موافقة مع ملاحظات", "primary"],
+            ["C", "طلب تعديل", "warning"],
             ["D", "رفض", "danger"],
           ] as const
         ).map(([code, label, variant]) => (
-          <ServerActionForm key={code} action={decideApprovalAction}>
+          <ServerActionForm key={code} action={decideApprovalAction} className={code === "A" || code === "B" ? "sm:col-span-3" : undefined}>
             <input type="hidden" name="stepId" value={node.openApproval!.stepId} />
             <input type="hidden" name="officialCode" value={code} />
             <input type="hidden" name="projectId" value={projectId} />

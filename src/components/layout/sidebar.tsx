@@ -36,7 +36,7 @@ const groups: NavGroup[] = [
   {
     id: "home",
     label: "الرئيسية",
-    items: [{ href: "/", label: "عملي اليوم", icon: LayoutDashboard, show: "always" }],
+    items: [{ href: "/", label: "لوحة العمل", icon: LayoutDashboard, show: "always" }],
   },
   {
     id: "my",
@@ -71,7 +71,7 @@ const groups: NavGroup[] = [
   },
   {
     id: "people",
-    label: "الأفراد",
+    label: "الموارد البشرية",
     items: [
       { href: "/employees", label: "الموظفون", icon: Users, show: "employees" },
       { href: "/departments", label: "الإدارات", icon: Building2, show: "departments" },
@@ -111,10 +111,14 @@ export function Sidebar({
   flags,
   open = false,
   onClose,
+  userName,
+  jobTitle,
 }: {
   flags: AppNavFlags;
   open?: boolean;
   onClose?: () => void;
+  userName?: string;
+  jobTitle?: string;
 }) {
   const pathname = usePathname();
   const onFinance = pathname.startsWith("/finance");
@@ -140,40 +144,35 @@ export function Sidebar({
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex w-72 shrink-0 flex-col bg-navy text-white print:hidden",
+        "flex w-[16.5rem] shrink-0 flex-col border-e border-line bg-white text-ink print:hidden",
         "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out max-xl:transition-transform",
         "xl:static xl:z-auto xl:h-auto xl:min-h-dvh xl:self-stretch xl:translate-x-0 xl:transition-none",
         "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
         open ? "max-xl:translate-x-0" : "max-xl:-translate-x-full max-xl:rtl:translate-x-full",
       )}
-      style={{
-        background:
-          "linear-gradient(180deg, #24365e 0%, #1b2a4a 28%, #162238 100%)",
-      }}
     >
-      <div className="flex items-start justify-between gap-3 px-5 pb-5 pt-6">
+      <div className="flex items-start justify-between gap-3 px-4 pb-4 pt-5">
         <div className="min-w-0">
-          <div className="mb-3 h-1 w-8 rounded-full bg-bronze" aria-hidden />
-          <p className="text-[11px] font-semibold tracking-[0.22em] text-bronze">MASTER TOUCH</p>
-          <p className="mt-1.5 text-[15px] font-semibold leading-snug">نظام التشغيل</p>
+          <p className="text-sm font-semibold text-ink">Master Touch</p>
+          <p className="mt-0.5 text-xs text-muted">نظام التشغيل</p>
         </div>
         <button
           type="button"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] text-white/90 duration-150 hover:bg-white/10 xl:hidden"
+          className="mt-icon-btn xl:hidden"
           aria-label="إغلاق القائمة"
           onClick={onClose}
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="mx-5 h-px bg-white/10" aria-hidden />
-      <nav className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-5" aria-label="التنقل الرئيسي">
+      <div className="mx-4 h-px bg-line" aria-hidden />
+      <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4" aria-label="التنقل الرئيسي">
         {visibleGroups.map((group) => (
           <div key={group.id}>
             {group.id !== "home" ? (
-              <p className="px-3 pb-2 text-[11px] font-medium text-white/70">{group.label}</p>
+              <p className="px-2.5 pb-1.5 text-[11px] font-medium text-muted">{group.label}</p>
             ) : null}
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -185,28 +184,17 @@ export function Sidebar({
                       onClick={onClose}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "relative flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-2.5 py-2 text-sm duration-150 transition-colors xl:min-h-10",
+                        "flex min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-sm duration-150 transition-colors",
                         active
-                          ? "bg-white/12 font-medium text-white"
-                          : "text-white/80 hover:bg-white/8 hover:text-white",
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-ink/80 hover:bg-surface-muted hover:text-ink",
                       )}
                     >
-                      {active ? (
-                        <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-bronze" aria-hidden />
-                      ) : null}
-                      <span
-                        className={cn(
-                          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                          active ? "bg-white/12 text-bronze" : "bg-white/6 text-white/85",
-                        )}
-                        aria-hidden
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
                       <span className="truncate">{item.label}</span>
                     </Link>
                     {isFinance && onFinance ? (
-                      <div className="me-2 mt-1 space-y-0.5 border-s border-white/10 pe-2">
+                      <div className="me-2 mt-1 space-y-0.5 border-s border-line pe-2">
                         {financeSubLinks.map((sub) => {
                           const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
                           return (
@@ -217,8 +205,8 @@ export function Sidebar({
                               aria-current={subActive ? "page" : undefined}
                               data-testid={`sidebar-${sub.href.replaceAll("/", "-").slice(1)}`}
                               className={cn(
-                                "block rounded-[var(--radius-control)] py-2 pe-3 ps-6 text-xs duration-150 transition-colors",
-                                subActive ? "bg-white/10 font-medium text-white" : "text-white/70 hover:bg-white/6 hover:text-white",
+                                "block rounded-[var(--radius-control)] py-1.5 pe-3 ps-6 text-xs duration-150 transition-colors",
+                                subActive ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted hover:text-ink",
                               )}
                             >
                               {sub.label}
@@ -234,6 +222,18 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+      {userName ? (
+        <div className="border-t border-line px-4 py-3">
+          <p className="truncate text-sm font-medium text-ink" dir="auto">
+            {userName}
+          </p>
+          {jobTitle ? (
+            <p className="truncate text-xs text-muted" dir="auto">
+              {jobTitle}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </aside>
   );
 }

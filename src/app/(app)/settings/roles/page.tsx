@@ -68,13 +68,13 @@ export default async function RolesSettingsPage({
       <nav className="flex gap-1 border-b border-line pb-2" aria-label="أقسام الأدوار">
         <Link
           href="/settings/roles"
-          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "custom" ? "bg-navy text-white" : "text-muted hover:bg-white"}`}
+          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "custom" ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"}`}
         >
           الأدوار المخصصة
         </Link>
         <Link
           href="/settings/roles?tab=system"
-          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "system" ? "bg-navy text-white" : "text-muted hover:bg-white"}`}
+          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "system" ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"}`}
         >
           أدوار النظام
         </Link>

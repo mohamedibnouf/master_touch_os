@@ -30,7 +30,7 @@ export function DocumentIntelligenceActions({
       {canAnalyze ? (
         <button
           type="button"
-          className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           data-testid="doc-intel-analyze"
           disabled={!aiEnabled || pending}
           onClick={() => {
@@ -51,7 +51,7 @@ export function DocumentIntelligenceActions({
       {canVerify && status === "EXTRACTED" && intelligenceId ? (
         <button
           type="button"
-          className="rounded-md border border-navy px-4 py-2 text-sm font-medium text-navy disabled:opacity-50"
+          className="rounded-md border border-primary px-4 py-2 text-sm font-medium text-navy disabled:opacity-50"
           data-testid="doc-intel-verify"
           disabled={pending}
           onClick={() => {

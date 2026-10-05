@@ -192,7 +192,7 @@ export default async function EngineeringPage({
             key={m.id}
             href={`/engineering?module=${m.id}${projectQs}`}
             className={`rounded-md px-3 py-1.5 text-sm ${
-              moduleFilter === m.id ? "bg-navy text-white" : "text-muted hover:bg-white"
+              moduleFilter === m.id ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"
             }`}
           >
             {m.label}

@@ -56,7 +56,7 @@ export default async function PurchaseRequestsPage({
             <option value="approved">معتمد</option>
             <option value="rejected">مرفوض</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

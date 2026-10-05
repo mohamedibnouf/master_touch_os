@@ -14,10 +14,10 @@ export function WorkflowDeadlinePanel({
   if (!node.dueAt && !node.canEditDeadline) return null;
   const dueLabel = node.dueAt ? formatRiyadhDateTimeAr(node.dueAt) : "غير محدد";
   return (
-    <div className="space-y-3 rounded-[var(--radius-control)] border border-line bg-paper px-3 py-3" data-testid="workflow-deadline-panel">
+    <div className="space-y-3 rounded-[var(--radius-surface)] border border-line bg-white px-4 py-3" data-testid="workflow-deadline-panel">
       <div>
         <p className="text-xs text-muted">موعد إغلاق المرحلة</p>
-        <p className="font-semibold text-navy">{dueLabel}</p>
+        <p className="font-semibold text-ink">{dueLabel}</p>
       </div>
       {node.deadlineState === "ON_TRACK" && node.remainingLabel ? (
         <p className="text-sm text-muted">متبقي {node.remainingLabel}</p>

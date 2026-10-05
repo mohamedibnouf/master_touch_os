@@ -1,7 +1,6 @@
 import { cache } from "react";
 import Link from "next/link";
 import {
-  Bell,
   CalendarPlus,
   ClipboardCheck,
   FileText,
@@ -9,7 +8,6 @@ import {
   Gauge,
   Sparkles,
   Stamp,
-  Users,
   Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/primitives";
@@ -300,13 +298,13 @@ export async function HomeAttentionRail({ ctx }: { ctx: AuthContext }) {
         </span>
         <p className="text-xs font-semibold text-warning">يحتاج انتباهك</p>
       </div>
-      <p className="mt-4 text-5xl font-semibold tabular-nums leading-none text-navy">{attentionCount}</p>
-      <p className="mt-2 text-base font-semibold text-navy">بانتظار قرارك</p>
+      <p className="mt-4 text-3xl font-semibold tabular-nums leading-none text-ink">{attentionCount}</p>
+      <p className="mt-2 text-sm font-semibold text-ink">بانتظار قرارك</p>
       <p className="mt-1 text-xs leading-relaxed text-muted">موافقات وإجراءات تشغيلية مخصّصة لك</p>
       {canOpenApprovals ? (
         <Link
           href="/approvals"
-          className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[var(--radius-control)] bg-navy px-3 text-sm font-medium text-white duration-150 hover:bg-navy-deep"
+          className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[var(--radius-control)] bg-primary px-3 text-sm font-medium text-white duration-150 hover:bg-primary-hover"
         >
           عرض صندوق الموافقات
         </Link>
@@ -324,17 +322,7 @@ export async function HomeAttentionRail({ ctx }: { ctx: AuthContext }) {
 }
 
 export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
-  const { dashboard, procActions, recentNotes, showOrgStats, canReadAudit } = await loadHomeOps(ctx);
-  const cards = showOrgStats
-    ? [
-        { label: "المشاريع النشطة", value: dashboard.stats.activeProjects, href: "/projects", Icon: FolderKanban, tint: "navy" as const },
-        { label: "مشاريع عالية المخاطر", value: dashboard.stats.projectsAtRisk, href: "/projects?risk=high", Icon: Gauge, tint: "warning" as const },
-        { label: "موافقات معلّقة (المنشأة)", value: dashboard.stats.pendingApprovals, href: "/approvals", Icon: Stamp, tint: "navy" as const },
-        { label: "موافقات متأخرة", value: dashboard.stats.overdueApprovals, href: "/approvals?overdue=1", Icon: Stamp, tint: "warning" as const },
-        { label: "موظفون نشطون", value: dashboard.stats.activeEmployees, href: "/employees", Icon: Users, tint: "success" as const },
-        { label: "تنبيهات غير مقروءة", value: dashboard.stats.unreadNotifications, href: "/notifications", Icon: Bell, tint: "info" as const },
-      ]
-    : [];
+  const { dashboard, procActions, recentNotes, canReadAudit } = await loadHomeOps(ctx);
 
   const shortcuts = [
     hasPermission(ctx, "project.read")
@@ -378,7 +366,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
         </nav>
       ) : null}
 
-      <section className="min-w-0 xl:col-span-8">
+      <section className="min-w-0 xl:col-span-12">
         <div className="mb-2 flex items-baseline justify-between gap-3">
           <h2 className="mt-section-title">عملي اليوم</h2>
           {canOpenApprovals ? (
@@ -439,42 +427,6 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
         )}
       </section>
 
-      {cards.length > 0 ? (
-        <section className="min-w-0 xl:col-span-4">
-          <h2 className="mt-section-title mb-2">ملخص تشغيلي</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {cards.map((card) => {
-              const Icon = card.Icon;
-              const value = Number(card.value);
-              const warn = card.tint === "warning" && value > 0;
-              const zero = value === 0;
-              const tintClass = warn
-                ? "mt-tint-warning"
-                : card.tint === "success"
-                  ? "mt-tint-success"
-                  : card.tint === "info"
-                    ? "mt-tint-info"
-                    : "mt-tint-navy";
-              return (
-                <Link key={card.label} href={card.href} className={`mt-metric ${tintClass}`}>
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium leading-snug text-muted">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-navy" aria-hidden />
-                    {card.label}
-                  </span>
-                  <span
-                    className={`mt-1.5 block text-xl font-semibold tabular-nums leading-none ${
-                      warn ? "text-warning" : zero ? "text-muted" : "text-navy"
-                    }`}
-                  >
-                    {card.value}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
       <section className="min-w-0 xl:col-span-6">
         <h2 className="mt-section-title mb-2">تنبيهات أخيرة</h2>
         {!hasPermission(ctx, "notification.read") ? (
@@ -488,7 +440,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
               const inner = (
                 <div className="flex items-start gap-2.5 rounded-[var(--radius-control)] px-2 py-2">
                   <span
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read_at ? "bg-line" : "bg-navy"}`}
+                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read_at ? "bg-line" : "bg-primary"}`}
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1">
@@ -526,10 +478,10 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
           {dashboard.recentActivity.length === 0 ? (
             <p className="text-sm text-muted">لا يوجد نشاط مسجّل بعد.</p>
           ) : (
-            <ol className="relative space-y-0 border-s-2 border-navy/15 ps-4">
+            <ol className="relative space-y-0 border-s-2 border-primary/15 ps-4">
               {dashboard.recentActivity.map((item) => (
                 <li key={item.id} className="relative pb-4 last:pb-0">
-                  <span className="absolute top-1.5 -start-[21px] h-2.5 w-2.5 rounded-full border-2 border-white bg-navy" aria-hidden />
+                  <span className="absolute top-1.5 -start-[21px] h-2.5 w-2.5 rounded-full border-2 border-white bg-primary" aria-hidden />
                   <p className="text-sm font-semibold leading-relaxed text-navy">{auditActionLabel(item.action)}</p>
                   <p className="text-[11px] text-muted">
                     {auditEntityLabel(item.entity_type)} ·{" "}

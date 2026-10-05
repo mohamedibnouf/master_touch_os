@@ -40,7 +40,7 @@ export default async function SupplierInvoicesPage({
           hasPermission(ctx, "supplier_invoice.create") ? (
             <Link
               href="/finance/supplier-invoices/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               + فاتورة جديدة
             </Link>
@@ -60,7 +60,7 @@ export default async function SupplierInvoicesPage({
             <option value="partially_paid">مدفوعة جزئياً</option>
             <option value="paid">مدفوعة</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

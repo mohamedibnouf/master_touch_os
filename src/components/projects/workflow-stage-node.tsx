@@ -38,13 +38,13 @@ export function WorkflowStageNode({
               "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
               node.visual === "completed" && "border-success bg-success text-white",
               node.visual === "current" &&
-                "border-navy bg-navy text-white motion-safe:shadow-[0_0_0_4px_rgba(15,40,80,0.12)]",
+                "border-primary bg-primary text-white",
               node.visual === "waiting_approval" && "border-warning bg-warning/15 text-warning",
               (node.visual === "blocked" || node.visual === "rejected" || node.visual === "overdue") &&
                 "border-danger bg-danger/10 text-danger",
               node.visual === "changes_requested" && "border-warning bg-warning/10 text-warning",
               node.visual === "upcoming" && "border-line bg-paper text-muted",
-              selected && "ring-2 ring-navy/30",
+              selected && "ring-2 ring-primary/30",
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />

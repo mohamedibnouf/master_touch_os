@@ -1,37 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --navy: #1b2a4a;
-  --navy-deep: #121a2f;
-  --navy-mid: #24365e;
-  --ink: #1a1c1f;
-  --muted: #5c6170;
-  --line: #e4dfd6;
-  --paper: #f6f3ee;
-  --card: #ffffff;
-  --bronze: #9a7b4f;
-  --success: #2f6f4e;
-  --danger: #9b2c2c;
-  --warning: #9a6b12;
-
-  --background: var(--paper);
-  --surface: var(--card);
-  --surface-muted: var(--paper);
-  --foreground: var(--ink);
-  --foreground-muted: var(--muted);
-  --border: var(--line);
-  --border-strong: #cfc6b8;
-  --primary: var(--navy);
-  --primary-hover: var(--navy-deep);
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #fafafa;
+  --surface-subtle: #f7f8fa;
+  --surface-strong: #f3f4f6;
+  --ink: #111318;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+  --line: #e8eaed;
+  --border-strong: #d0d5dd;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
   --primary-foreground: #ffffff;
-  --info: var(--navy);
-  --ring: var(--bronze);
-  --disabled-foreground: #8a8f9a;
-  --shadow-1: 0 1px 2px rgba(27, 42, 74, 0.04), 0 2px 8px rgba(27, 42, 74, 0.04);
-  --shadow-2: 0 4px 16px rgba(27, 42, 74, 0.07), 0 1px 3px rgba(27, 42, 74, 0.04);
+  --info: #2563eb;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --ring: #2563eb;
+  --disabled-foreground: #98a2b3;
+  --success-soft: color-mix(in srgb, var(--success) 10%, #fff);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, #fff);
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, #fff);
+  --info-soft: color-mix(in srgb, var(--info) 10%, #fff);
+  --success-border: color-mix(in srgb, var(--success) 28%, var(--line));
+  --warning-border: color-mix(in srgb, var(--warning) 28%, var(--line));
+  --danger-border: color-mix(in srgb, var(--danger) 28%, var(--line));
+  --info-border: color-mix(in srgb, var(--info) 28%, var(--line));
+
+  /* Legacy class aliases — mapped to the 2026 light system, not the old navy/paper/bronze identity. */
+  --navy: var(--ink);
+  --navy-deep: #0b0d12;
+  --navy-mid: #1d2433;
+  --muted: var(--text-secondary);
+  --paper: var(--surface-muted);
+  --card: var(--surface);
+  --bronze: var(--text-secondary);
+  --foreground: var(--ink);
+  --foreground-muted: var(--text-secondary);
+  --border: var(--line);
+  --primary-soft: color-mix(in srgb, var(--primary) 10%, #fff);
+
+  --shadow-1: 0 1px 2px rgba(17, 19, 24, 0.04);
+  --shadow-2: 0 8px 24px rgba(17, 19, 24, 0.08), 0 2px 6px rgba(17, 19, 24, 0.04);
   --radius-control: 0.5625rem;
-  --radius-surface: 1rem;
-  --radius-hero: 1.125rem;
+  --radius-surface: 0.75rem;
+  --radius-hero: 0.875rem;
 }
 
 @theme inline {
@@ -50,6 +65,8 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-strong: var(--surface-strong);
   --color-foreground: var(--foreground);
   --color-foreground-muted: var(--foreground-muted);
   --color-border: var(--border);
@@ -58,8 +75,18 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-info: var(--info);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger-soft: var(--danger-soft);
+  --color-info-soft: var(--info-soft);
+  --color-success-border: var(--success-border);
+  --color-warning-border: var(--warning-border);
+  --color-danger-border: var(--danger-border);
+  --color-info-border: var(--info-border);
   --color-ring: var(--ring);
   --color-disabled-foreground: var(--disabled-foreground);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
   --font-sans: var(--font-ibm-arabic), var(--font-ibm), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -93,29 +120,29 @@ summary::-webkit-details-marker {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-surface);
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
 }
 
 .mt-surface-priority {
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--navy) 18%, var(--border));
-  border-radius: var(--radius-hero);
-  box-shadow: var(--shadow-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: none;
 }
 
 .mt-icon-btn-inverse {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .mt-icon-btn-inverse:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.32);
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
 }
 
 .mt-tint-navy {
-  background: color-mix(in srgb, var(--navy) 7%, #fff);
+  background: var(--primary-soft);
 }
 
 .mt-tint-warning {
@@ -123,44 +150,44 @@ summary::-webkit-details-marker {
 }
 
 .mt-tint-info {
-  background: color-mix(in srgb, var(--navy) 5%, var(--paper));
+  background: var(--primary-soft);
 }
 
 .mt-tint-success {
-  background: color-mix(in srgb, var(--success) 8%, #fff);
+  background: color-mix(in srgb, var(--success) 10%, #fff);
 }
 
 .mt-tint-sand {
-  background: color-mix(in srgb, var(--bronze) 8%, #fff8f1);
+  background: var(--surface-subtle);
 }
 
 .mt-icon-btn {
   display: inline-flex;
-  height: 2.5rem;
-  width: 2.5rem;
+  height: 2.25rem;
+  width: 2.25rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--navy);
+  color: var(--ink);
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
 }
 
 .mt-icon-btn:hover {
-  background: var(--paper);
+  background: var(--surface-muted);
   border-color: var(--border-strong);
 }
 
 .mt-section-title {
   font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: 0;
   line-height: 1.4;
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .mt-icon-well {
@@ -171,13 +198,13 @@ summary::-webkit-details-marker {
   align-items: center;
   justify-content: center;
   border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--navy) 8%, #fff);
-  color: var(--navy);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .mt-action-tile {
   display: flex;
-  min-height: 4.25rem;
+  min-height: 4rem;
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
@@ -187,17 +214,15 @@ summary::-webkit-details-marker {
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 0.7rem 0.8rem;
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
   transition:
     background-color 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color 150ms ease;
 }
 
 .mt-action-tile:hover {
-  background: color-mix(in srgb, var(--navy) 5%, #fff);
-  border-color: color-mix(in srgb, var(--navy) 22%, var(--border));
-  box-shadow: var(--shadow-2);
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
 }
 
 .mt-work-row {
@@ -212,36 +237,40 @@ summary::-webkit-details-marker {
 }
 
 .mt-work-row:hover {
-  background: color-mix(in srgb, var(--navy) 4%, #fff);
+  background: var(--surface-muted);
 }
 
 .mt-work-list > li:nth-child(even) > .mt-work-row {
-  background: color-mix(in srgb, var(--paper) 70%, #fff);
+  background: var(--surface-muted);
 }
 
 .mt-work-list > li:nth-child(even) > .mt-work-row:hover {
-  background: color-mix(in srgb, var(--navy) 5%, #fff);
+  background: var(--surface-strong);
 }
 
 .mt-metric {
   border-radius: var(--radius-control);
   padding: 0.7rem 0.75rem;
-  transition: box-shadow 150ms ease;
 }
 
 .mt-metric:hover {
-  box-shadow: var(--shadow-1);
+  background: var(--surface-muted);
 }
 
 .mt-surface-hero {
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--navy) 14%, var(--border));
-  border-radius: var(--radius-hero);
-  box-shadow: var(--shadow-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: none;
 }
 
-/* Keep enterprise tables readable on narrow screens via parent overflow-x-auto */
+.mt-tab-active {
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 600;
+}
+
 .table-scroll {
   -webkit-overflow-scrolling: touch;
 }
@@ -253,7 +282,7 @@ table.table-register thead {
 }
 
 .table-scroll tbody tr:hover {
-  background: color-mix(in srgb, var(--navy) 3.5%, #fff);
+  background: var(--surface-muted);
 }
 
 @keyframes nav-indeterminate {
@@ -282,7 +311,6 @@ table.table-register thead {
   }
 }
 
-/* Dialog / modal safety when present */
 [role="dialog"],
 [data-dialog] {
   max-width: calc(100vw - 24px);
@@ -290,7 +318,6 @@ table.table-register thead {
   overflow-y: auto;
 }
 
-/* Phase 5.3 — management report print */
 @media print {
   body {
     background: white !important;

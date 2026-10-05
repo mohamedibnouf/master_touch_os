@@ -6,7 +6,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { projectRiskLabel, projectStatusLabel } from "@/lib/ui/operational-labels";
+import { projectRiskLabel, projectRiskTone, projectStatusLabel, projectStatusTone } from "@/lib/ui/operational-labels";
 
 export default async function ProjectsPage({
   searchParams,
@@ -99,14 +99,24 @@ export default async function ProjectsPage({
                     <p className="text-xs text-muted">{project.name_en}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge>{projectStatusLabel(project.status)}</Badge>
+                    <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge tone={project.risk_level === "high" || project.risk_level === "critical" ? "danger" : "neutral"}>
+                    <Badge tone={projectRiskTone(project.risk_level)}>
                       {projectRiskLabel(project.risk_level)}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3">{project.progress_percentage}%</td>
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-[7rem] items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-strong">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${Math.min(100, Math.max(0, project.progress_percentage))}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-xs text-muted">{project.progress_percentage}%</span>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -14,7 +14,7 @@ function FormError({ state }: { state: FormActionState }) {
   if (!state || !state.message) return null;
   if (state.ok) {
     return (
-      <p className="text-sm text-navy" data-testid="form-action-success">
+      <p className="text-sm text-ink" data-testid="form-action-success">
         {state.message}
       </p>
     );

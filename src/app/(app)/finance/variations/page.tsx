@@ -40,7 +40,7 @@ export default async function VariationsPage({
           hasPermission(ctx, "variation.create") ? (
             <Link
               href="/finance/variations/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
               data-testid="variation-create-link"
             >
               + أمر تغيير جديد
@@ -67,7 +67,7 @@ export default async function VariationsPage({
             <option value="rejected">مرفوض</option>
             <option value="cancelled">ملغى</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

@@ -199,7 +199,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
               ))}
 
               {/* Summary row */}
-              <tr className="border-t-2 border-navy/20 bg-paper font-semibold">
+              <tr className="border-t-2 border-primary/20 bg-paper font-semibold">
                 <td className="px-4 py-3">الإجمالي الكلي</td>
                 {quotes.map((q) => (
                   <td key={q.id} className="border-l border-line px-4 py-3">
@@ -322,7 +322,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
           <h2 className="mb-3 font-semibold text-navy">الخطوة التالية</h2>
           <Link
             href={`/procurement/purchase-orders/new?quotationId=${comparison.recommended_quotation_id}`}
-            className="inline-flex items-center rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             إنشاء أمر الشراء →
           </Link>

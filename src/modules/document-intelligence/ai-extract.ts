@@ -1,6 +1,7 @@
 import "server-only";
 
 import { AppError, ValidationError } from "@/lib/errors";
+import { getAiPlatformConfig, isAiKillSwitchOff } from "@/modules/ai/config-env";
 import { DOCUMENT_AI_LIMITS as L } from "./limits";
 import { buildBusinessCaseExtractionSystemPrompt } from "./prompt";
 import { mockExtractBusinessCase } from "./mock-extract";
@@ -14,11 +15,16 @@ export type DocumentAIConfig = {
 };
 
 export function getDocumentAIConfig(): DocumentAIConfig {
-  const raw = (process.env.DOCUMENT_AI_PROVIDER || process.env.MANAGEMENT_AI_PROVIDER || "none").toLowerCase();
+  if (isAiKillSwitchOff()) return { provider: "none", enabled: false, model: null };
+  const platform = getAiPlatformConfig();
+  if (platform.enabled && (platform.provider === "mock" || platform.provider === "openai")) {
+    return { provider: platform.provider, enabled: true, model: platform.documentModel };
+  }
+  const raw = (process.env.DOCUMENT_AI_PROVIDER || process.env.MANAGEMENT_AI_PROVIDER || process.env.AI_PROVIDER || "none").toLowerCase();
   const provider = raw === "mock" || raw === "openai" || raw === "none" ? raw : "none";
-  const apiKey = process.env.DOCUMENT_AI_API_KEY || process.env.MANAGEMENT_AI_API_KEY || "";
+  const apiKey = process.env.DOCUMENT_AI_API_KEY || process.env.MANAGEMENT_AI_API_KEY || process.env.OPENAI_API_KEY || "";
   const model =
-    process.env.DOCUMENT_AI_MODEL || process.env.MANAGEMENT_AI_MODEL || L.defaultModel;
+    process.env.DOCUMENT_AI_MODEL || process.env.AI_DOCUMENT_MODEL || process.env.MANAGEMENT_AI_MODEL || process.env.AI_MODEL || L.defaultModel;
 
   if (provider === "mock") return { provider: "mock", enabled: true, model: "mock-doc-v1" };
   if (provider === "openai" && apiKey.length >= 8) {
@@ -50,7 +56,7 @@ export async function extractBusinessCaseWithAI(input: {
     };
   }
 
-  const apiKey = process.env.DOCUMENT_AI_API_KEY || process.env.MANAGEMENT_AI_API_KEY || "";
+  const apiKey = process.env.DOCUMENT_AI_API_KEY || process.env.MANAGEMENT_AI_API_KEY || process.env.OPENAI_API_KEY || "";
   const baseUrl = (
     process.env.DOCUMENT_AI_BASE_URL ||
     process.env.MANAGEMENT_AI_BASE_URL ||

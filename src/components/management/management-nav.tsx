@@ -30,8 +30,8 @@ export function ManagementNav({ pathname }: { pathname: string }) {
             key={link.href}
             href={link.href}
             className={cn(
-              "rounded-md px-3 py-2 text-sm font-medium",
-              active ? "bg-navy text-white" : "bg-white text-ink hover:bg-paper",
+              "rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-medium",
+              active ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted",
             )}
           >
             {link.label}

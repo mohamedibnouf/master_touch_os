@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AttendanceRepository } from "@/server/repositories/attendance.repository";
 import { attendanceStatusLabel } from "@/lib/hr/labels";
+import { attendanceStatusTone } from "@/lib/ui/operational-labels";
 import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 import { ServerActionForm } from "@/components/forms/server-action-form";
@@ -95,27 +96,27 @@ export default async function AttendanceDashboardPage() {
       />
 
       <section className="mt-surface-priority mb-6 overflow-hidden" data-testid="attendance-today-card">
-        <div className="bg-navy px-4 py-4 text-white md:px-5">
-          <p className="text-xs font-medium text-white/70">حالة اليوم</p>
-          <p className="mt-1 text-2xl font-semibold" data-testid="attendance-today-status">
+        <div className="border-b border-line px-4 py-4 md:px-5">
+          <p className="text-xs font-medium text-muted">حالة اليوم</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-ink" data-testid="attendance-today-status">
             {todayRecord ? attendanceStatusLabel(todayRecord.attendance_status) : "لم يُسجَّل بعد"}
           </p>
-          <p className="mt-2 text-sm text-white/70">
+          <p className="mt-2 text-sm text-muted">
             دخول: {formatTs(todayRecord?.check_in_at ?? null)} · خروج:{" "}
             {formatTs(todayRecord?.check_out_at ?? null)}
           </p>
           {todayRecord ? (
-            <p className="mt-1 text-xs text-white/60">
+            <p className="mt-1 text-xs text-muted">
               عمل {todayRecord.worked_minutes} د · تأخير {todayRecord.late_minutes} د · انصراف مبكر{" "}
               {todayRecord.early_leave_minutes} د
             </p>
           ) : null}
           {todayRecord?.check_in_at && !todayRecord.check_out_at ? (
-            <p className="mt-1 text-xs text-white/80">لم يُسجَّل الانصراف بعد.</p>
+            <p className="mt-1 text-xs text-warning">لم يُسجَّل الانصراف بعد.</p>
           ) : null}
           {todayRecord ? (
             <span className="mt-2 inline-block">
-              <Badge tone={todayRecord.attendance_status === "present" ? "success" : "warning"}>
+              <Badge tone={attendanceStatusTone(todayRecord.attendance_status)}>
                 {attendanceStatusLabel(todayRecord.attendance_status)}
               </Badge>
             </span>

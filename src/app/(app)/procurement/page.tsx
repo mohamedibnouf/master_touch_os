@@ -131,12 +131,12 @@ export default async function ProcurementPage() {
       {/* Quick Nav */}
       <div className="mb-6 flex flex-wrap gap-2">
         {hasPermission(ctx, "purchase_request.create") ? (
-          <Link href="/procurement/purchase-requests/new" className="rounded-md bg-navy px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+          <Link href="/procurement/purchase-requests/new" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
             + طلب شراء
           </Link>
         ) : null}
         {hasPermission(ctx, "rfq.create") ? (
-          <Link href="/procurement/rfqs/new" className="rounded-md border border-navy px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5">
+          <Link href="/procurement/rfqs/new" className="rounded-md border border-primary px-3 py-1.5 text-sm font-medium text-navy hover:bg-primary/5">
             + RFQ
           </Link>
         ) : null}
@@ -156,7 +156,7 @@ export default async function ProcurementPage() {
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpiCards.map((card) => (
           <Link key={card.label} href={card.href}>
-            <Card className="transition hover:border-navy/30">
+            <Card className="transition hover:border-primary/30">
               <p className="text-xs text-muted">{card.label}</p>
               <p className={`mt-2 text-3xl font-semibold ${card.warn && card.value > 0 ? "text-danger" : "text-navy"}`}>
                 {card.value}

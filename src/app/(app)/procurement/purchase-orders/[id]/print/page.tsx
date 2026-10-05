@@ -34,7 +34,7 @@ export default async function PurchaseOrderPrintPage({
       <div className="mb-6 print:hidden">
         <button
           onClick={undefined}
-          className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white"
           suppressHydrationWarning
         >
           طباعة
@@ -50,7 +50,7 @@ export default async function PurchaseOrderPrintPage({
       {/* PO Document */}
       <div className="rounded-lg border border-line bg-white p-8 print:rounded-none print:border-0 print:p-0">
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between border-b-2 border-navy pb-6">
+        <div className="mb-8 flex items-start justify-between border-b-2 border-primary pb-6">
           <div>
             <h1 className="text-2xl font-bold text-navy">MASTER TOUCH</h1>
             <p className="text-sm text-muted">General Contracting & Smart Systems</p>
@@ -115,7 +115,7 @@ export default async function PurchaseOrderPrintPage({
         {/* Line items */}
         <table className="mb-6 w-full text-sm">
           <thead>
-            <tr className="bg-navy text-white">
+            <tr className="bg-primary text-white">
               <th className="px-3 py-2 text-right">#</th>
               <th className="px-3 py-2 text-right">الوصف</th>
               <th className="px-3 py-2 text-right">الكمية</th>

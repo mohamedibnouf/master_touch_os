@@ -8,6 +8,7 @@ import {
   mapEngineStatusToVisual,
   officialCodeToWorkflowOutcome,
   pickCurrentNodeId,
+  resolveStageAssignment,
   waitingApprovalPhrase,
 } from "./workflow-view";
 
@@ -217,5 +218,52 @@ describe("formatOverdueDurationAr", () => {
       "متأخرة يومين",
     );
     expect(formatOverdueDurationAr("2026-10-04T00:00:00.000Z", "2026-10-03T01:00:00.000Z")).toBeNull();
+  });
+});
+
+describe("resolveStageAssignment", () => {
+  const maps = {
+    profileNames: new Map([["u1", "محمد أحمد"]]),
+    roleNames: new Map([["r1", "المدير العام"]]),
+    departmentNames: new Map([["d1", "الهندسة"]]),
+    jobTitles: new Map([["u1", "مدير المشروع"]]),
+  };
+
+  it("prefers assigned user over role and department", () => {
+    expect(
+      resolveStageAssignment({
+        assignedUserId: "u1",
+        assignedRoleId: "r1",
+        assignedDepartmentId: "d1",
+        ...maps,
+      }),
+    ).toEqual({ kind: "user", label: "محمد أحمد", subtitle: "مدير المشروع" });
+  });
+
+  it("uses role then department then unassigned", () => {
+    expect(
+      resolveStageAssignment({
+        assignedUserId: null,
+        assignedRoleId: "r1",
+        assignedDepartmentId: "d1",
+        ...maps,
+      }),
+    ).toEqual({ kind: "role", label: "المدير العام", subtitle: "دور" });
+    expect(
+      resolveStageAssignment({
+        assignedUserId: null,
+        assignedRoleId: null,
+        assignedDepartmentId: "d1",
+        ...maps,
+      }),
+    ).toEqual({ kind: "department", label: "الهندسة", subtitle: "قسم" });
+    expect(
+      resolveStageAssignment({
+        assignedUserId: null,
+        assignedRoleId: null,
+        assignedDepartmentId: null,
+        ...maps,
+      }),
+    ).toEqual({ kind: "none", label: "غير محدد", subtitle: null });
   });
 });

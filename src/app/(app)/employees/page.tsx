@@ -60,7 +60,7 @@ export default async function EmployeesPage() {
           canCreate ? (
             <Link
               href="#employee-create-card"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-navy-deep md:min-h-10"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-primary px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-primary-hover md:min-h-10"
             >
               إضافة موظف
             </Link>
@@ -112,7 +112,7 @@ export default async function EmployeesPage() {
               canCreate ? (
                 <Link
                   href="#employee-create-card"
-                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-primary px-4 text-sm font-medium text-white"
                 >
                   إضافة موظف
                 </Link>

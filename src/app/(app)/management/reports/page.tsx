@@ -22,7 +22,7 @@ export default async function ManagementReportsIndexPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MANAGEMENT_REPORT_CATALOG.map((item) => (
           <Link key={item.kind} href={item.href} className="block" data-testid={`report-card-${item.kind}`}>
-            <Card className="h-full transition hover:border-navy">
+            <Card className="h-full transition hover:border-primary">
               <h2 className="font-semibold text-navy">{item.titleAr}</h2>
               <p className="mt-2 text-sm text-muted">{item.descriptionAr}</p>
             </Card>

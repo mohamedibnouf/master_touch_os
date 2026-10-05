@@ -39,7 +39,7 @@ export function EmployeeDirectory({ employees }: { employees: DirectoryRow[] }) 
             >
               <div className="flex min-w-0 items-center gap-3 md:col-span-4">
                 <span
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-navy/10 text-sm font-semibold text-navy"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-primary/10 text-sm font-semibold text-navy"
                   aria-hidden
                 >
                   {displayInitials(arName === "بدون اسم" ? "" : arName)}

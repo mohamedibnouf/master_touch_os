@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Field, Select } from "@/components/ui/primitives";
+import { Badge, Button, Field, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { ApprovalActionPanel } from "@/components/projects/approval-action-panel";
 import { WorkflowDeadlinePanel } from "@/components/projects/workflow-deadline-panel";
@@ -28,10 +28,10 @@ export function WorkflowStageDetails({
   approvers: Array<{ id: string; name: string }>;
 }) {
   return (
-    <Card data-testid="workflow-stage-details" className="space-y-4">
+    <div data-testid="workflow-stage-details" className="space-y-4">
       <div>
         <p className="text-xs text-muted">تفاصيل المرحلة</p>
-        <h2 className="text-lg font-semibold text-navy">{node.nameAr}</h2>
+        <h2 className="text-lg font-semibold text-ink">{node.nameAr}</h2>
         <p className="text-sm text-muted">{node.nameEn}</p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -55,7 +55,7 @@ export function WorkflowStageDetails({
       <dl className="grid gap-2 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted">المسؤول</dt>
-          <dd>{node.responsibleLabel ?? "غير معيّن"}</dd>
+          <dd>{node.responsibleLabel ?? "غير محدد"}</dd>
         </div>
         <div>
           <dt className="text-muted">الموافقة المطلوبة</dt>
@@ -119,7 +119,9 @@ export function WorkflowStageDetails({
           <input type="hidden" name="instanceStepId" value={node.instanceStepId} />
           <input type="hidden" name="outcome" value="complete" />
           <input type="hidden" name="projectId" value={projectId} />
-          <Button type="submit">إكمال المرحلة</Button>
+          <Button type="submit" variant="success">
+            إكمال المرحلة
+          </Button>
         </ServerActionForm>
       ) : null}
 
@@ -127,9 +129,11 @@ export function WorkflowStageDetails({
         <ServerActionForm action={completeProjectStageAction}>
           <input type="hidden" name="stageId" value={node.projectStageId} />
           <input type="hidden" name="projectId" value={projectId} />
-          <Button type="submit">إكمال المرحلة</Button>
+          <Button type="submit" variant="success">
+            إكمال المرحلة
+          </Button>
         </ServerActionForm>
       ) : null}
-    </Card>
+    </div>
   );
 }

@@ -67,7 +67,7 @@ export function ManagementAnalystClient({
       <div className="mb-4 flex flex-wrap gap-2 print:hidden">
         <button
           type="button"
-          className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           data-testid="analyst-executive-brief"
           disabled={!aiEnabled || pending}
           onClick={() => run("executive_brief")}
@@ -111,7 +111,7 @@ export function ManagementAnalystClient({
           />
           <button
             type="button"
-            className="rounded-md bg-navy px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             data-testid="analyst-ask"
             disabled={!aiEnabled || pending || question.trim().length === 0}
             onClick={() => run("free_question", question.trim())}

@@ -263,7 +263,7 @@ export default async function DocumentControlPage({
               <Card key={doc.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold tracking-wide text-bronze">
+                    <p className="text-xs font-semibold tracking-wide text-muted">
                       {doc.document_number}
                     </p>
                     <h2 className="mt-1 text-base font-semibold text-navy">{doc.title}</h2>

@@ -311,7 +311,7 @@ export default async function SearchPage({
             />
           </Field>
           <div className="flex items-end">
-            <button type="submit" className="rounded-md bg-navy px-4 py-2 text-sm text-white">
+            <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm text-white">
               بحث
             </button>
           </div>

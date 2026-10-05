@@ -92,14 +92,31 @@ export function utcIsoToRiyadhLocalInput(iso: string): string {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+function toArabicDigits(value: string): string {
+  return value.replace(/\d/g, (digit) => ARABIC_DIGITS[Number(digit)] ?? digit);
+}
+
+/** Riyadh datetime for UI — formatToParts so Node and the browser cannot disagree on Arabic commas. */
 export function formatRiyadhDateTimeAr(iso: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return "—";
-  return new Date(ms).toLocaleString("ar-SA", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: RIYADH_TIME_ZONE,
-    dateStyle: "long",
-    timeStyle: "short",
-  });
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(ms));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const day = String(Number(get("day")));
+  const month = String(Number(get("month")));
+  const hour = String(Number(get("hour")));
+  const period = get("dayPeriod").toLowerCase().includes("p") ? "م" : "ص";
+  return toArabicDigits(`${day}/${month}/${get("year")} ${hour}:${get("minute")} ${period}`);
 }
 
 function dualAr(count: number, one: string, two: string, few: string, many: string): string {

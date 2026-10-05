@@ -40,7 +40,7 @@ export default async function ClientInvoicesPage({
           hasPermission(ctx, "client_invoice.create") ? (
             <Link
               href="/finance/client-invoices/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
               data-testid="client-invoice-create-link"
             >
               + فاتورة جديدة
@@ -65,7 +65,7 @@ export default async function ClientInvoicesPage({
             <option value="overdue">متأخرة</option>
             <option value="cancelled">ملغاة</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

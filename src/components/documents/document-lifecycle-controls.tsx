@@ -22,7 +22,7 @@ export function DocumentArchiveControl({
         حذف المستند
       </Button>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/40 p-4 sm:items-center" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-[var(--radius-control)] border border-line bg-white p-4 shadow-[var(--shadow-2)]">
             <h3 className="font-semibold text-navy">{isDrive ? ARCHIVE_CONFIRM_COPY.driveTitle : ARCHIVE_CONFIRM_COPY.storageTitle}</h3>
             <p className="mt-2 text-sm text-ink">{isDrive ? ARCHIVE_CONFIRM_COPY.driveBody : ARCHIVE_CONFIRM_COPY.storageBody}</p>
@@ -50,7 +50,7 @@ export function DocumentRestoreControl({ documentId }: { documentId: string }) {
         استعادة المستند
       </Button>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/40 p-4 sm:items-center" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-[var(--radius-control)] border border-line bg-white p-4 shadow-[var(--shadow-2)]">
             <h3 className="font-semibold text-navy">{ARCHIVE_CONFIRM_COPY.restoreTitle}</h3>
             <p className="mt-2 text-sm text-ink">{ARCHIVE_CONFIRM_COPY.restoreBody}</p>

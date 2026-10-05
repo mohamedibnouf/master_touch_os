@@ -39,7 +39,7 @@ export default async function SuppliersPage({
           hasPermission(ctx, "supplier.manage") ? (
             <Link
               href="/procurement/suppliers/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               + مورد جديد
             </Link>
@@ -55,7 +55,7 @@ export default async function SuppliersPage({
             <option value="suspended">موقوف</option>
             <option value="blocked">محظور</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

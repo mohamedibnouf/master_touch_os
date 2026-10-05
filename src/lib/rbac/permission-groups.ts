@@ -101,6 +101,7 @@ const RESOURCE_TO_GROUP: Record<string, PermissionGroupId> = {
   client_payment: "commercial",
   variation: "commercial",
   commercial_reports: "commercial",
+  ai: "reports",
 };
 
 export function permissionGroupForKey(key: PermissionKey | string): PermissionGroupId {

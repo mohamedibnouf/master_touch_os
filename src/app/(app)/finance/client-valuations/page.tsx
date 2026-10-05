@@ -40,7 +40,7 @@ export default async function ClientValuationsPage({
           hasPermission(ctx, "client_valuation.create") ? (
             <Link
               href="/finance/client-valuations/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
               data-testid="valuation-create-link"
             >
               + مستخلص جديد
@@ -69,7 +69,7 @@ export default async function ClientValuationsPage({
             <option value="invoiced">مفوتر</option>
             <option value="paid">مدفوع</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

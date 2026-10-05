@@ -10,6 +10,7 @@ import {
   riyadhLocalDateTimeToUtcIso,
   uniqueProfileIds,
   utcIsoToRiyadhLocalInput,
+  formatRiyadhDateTimeAr,
   validateDeadlineChange,
   warningStartsAtIso,
 } from "./deadline";
@@ -17,6 +18,12 @@ import { emailAudienceFor } from "@/modules/notifications/event-compat";
 import { whatsappAudienceFor } from "@/modules/notifications/whatsapp-policy";
 
 const due = "2026-10-10T14:00:00.000Z"; // 17:00 Asia/Riyadh
+
+describe("formatRiyadhDateTimeAr", () => {
+  it("formats Riyadh time without locale punctuation", () => {
+    expect(formatRiyadhDateTimeAr("2026-10-05T06:50:05.000Z")).toBe("٥/١٠/٢٠٢٦ ٩:٥٠ ص");
+  });
+});
 
 describe("deadline calculation", () => {
   it("SLA produces due_at from activation", () => {

@@ -9,17 +9,17 @@ export default async function LoginPage({
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4" data-testid="login-page">
-      <div className="w-full max-w-md rounded-xl border border-line bg-white p-5 shadow-sm sm:p-8">
-        <div className="mb-8">
-          <p className="text-xs font-semibold tracking-[0.2em] text-bronze">MASTER TOUCH</p>
+    <main className="flex min-h-screen items-center justify-center bg-white px-4" data-testid="login-page">
+      <div className="w-full max-w-md rounded-[var(--radius-hero)] border border-line bg-white p-5 sm:p-8">
+        <div className="mb-6">
+          <p className="text-sm font-semibold text-ink">Master Touch</p>
           <PageHeader
             title="تسجيل الدخول"
             description="ادخل الرقم الوظيفي وكلمة المرور. لا تحتاج إلى بريد إلكتروني."
           />
         </div>
         {params.disabled ? (
-          <p className="mb-4 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p className="mb-4 rounded-[var(--radius-control)] bg-danger/10 px-3 py-2 text-sm text-danger">
             تم إيقاف صلاحية الدخول لهذا الحساب.
           </p>
         ) : null}

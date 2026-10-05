@@ -78,7 +78,7 @@ export default async function PurchaseOrderDetailPage({
             {isIssued ? (
               <Link
                 href={`/procurement/purchase-orders/${id}/print`}
-                className="inline-flex items-center rounded-md border border-navy px-3 py-1.5 text-sm text-navy hover:bg-navy/5"
+                className="inline-flex items-center rounded-md border border-primary px-3 py-1.5 text-sm text-navy hover:bg-primary/5"
                 target="_blank"
               >
                 طباعة PO
@@ -263,7 +263,7 @@ export default async function PurchaseOrderDetailPage({
         <div className="mb-6">
           <Link
             href={`/procurement/goods-receipts/new?poId=${id}`}
-            className="inline-flex items-center rounded-md bg-navy px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             + تسجيل استلام بضاعة
           </Link>

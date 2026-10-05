@@ -48,7 +48,7 @@ export default async function GoodsReceiptsPage({
           hasPermission(ctx, "goods_receipt.create") ? (
             <Link
               href="/procurement/goods-receipts/new"
-              className="inline-flex items-center rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               + استلام جديد
             </Link>
@@ -66,7 +66,7 @@ export default async function GoodsReceiptsPage({
             <option value="accepted">مقبول</option>
             <option value="rejected">مرفوض</option>
           </select>
-          <button type="submit" className="rounded-md bg-navy px-3 py-2 text-sm text-white">
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
             تصفية
           </button>
         </form>

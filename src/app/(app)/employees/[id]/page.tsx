@@ -305,7 +305,7 @@ export default async function EmployeeDetailPage({
             href={`/employees/${id}?tab=${t.id}`}
             data-testid={`employee-tab-${t.id}`}
             className={`shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium duration-150 ${
-              tab === t.id ? "bg-navy text-white" : "text-muted hover:bg-white hover:text-navy"
+              tab === t.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted hover:text-ink"
             }`}
           >
             {t.label}
@@ -1120,7 +1120,7 @@ export default async function EmployeeDetailPage({
                       type="file"
                       name="file"
                       required
-                      className="w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90"
+                      className="w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
                       data-testid="hr-doc-file"
                     />
                   </Field>

@@ -360,3 +360,38 @@ export function pickCurrentNodeId(nodes: Array<{ id: string; visual: WorkflowVis
   }
   return nodes.find((n) => n.visual !== "completed" && n.visual !== "upcoming")?.id ?? null;
 }
+
+export type StageAssignmentKind = "user" | "role" | "department" | "none";
+
+export function resolveStageAssignment(input: {
+  assignedUserId: string | null;
+  assignedRoleId: string | null;
+  assignedDepartmentId: string | null;
+  profileNames: Map<string, string>;
+  roleNames: Map<string, string>;
+  departmentNames: Map<string, string>;
+  jobTitles: Map<string, string>;
+}): { kind: StageAssignmentKind; label: string; subtitle: string | null } {
+  if (input.assignedUserId) {
+    return {
+      kind: "user",
+      label: input.profileNames.get(input.assignedUserId) ?? "مستخدم معيّن",
+      subtitle: input.jobTitles.get(input.assignedUserId) ?? null,
+    };
+  }
+  if (input.assignedRoleId) {
+    return {
+      kind: "role",
+      label: input.roleNames.get(input.assignedRoleId) ?? "دور معيّن",
+      subtitle: "دور",
+    };
+  }
+  if (input.assignedDepartmentId) {
+    return {
+      kind: "department",
+      label: input.departmentNames.get(input.assignedDepartmentId) ?? "قسم معيّن",
+      subtitle: "قسم",
+    };
+  }
+  return { kind: "none", label: "غير محدد", subtitle: null };
+}

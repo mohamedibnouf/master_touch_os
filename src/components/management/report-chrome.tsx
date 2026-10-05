@@ -44,7 +44,7 @@ export function ReportChrome({
         </div>
       </div>
 
-      <header className="mb-6 border-b-2 border-navy pb-4" data-testid="report-header">
+      <header className="mb-6 border-b-2 border-primary pb-4" data-testid="report-header">
         <p className="text-sm font-medium text-navy">{context.organizationNameAr}</p>
         <p className="text-xs text-muted">{context.organizationNameEn}</p>
         <h1 className="mt-2 text-2xl font-bold text-navy">{title}</h1>

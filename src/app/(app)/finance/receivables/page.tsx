@@ -102,7 +102,7 @@ export default async function ReceivablesPage({
         {(Object.keys(BUCKET_LABELS) as AgeBucket[]).map((bucket) => (
           <Link key={bucket} href={`/finance/receivables?bucket=${bucket}`}>
             <Card
-              className={`transition hover:border-navy/30 ${params.bucket === bucket ? "border-navy ring-1 ring-navy/20" : ""}`}
+              className={`transition hover:border-primary/30 ${params.bucket === bucket ? "border-primary ring-1 ring-primary/20" : ""}`}
               data-testid={`receivables-bucket-${bucket}`}
             >
               <p className="text-sm text-muted">{BUCKET_LABELS[bucket]}</p>

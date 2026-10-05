@@ -73,18 +73,17 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
     <div className="flex h-full flex-col gap-3">
       {showAttendance ? (
         <section data-testid="home-attendance" className="mt-surface-priority flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="relative bg-navy px-4 py-4 text-white md:px-5 md:py-5">
-            <span className="absolute inset-y-4 start-0 w-0.5 rounded-full bg-bronze" aria-hidden />
+          <div className="relative border-b border-line px-4 py-4 md:px-5">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-white/12">
-                <Clock className="h-5 w-5 text-white" aria-hidden />
+              <span className="mt-icon-well">
+                <Clock className="h-4 w-4" aria-hidden />
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-white/70">الحضور اليوم · {todayYmd}</p>
-                <p className="mt-1 text-xl font-semibold leading-snug">
+                <p className="text-xs font-medium text-muted">الحضور اليوم · {todayYmd}</p>
+                <p className="mt-1 text-xl font-semibold leading-snug text-ink">
                   {attendance ? attendanceStatusLabel(attendance.attendance_status) : "لم يُسجَّل بعد"}
                 </p>
-                {shift ? <p className="mt-1 text-sm text-white/70">{shift.name_ar}</p> : null}
+                {shift ? <p className="mt-1 text-sm text-muted">{shift.name_ar}</p> : null}
                 {attendance?.check_in_at && !attendance.check_out_at ? (
                   <span className="mt-2 inline-block">
                     <Badge tone={statusTone}>لم يُسجَّل الانصراف</Badge>
@@ -124,7 +123,7 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
             {!canCheckIn && !canCheckOut ? (
               <p className="text-sm text-muted">لا يوجد إجراء حضور متاح حالياً.</p>
             ) : null}
-            <Link href="/attendance" className="text-xs font-medium text-navy duration-150 hover:underline">
+            <Link href="/attendance" className="text-xs font-medium text-primary duration-150 hover:underline">
               صفحة الحضور
             </Link>
           </div>
@@ -134,9 +133,9 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
       {showLeave ? (
         <section
           data-testid="home-leave"
-          className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[var(--radius-surface)] bg-navy/[0.05] px-3 py-2.5"
+          className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[var(--radius-surface)] border border-line bg-surface-muted px-3 py-2.5"
         >
-          <span className="inline-flex min-w-0 items-center gap-2 text-sm text-navy">
+          <span className="inline-flex min-w-0 items-center gap-2 text-sm text-ink">
             <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
             <span className="font-medium">الإجازات</span>
             <span className="font-semibold tabular-nums">
@@ -144,7 +143,7 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
             </span>
             <span className="text-muted">· {leavePendingCount} قيد المعالجة</span>
           </span>
-          <Link href="/leave" className="text-xs font-medium text-navy duration-150 hover:underline">
+          <Link href="/leave" className="text-xs font-medium text-primary duration-150 hover:underline">
             إجازاتي
           </Link>
         </section>

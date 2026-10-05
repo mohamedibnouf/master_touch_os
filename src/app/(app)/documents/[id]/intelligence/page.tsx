@@ -12,6 +12,10 @@ import { compareBusinessCaseToProject } from "@/modules/document-intelligence/co
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import type { BusinessCaseExtraction, ExtractedFact } from "@/modules/document-intelligence/schema";
 import { DRIVE_INTELLIGENCE_UNAVAILABLE_AR, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
+import { DocumentAiAnalysisPanel } from "@/components/ai/document-ai-analysis";
+import { classifyDocumentSource } from "@/modules/ai/classify-source";
+import { getAiPlatformConfig } from "@/modules/ai/config-env";
+import { canUseAiCapability } from "@/modules/ai/security/permissions";
 
 function TrustBadge({ status }: { status: string | null }) {
   if (status === "VERIFIED") return <Badge tone="navy" data-testid="trust-verified">Verified</Badge>;
@@ -260,6 +264,19 @@ export default async function DocumentIntelligencePage({
             </ul>
           )}
         </Card>
+      ) : null}
+
+      {canUseAiCapability(ctx, "ai.document.analyze") ? (
+        <DocumentAiAnalysisPanel
+          documentId={doc.id}
+          enabled={getAiPlatformConfig().enabled}
+          sourceClass={classifyDocumentSource({
+            fileSource: version?.file_source,
+            mimeType: version?.mime_type,
+            filePath: version?.file_path,
+          })}
+          defaultBusinessCase
+        />
       ) : null}
     </PageContainer>
   );

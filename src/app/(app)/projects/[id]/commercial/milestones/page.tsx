@@ -55,7 +55,7 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
           {canManage ? (
             <Link
               href={`/projects/${projectId}/commercial/contract`}
-              className="inline-flex rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white"
+              className="inline-flex rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white"
             >
               إنشاء العقد
             </Link>

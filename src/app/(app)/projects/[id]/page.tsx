@@ -21,16 +21,20 @@ import {
   DocumentSourceBadge,
 } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl } from "@/components/documents/document-lifecycle-controls";
-import { documentStatusLabel, projectRiskLabel, projectStatusLabel } from "@/lib/ui/operational-labels";
+import { documentStatusLabel, projectRiskLabel, projectRiskTone, projectStatusLabel, projectStatusTone } from "@/lib/ui/operational-labels";
 import { ProjectProgress } from "@/components/projects/project-progress";
 import { ProjectAttentionCard } from "@/components/projects/project-attention-card";
-import { ProjectWorkflowTimeline } from "@/components/projects/project-workflow-timeline";
+import { CaseFlowStep, ProjectCaseFlow } from "@/components/projects/project-case-flow";
 import { WorkflowStageDetails } from "@/components/projects/workflow-stage-details";
 import { ProjectActivityTimeline } from "@/components/projects/project-activity-timeline";
 import { activityNarrative } from "@/modules/projects/approval-workflow-gate";
 import { AUDIT_FEED_COLUMNS } from "@/lib/query-projections";
+import { ProjectAiCard } from "@/components/ai/project-ai-card";
+import { ProjectAiAssistant } from "@/components/ai/project-ai-assistant";
+import { canAnalyzeProjectAi } from "@/modules/ai/security/permissions";
+import { getAiPlatformConfig } from "@/modules/ai/config-env";
 
-const laterTabs = ["السلامة", "الجودة", "الاتصالات", "الذكاء الاصطناعي"];
+const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
 export default async function ProjectDetailPage({
   params,
@@ -43,7 +47,7 @@ export default async function ProjectDetailPage({
   if (!ctx || !hasPermission(ctx, "project.read")) redirect("/login");
 
   const { id } = await params;
-  const { tab = "overview", stage: selectedStageParam } = await searchParams;
+  const { tab = "overview" } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const project = await repo.getProject(ctx.organization.id, id);
@@ -68,16 +72,25 @@ export default async function ProjectDetailPage({
   const canArchiveDocs = hasPermission(ctx, "document.archive");
 
   const profileNames = new Map<string, string>();
+  const jobTitles = new Map<string, string>();
   for (const row of users) {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
     const name = profile?.full_name_ar || profile?.full_name_en;
     if (name) profileNames.set(row.profile_id, name);
+    const employees = Array.isArray(row.employees) ? row.employees : [];
+    const title = employees.find((emp) => emp.job_title_ar)?.job_title_ar;
+    if (title) jobTitles.set(row.profile_id, title);
   }
   const { data: roleRows } = await supabase
     .from("roles")
     .select("id, name_ar")
     .or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`);
   const roleNames = new Map((roleRows ?? []).map((r) => [r.id as string, r.name_ar as string]));
+  const { data: departmentRows } = await supabase
+    .from("departments")
+    .select("id, name_ar")
+    .eq("organization_id", ctx.organization.id);
+  const departmentNames = new Map((departmentRows ?? []).map((d) => [d.id as string, d.name_ar as string]));
 
   const workflow = await loadProjectWorkflowProjection({
     supabase,
@@ -86,6 +99,8 @@ export default async function ProjectDetailPage({
     stages,
     profileNames,
     roleNames,
+    departmentNames,
+    jobTitles,
   });
   const approverOptions = users.flatMap((row) => {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -96,11 +111,6 @@ export default async function ProjectDetailPage({
     if (!memberActive || !profileActive || !employeeOk) return [];
     return [{ id: row.profile_id, name: profile?.full_name_ar || row.profile_id }];
   });
-  const selectedNode =
-    workflow.nodes.find((n) => n.id === selectedStageParam) ??
-    workflow.nodes.find((n) => n.id === workflow.currentNodeId) ??
-    workflow.nodes[0] ??
-    null;
   const managerName = project.project_manager_id ? (profileNames.get(project.project_manager_id) ?? null) : null;
 
   const activityIds = [project.id, workflow.instanceId, ...workflow.nodes.map((n) => n.id)].filter(
@@ -140,6 +150,7 @@ export default async function ProjectDetailPage({
     { id: "commercial", label: "التجاري" },
     { id: "approvals", label: "الموافقات" },
     { id: "activity", label: "النشاط" },
+    ...(canAnalyzeProjectAi(ctx) ? [{ id: "ai", label: "المساعد الذكي" }] : []),
   ];
 
   const [projectRfis, projectMats, projectShds, projectIrs, projectNcrs, projectReports, projectCors, projectPrs, projectPos, projectSupplierInv, commercialSummary, commercialHealth] =
@@ -212,6 +223,15 @@ export default async function ProjectDetailPage({
         : Promise.resolve({ data: null, error: null }),
     ]);
 
+  const currentStage = workflow.nodes.find((n) => n.id === workflow.currentNodeId);
+  const progressTone =
+    workflow.progress.total > 0 && workflow.progress.completed === workflow.progress.total
+      ? "success"
+      : currentStage?.visual === "overdue" || currentStage?.deadlineState === "OVERDUE"
+        ? "danger"
+        : currentStage?.deadlineState === "DUE_SOON"
+          ? "warning"
+          : "info";
   const healthTone =
     health.data === "red" ? "danger" : health.data === "amber" ? "warning" : "success";
   const healthLabel =
@@ -231,8 +251,8 @@ export default async function ProjectDetailPage({
         }
         badges={
           <>
-            <Badge tone="navy">{projectStatusLabel(project.status)}</Badge>
-            <Badge tone={project.risk_level === "high" || project.risk_level === "critical" ? "danger" : "neutral"}>
+            <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Badge>
+            <Badge tone={projectRiskTone(project.risk_level)}>
               المخاطر: {projectRiskLabel(project.risk_level)}
             </Badge>
             <Badge tone={healthTone as "danger" | "warning" | "success"}>صحة المشروع: {healthLabel}</Badge>
@@ -246,18 +266,22 @@ export default async function ProjectDetailPage({
             percent={workflow.progress.percent}
             completed={workflow.progress.completed}
             total={workflow.progress.total}
+            tone={progressTone}
           />
           <p className="mt-3 text-sm text-muted">الإجراء المطلوب: {workflow.nextRequiredAction}</p>
         </Card>
         <ProjectAttentionCard attention={workflow.attention} />
       </div>
+      {canAnalyzeProjectAi(ctx) ? (
+        <ProjectAiCard projectId={project.id} enabled={getAiPlatformConfig().enabled} />
+      ) : null}
 
       <div className="mb-6 min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
         {tabs.map((item) => (
           <a
             key={item.id}
             href={`/projects/${project.id}?tab=${item.id}`}
-            className={`shrink-0 rounded-md px-3 py-2 text-sm ${tab === item.id ? "bg-navy text-white" : "text-muted hover:bg-white"}`}
+            className={`shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm ${tab === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted"}`}
           >
             {item.label}
           </a>
@@ -313,26 +337,30 @@ export default async function ProjectDetailPage({
             <EmptyState title="لا توجد مراحل ولا مسار عمل لهذا المشروع." />
           ) : (
             <>
-              <Card>
+              <Card className="p-4 md:p-5">
                 <p className="mb-4 text-sm text-muted">
                   {workflow.definitionName
                     ? `المسار: ${workflow.definitionName}`
                     : "عرض مراحل المشروع الحالية. إكمال المرحلة يفعّل التالية تلقائياً."}
                 </p>
-                <ProjectWorkflowTimeline
-                  projectId={project.id}
-                  nodes={workflow.nodes}
-                  selectedId={selectedNode?.id ?? null}
-                />
+                <ProjectCaseFlow>
+                  {workflow.nodes.map((node, index) => (
+                    <CaseFlowStep
+                      key={node.id}
+                      node={node}
+                      current={node.id === workflow.currentNodeId}
+                      isLast={index === workflow.nodes.length - 1}
+                    >
+                      <WorkflowStageDetails
+                        node={node}
+                        projectId={project.id}
+                        projectCode={project.project_code}
+                        approvers={approverOptions}
+                      />
+                    </CaseFlowStep>
+                  ))}
+                </ProjectCaseFlow>
               </Card>
-              {selectedNode ? (
-                <WorkflowStageDetails
-                  node={selectedNode}
-                  projectId={project.id}
-                  projectCode={project.project_code}
-                  approvers={approverOptions}
-                />
-              ) : null}
             </>
           )}
           {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
@@ -416,7 +444,7 @@ export default async function ProjectDetailPage({
           </p>
           <a
             href={`/engineering?project=${project.id}`}
-            className="inline-flex rounded-md bg-navy px-3.5 py-2 text-sm font-medium text-white"
+            className="inline-flex rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white"
           >
             فتح لوحة الهندسة
           </a>
@@ -781,6 +809,10 @@ export default async function ProjectDetailPage({
       ) : null}
 
       {tab === "activity" ? <ProjectActivityTimeline items={activityItems} /> : null}
+
+      {tab === "ai" && canAnalyzeProjectAi(ctx) ? (
+        <ProjectAiAssistant projectId={project.id} enabled={getAiPlatformConfig().enabled} />
+      ) : null}
     </PageContainer>
   );
 }

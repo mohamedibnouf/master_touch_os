@@ -39,7 +39,7 @@ export default async function DepartmentsPage() {
         <div className="mt-surface p-4 md:p-5" data-testid={`department-card-${department.id}`}>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.12em] text-bronze">{department.code}</p>
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-muted">{department.code}</p>
               <h2 className="mt-1 text-base font-semibold text-navy" dir="auto">
                 {department.name_ar}
               </h2>
@@ -134,7 +134,7 @@ export default async function DepartmentsPage() {
             {canCreate ? (
               <a
                 href="#department-create-card"
-                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-navy-deep md:min-h-10"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-primary px-4 text-sm font-medium text-white shadow-[var(--shadow-1)] duration-150 hover:bg-primary-hover md:min-h-10"
               >
                 إنشاء إدارة
               </a>
@@ -202,7 +202,7 @@ export default async function DepartmentsPage() {
             canCreate ? (
               <a
                 href="#department-create-card"
-                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-navy px-4 text-sm font-medium text-white"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-primary px-4 text-sm font-medium text-white"
               >
                 إنشاء إدارة
               </a>

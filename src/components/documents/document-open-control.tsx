@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/primitives";
+import { Badge, Button } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { openStorageDocumentAction } from "@/server/use-cases/platform";
 import { documentFileSourceLabelAr, driveOpenHref } from "@/modules/documents/file-source";
@@ -47,10 +47,12 @@ export function DocumentOpenControl({
 }
 
 export function DocumentSourceBadge({ source }: { source: string | null | undefined }) {
+  const value = source ?? "storage";
+  const tone = value === "google_drive" || value === "drive" ? "info" : value === "archived" ? "neutral" : "neutral";
   return (
-    <span className="text-xs text-muted" data-testid="document-source-badge">
-      {documentFileSourceLabelAr(source ?? "storage")}
-    </span>
+    <Badge tone={tone} data-testid="document-source-badge">
+      {documentFileSourceLabelAr(value)}
+    </Badge>
   );
 }
 

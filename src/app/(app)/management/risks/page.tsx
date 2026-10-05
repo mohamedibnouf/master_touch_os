@@ -108,7 +108,7 @@ export default async function ManagementRisksPage({
         <div className="flex flex-wrap gap-2">
           <Link
             href={filterHref({ severity: null })}
-            className={`rounded-md px-3 py-2 text-sm ${!severityFilter ? "bg-navy text-white" : "bg-paper text-ink"}`}
+            className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${!severityFilter ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
             data-testid="filter-severity-all"
           >
             كل الشدّة
@@ -117,7 +117,7 @@ export default async function ManagementRisksPage({
             <Link
               key={s}
               href={filterHref({ severity: s })}
-              className={`rounded-md px-3 py-2 text-sm ${severityFilter === s ? "bg-navy text-white" : "bg-paper text-ink"}`}
+              className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${severityFilter === s ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
               data-testid={`filter-severity-${s}`}
             >
               {s} ({bySeverity[s]})
@@ -127,7 +127,7 @@ export default async function ManagementRisksPage({
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             href={filterHref({ category: null })}
-            className={`rounded-md px-3 py-2 text-sm ${!categoryFilter ? "bg-navy text-white" : "bg-paper text-ink"}`}
+            className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${!categoryFilter ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
             data-testid="filter-category-all"
           >
             كل الفئات
@@ -136,7 +136,7 @@ export default async function ManagementRisksPage({
             <Link
               key={c}
               href={filterHref({ category: c })}
-              className={`rounded-md px-3 py-2 text-sm ${categoryFilter === c ? "bg-navy text-white" : "bg-paper text-ink"}`}
+              className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${categoryFilter === c ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
               data-testid={`filter-category-${c}`}
             >
               {c} ({byCategory[c] ?? 0})

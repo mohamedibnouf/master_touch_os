@@ -10,6 +10,8 @@ export function ProjectAttentionCard({
   attention: ProjectAttention;
   actions?: ReactNode;
 }) {
+  if (attention.kind === "none") return null;
+
   const tone =
     attention.kind === "approve" || attention.kind === "complete" || attention.kind === "submit_approval"
       ? "action"
@@ -23,13 +25,13 @@ export function ProjectAttentionCard({
     <Card
       data-testid="project-attention-card"
       className={cn(
-        tone === "action" && "border-navy/30 bg-navy/[0.04]",
-        tone === "wait" && "border-warning/30 bg-warning/[0.06]",
-        tone === "danger" && "border-danger/30 bg-danger/[0.06]",
+        tone === "action" && "border-info-border bg-info-soft",
+        tone === "wait" && "border-warning-border bg-warning-soft",
+        tone === "danger" && "border-danger-border bg-danger-soft",
       )}
     >
       <p className="text-xs font-medium tracking-wide text-muted">ماذا يحتاج انتباهك؟</p>
-      <h2 className="mt-1 text-base font-semibold text-navy">{attention.title}</h2>
+      <h2 className="mt-1 text-base font-semibold text-ink">{attention.title}</h2>
       <p className="mt-1 text-sm leading-7 text-muted">{attention.detail}</p>
       {actions ? <div className="mt-4 space-y-3">{actions}</div> : null}
     </Card>

@@ -66,7 +66,7 @@ export function AppShellFrame({
   }, [drawerOpen, routeKey]);
 
   return (
-    <div className="flex min-h-dvh min-w-0 overflow-x-clip bg-paper">
+    <div className="flex min-h-dvh min-w-0 overflow-x-clip bg-white">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:text-navy"
@@ -78,16 +78,22 @@ export function AppShellFrame({
         <button
           type="button"
           aria-label="إغلاق القائمة"
-          className="fixed inset-0 z-40 bg-navy/40 xl:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 xl:hidden print:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
 
-      <Sidebar flags={flags} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <Sidebar
+        flags={flags}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        userName={userName}
+        jobTitle={jobTitle}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          className="flex min-h-14 items-center gap-3 bg-navy px-3 text-white md:px-6 print:hidden"
+          className="flex min-h-14 items-center gap-3 border-b border-line bg-white px-3 text-ink md:px-6 print:hidden"
           style={{
             paddingTop: "max(0.75rem, env(safe-area-inset-top))",
             paddingInlineStart: "max(0.75rem, env(safe-area-inset-left))",
@@ -96,7 +102,7 @@ export function AppShellFrame({
         >
           <button
             type="button"
-            className="mt-icon-btn mt-icon-btn-inverse xl:hidden"
+            className="mt-icon-btn xl:hidden"
             aria-label="فتح القائمة"
             aria-expanded={drawerOpen}
             aria-controls="app-sidebar"
@@ -106,41 +112,36 @@ export function AppShellFrame({
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold tracking-[0.18em] text-bronze">MASTER TOUCH</p>
-            <p className="truncate text-sm font-medium text-white" title={organizationNameEn || organizationNameAr}>
+            <p className="truncate text-sm font-medium text-ink" title={organizationNameEn || organizationNameAr}>
               {organizationNameAr}
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2">
             {flags.notifications ? notificationsSlot : null}
-            <div className="hidden h-7 w-px bg-white/15 sm:block" aria-hidden />
+            <div className="hidden h-6 w-px bg-line sm:block" aria-hidden />
             <div
-              className="flex min-w-0 items-center gap-2.5 rounded-[var(--radius-control)] bg-white/8 py-1 pe-1.5 ps-1"
+              className="flex min-w-0 items-center gap-2 rounded-[var(--radius-control)] py-1 pe-1 ps-1"
               data-testid="header-account"
               title={jobTitle}
             >
               <span
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold text-white"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
                 aria-hidden
               >
                 {initialsFromName(userName)}
               </span>
               <div className="hidden min-w-0 sm:block">
-                <p className="max-w-[10rem] truncate text-sm font-medium leading-tight text-white md:max-w-[14rem]" dir="auto">
+                <p className="max-w-[10rem] truncate text-sm font-medium leading-tight text-ink md:max-w-[14rem]" dir="auto">
                   {userName}
                 </p>
-                <p className="max-w-[10rem] truncate text-xs text-white/65 md:max-w-[14rem]" dir="auto">
+                <p className="max-w-[10rem] truncate text-xs text-muted md:max-w-[14rem]" dir="auto">
                   {jobTitle}
                 </p>
               </div>
             </div>
             <form action={signOutAction}>
-              <Button
-                type="submit"
-                variant="ghost"
-                className="min-h-11 px-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white md:min-h-9"
-              >
+              <Button type="submit" variant="ghost" className="px-2.5 text-sm">
                 خروج
               </Button>
             </form>
