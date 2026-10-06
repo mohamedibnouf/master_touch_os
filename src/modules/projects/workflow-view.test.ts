@@ -182,6 +182,10 @@ describe("progress and attention", () => {
     expect(approve.kind).toBe("approve");
     expect(approve.detail).toContain("مراجعة المهندس");
 
+    expect(
+      buildProjectAttention({ mode: "preview", instanceStatus: null, current: null }).title,
+    ).toBe("مسار العمل لم يبدأ بعد");
+
     const wait = buildProjectAttention({
       mode: "workflow",
       instanceStatus: "in_progress",

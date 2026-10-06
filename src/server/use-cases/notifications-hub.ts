@@ -147,7 +147,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
   const { data: wfSteps } = await admin
     .from("workflow_instance_steps")
     .select(
-      "id, organization_id, instance_id, status, due_at, assigned_user_id, assigned_role_id, workflow_steps(name_ar, warning_hours)",
+      "id, organization_id, instance_id, status, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar, warning_hours)",
     )
     .in("status", ["ready", "in_progress"])
     .not("due_at", "is", null)
@@ -236,6 +236,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
           dueAt: (s.due_at as string | null) ?? null,
           warningHours: defOne?.warning_hours ?? null,
           recipientIds: uniqueProfileIds([
+            (s.responsible_user_id as string | null) ?? null,
             s.assigned_user_id as string | null,
             ...roleHolders,
             projectId ? managerByProject.get(projectId) ?? null : null,

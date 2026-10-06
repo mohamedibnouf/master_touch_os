@@ -160,7 +160,7 @@ export function blockReasonForNode(input: {
 }
 
 export function buildProjectAttention(input: {
-  mode: "workflow" | "legacy" | "empty";
+  mode: "workflow" | "legacy" | "empty" | "preview";
   instanceStatus: string | null;
   current: {
     nameAr: string;
@@ -179,6 +179,15 @@ export function buildProjectAttention(input: {
       kind: "start_workflow",
       title: "لا يوجد مسار عمل نشط",
       detail: "يمكن بدء مسار عمل معتمد أو متابعة مراحل المشروع الحالية.",
+      waitForLabel: null,
+    };
+  }
+
+  if (input.mode === "preview") {
+    return {
+      kind: "start_workflow",
+      title: "مسار العمل لم يبدأ بعد",
+      detail: "عيّن مسؤول كل مرحلة ثم ابدأ المسار.",
       waitForLabel: null,
     };
   }
@@ -364,6 +373,7 @@ export function pickCurrentNodeId(nodes: Array<{ id: string; visual: WorkflowVis
 export type StageAssignmentKind = "user" | "role" | "department" | "none";
 
 export function resolveStageAssignment(input: {
+  responsibleUserId?: string | null;
   assignedUserId: string | null;
   assignedRoleId: string | null;
   assignedDepartmentId: string | null;
@@ -372,11 +382,12 @@ export function resolveStageAssignment(input: {
   departmentNames: Map<string, string>;
   jobTitles: Map<string, string>;
 }): { kind: StageAssignmentKind; label: string; subtitle: string | null } {
-  if (input.assignedUserId) {
+  const displayUserId = input.responsibleUserId || input.assignedUserId;
+  if (displayUserId) {
     return {
       kind: "user",
-      label: input.profileNames.get(input.assignedUserId) ?? "مستخدم معيّن",
-      subtitle: input.jobTitles.get(input.assignedUserId) ?? null,
+      label: input.profileNames.get(displayUserId) ?? "مستخدم معيّن",
+      subtitle: input.jobTitles.get(displayUserId) ?? null,
     };
   }
   if (input.assignedRoleId) {

@@ -26,6 +26,10 @@ import {
   formatRemainingAr,
   type DeadlineState,
 } from "@/modules/projects/deadline";
+import {
+  WORKFLOW_ASSIGN_PERMISSION,
+  canReassignWorkflowStepStatus,
+} from "@/modules/projects/workflow-responsibility";
 
 function asOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -66,10 +70,13 @@ export type WorkflowViewNode = {
   deadlineState: DeadlineState;
   remainingLabel: string | null;
   overdueSinceLabel: string | null;
+  workflowStepId: string | null;
+  responsibleUserId: string | null;
+  canAssignResponsible: boolean;
 };
 
 export type ProjectWorkflowProjection = {
-  mode: "workflow" | "legacy" | "empty";
+  mode: "workflow" | "legacy" | "empty" | "preview";
   instanceId: string | null;
   instanceStatus: string | null;
   definitionName: string | null;
@@ -100,6 +107,7 @@ type InstanceStepRow = {
   assigned_user_id: string | null;
   assigned_role_id: string | null;
   assigned_department_id: string | null;
+  responsible_user_id: string | null;
   due_at: string | null;
   step_key: string;
   step_id: string;
@@ -161,7 +169,7 @@ export async function loadProjectWorkflowProjection(input: {
       supabase
         .from("workflow_instance_steps")
         .select(
-          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, assigned_department_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id, assigned_department_id, warning_hours, sla_hours)",
+          "id, sequence, status, started_at, completed_at, completed_by, assigned_user_id, assigned_role_id, assigned_department_id, responsible_user_id, due_at, step_key, step_id, workflow_steps(name_ar, name_en, requires_approval, assigned_role_id, assigned_department_id, warning_hours, sla_hours)",
         )
         .eq("instance_id", instance.id)
         .order("sequence"),
@@ -255,6 +263,7 @@ export async function loadProjectWorkflowProjection(input: {
       const roleId = step.assigned_role_id ?? def?.assigned_role_id ?? null;
       const departmentId = step.assigned_department_id ?? def?.assigned_department_id ?? null;
       const assignment = resolveStageAssignment({
+        responsibleUserId: step.responsible_user_id,
         assignedUserId: step.assigned_user_id,
         assignedRoleId: roleId,
         assignedDepartmentId: departmentId,
@@ -340,6 +349,9 @@ export async function loadProjectWorkflowProjection(input: {
         deadlineState,
         remainingLabel,
         overdueSinceLabel,
+        workflowStepId: step.step_id,
+        responsibleUserId: step.responsible_user_id,
+        canAssignResponsible: Boolean(canManage && canReassignWorkflowStepStatus(step.status)),
       };
     });
 
@@ -363,6 +375,119 @@ export async function loadProjectWorkflowProjection(input: {
       attention,
       nextRequiredAction: attention.detail,
     };
+  }
+
+  const { data: publishedDefs } = await supabase
+    .from("workflow_definitions")
+    .select("id, name_ar, code")
+    .eq("status", "published")
+    .eq("entity_type", "project")
+    .or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`);
+  const previewDef =
+    (publishedDefs ?? []).find((d) => d.code === "project_lifecycle") ?? (publishedDefs ?? [])[0] ?? null;
+
+  if (previewDef) {
+    const { data: version } = await supabase
+      .from("workflow_versions")
+      .select("id")
+      .eq("definition_id", previewDef.id)
+      .eq("status", "published")
+      .order("version_number", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    const { data: templateSteps } = version
+      ? await supabase
+          .from("workflow_steps")
+          .select("id, key, name_ar, name_en, sequence, assigned_role_id, assigned_department_id, assigned_user_id, requires_approval, warning_hours, sla_hours")
+          .eq("version_id", version.id)
+          .order("sequence")
+      : { data: [] as Array<Record<string, unknown>> };
+    const { data: assignmentRows } = await supabase
+      .from("project_workflow_step_assignments")
+      .select("workflow_step_id, responsible_user_id")
+      .eq("organization_id", ctx.organization.id)
+      .eq("project_id", projectId);
+
+    if (templateSteps && templateSteps.length > 0) {
+      const assignedByStep = new Map(
+        (assignmentRows ?? []).map((row) => [row.workflow_step_id as string, row.responsible_user_id as string]),
+      );
+      const canManage = hasPermission(ctx, WORKFLOW_ASSIGN_PERMISSION);
+      const nodes: WorkflowViewNode[] = templateSteps.map((step) => {
+        const responsibleUserId = assignedByStep.get(step.id as string) ?? null;
+        const assignment = resolveStageAssignment({
+          responsibleUserId,
+          assignedUserId: (step.assigned_user_id as string | null) ?? null,
+          assignedRoleId: (step.assigned_role_id as string | null) ?? null,
+          assignedDepartmentId: (step.assigned_department_id as string | null) ?? null,
+          profileNames,
+          roleNames,
+          departmentNames,
+          jobTitles,
+        });
+        const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
+        const visual = mapEngineStatusToVisual({
+          engineStatus: "pending",
+          requiresApproval: Boolean(step.requires_approval),
+          dueAt: null,
+          nowIso,
+          openApproval: null,
+          latestOfficialCode: null,
+        });
+        return {
+          id: step.id as string,
+          source: "workflow",
+          sequence: step.sequence as number,
+          nameAr: step.name_ar as string,
+          nameEn: step.name_en as string,
+          visual,
+          visualLabel: workflowVisualLabel(visual),
+          engineStatus: "pending",
+          gate: step.requires_approval ? "APPROVAL" : "MANUAL_COMPLETION",
+          requiresApproval: Boolean(step.requires_approval),
+          responsibleLabel,
+          assignmentKind: assignment.kind,
+          assignmentSubtitle: assignment.subtitle,
+          approverLabel: null,
+          startedAt: null,
+          dueAt: null,
+          completedAt: null,
+          completedByLabel: null,
+          blockReason: "بانتظار بدء مسار العمل",
+          overdueLabel: null,
+          activationHint: null,
+          instanceStepId: null,
+          projectStageId: null,
+          openApproval: null,
+          latestOfficialCode: null,
+          canComplete: false,
+          canSubmitApproval: false,
+          canDecideApproval: false,
+          canEditDeadline: false,
+          warningHours: (step.warning_hours as number | null) ?? null,
+          deadlineState: "ON_TRACK",
+          remainingLabel: null,
+          overdueSinceLabel: null,
+          workflowStepId: step.id as string,
+          responsibleUserId,
+          canAssignResponsible: canManage,
+        };
+      });
+      const currentNodeId = pickCurrentNodeId(nodes);
+      const progress = deriveStageProgress(nodes);
+      const attention = buildProjectAttention({ mode: "preview", instanceStatus: null, current: null });
+      return {
+        mode: "preview",
+        instanceId: null,
+        instanceStatus: null,
+        definitionName: previewDef.name_ar,
+        nodes,
+        progress,
+        currentNodeId,
+        attention,
+        nextRequiredAction: attention.detail,
+      };
+    }
   }
 
   if (stages.length === 0) {
@@ -447,6 +572,9 @@ export async function loadProjectWorkflowProjection(input: {
       }),
       remainingLabel: stage.due_at || stage.planned_end ? formatRemainingAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
       overdueSinceLabel: stage.due_at || stage.planned_end ? formatOverdueSinceAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
+      workflowStepId: null,
+      responsibleUserId: stage.owner_user_id,
+      canAssignResponsible: false,
     };
   });
 

@@ -21,6 +21,7 @@ export const DOMAIN_EVENTS = [
   "document.archived",
   "document.restored",
   "workflow.started",
+  "workflow.step.assignee_changed",
   "workflow.step.completed",
   "workflow.step.deadline_changed",
   "workflow.step.deadline_warning",

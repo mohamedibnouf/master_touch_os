@@ -31,6 +31,12 @@ import {
   parseStartWorkflowForm,
   startWorkflowValidationMessage,
 } from "@/modules/projects/start-workflow-input";
+import {
+  WORKFLOW_ASSIGN_PERMISSION,
+  assignWorkflowStepResponsibleSchema,
+  eligibleResponsibleRejectMessage,
+  workflowStepNotificationRecipients,
+} from "@/modules/projects/workflow-responsibility";
 import { logger } from "@/lib/logger";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
@@ -97,7 +103,7 @@ async function notifyWorkflowReadyAssignees(input: {
 }) {
   const { data: ready } = await input.supabase
     .from("workflow_instance_steps")
-    .select("id, assigned_user_id, assigned_role_id, due_at, workflow_steps(name_ar)")
+    .select("id, assigned_user_id, assigned_role_id, responsible_user_id, due_at, workflow_steps(name_ar)")
     .eq("instance_id", input.instanceId)
     .eq("status", "ready");
   const href = input.projectId ? `/projects/${input.projectId}?tab=stages` : null;
@@ -106,10 +112,15 @@ async function notifyWorkflowReadyAssignees(input: {
     const stepRel = row.workflow_steps as { name_ar: string } | { name_ar: string }[] | null;
     const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
     const dueLabel = row.due_at ? formatRiyadhDateTimeAr(row.due_at as string) : null;
-    const recipients = uniqueProfileIds([
-      row.assigned_user_id as string | null,
-      ...(await activeRoleHolderIds(input.supabase, input.organizationId, (row.assigned_role_id as string | null) ?? null)),
-    ]);
+    const recipients = workflowStepNotificationRecipients({
+      responsibleUserId: (row.responsible_user_id as string | null) ?? null,
+      assignedUserId: (row.assigned_user_id as string | null) ?? null,
+      roleHolderIds: await activeRoleHolderIds(
+        input.supabase,
+        input.organizationId,
+        (row.assigned_role_id as string | null) ?? null,
+      ),
+    });
     for (const userId of recipients) {
       await notifications.notify({
         organizationId: input.organizationId,
@@ -448,7 +459,7 @@ export async function updateWorkflowStepDeadlineAction(
     const supabase = await createServerSupabaseClient();
     const { data: current } = await supabase
       .from("workflow_instance_steps")
-      .select("id, organization_id, instance_id, status, started_at, due_at, assigned_user_id, assigned_role_id, workflow_steps(name_ar)")
+      .select("id, organization_id, instance_id, status, started_at, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar)")
       .eq("id", parsed.data.instanceStepId)
       .maybeSingle<{
         id: string;
@@ -459,6 +470,7 @@ export async function updateWorkflowStepDeadlineAction(
         due_at: string | null;
         assigned_user_id: string | null;
         assigned_role_id: string | null;
+        responsible_user_id: string | null;
         workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
       }>();
     if (!current || current.organization_id !== ctx.organization.id) {
@@ -488,10 +500,11 @@ export async function updateWorkflowStepDeadlineAction(
     const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
     const nameRel = current.workflow_steps;
     const name = Array.isArray(nameRel) ? nameRel[0]?.name_ar : nameRel?.name_ar;
-    const recipients = uniqueProfileIds([
-      current.assigned_user_id,
-      ...(await activeRoleHolderIds(supabase, current.organization_id, current.assigned_role_id)),
-    ]).filter((id) => id !== ctx.userId);
+    const recipients = workflowStepNotificationRecipients({
+      responsibleUserId: current.responsible_user_id,
+      assignedUserId: current.assigned_user_id,
+      roleHolderIds: await activeRoleHolderIds(supabase, current.organization_id, current.assigned_role_id),
+    }).filter((id) => id !== ctx.userId);
     const notifications = createNotificationService(supabase);
     const dueLabel = formatRiyadhDateTimeAr(dueAt);
     for (const userId of recipients) {
@@ -509,6 +522,105 @@ export async function updateWorkflowStepDeadlineAction(
       });
     }
     revalidateProjectWorkflow(projectId);
+  });
+}
+
+export async function assignWorkflowStepResponsibleAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر تعيين مسؤول المرحلة.", async () => {
+    const ctx = authorize(await getAuthContext(), WORKFLOW_ASSIGN_PERMISSION);
+    const parsed = assignWorkflowStepResponsibleSchema.safeParse({
+      projectId: formData.get("projectId"),
+      workflowStepId: formData.get("workflowStepId"),
+      responsibleUserId: formData.get("responsibleUserId"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات التعيين غير صالحة.", "Assignment data is invalid.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id, organization_id, project_manager_id")
+      .eq("id", parsed.data.projectId)
+      .maybeSingle<{ id: string; organization_id: string; project_manager_id: string | null }>();
+    if (!project || project.organization_id !== ctx.organization.id) {
+      throw new NotFoundError("المشروع", "Project");
+    }
+
+    const { error } = await supabase.rpc("assign_workflow_step_responsible", {
+      p_project_id: parsed.data.projectId,
+      p_workflow_step_id: parsed.data.workflowStepId,
+      p_responsible_user_id: parsed.data.responsibleUserId,
+    });
+    if (error) {
+      const mapped = mapStartWorkflowRpcError(error.message);
+      if (mapped.kind === "FORBIDDEN") {
+        throw new ForbiddenError();
+      }
+      if (mapped.kind === "CONFLICT") {
+        throw new ConflictError("لا يمكن تغيير مسؤول مرحلة مكتملة.", "A completed stage cannot be reassigned.");
+      }
+      if (mapped.kind === "NOT_FOUND") {
+        throw new NotFoundError("المرحلة", "Stage");
+      }
+      if (mapped.kind === "VALIDATION") {
+        throw new ValidationError(
+          eligibleResponsibleRejectMessage("not_on_project").ar,
+          eligibleResponsibleRejectMessage("not_on_project").en,
+        );
+      }
+      throw new DatabaseError(error);
+    }
+
+    const { data: liveInstance } = await supabase
+      .from("workflow_instances")
+      .select("id")
+      .eq("organization_id", ctx.organization.id)
+      .eq("entity_type", "project")
+      .eq("entity_id", parsed.data.projectId)
+      .in("status", ["pending", "in_progress"])
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    const { data: liveStep } = liveInstance
+      ? await supabase
+          .from("workflow_instance_steps")
+          .select("id, status, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar)")
+          .eq("instance_id", liveInstance.id)
+          .eq("step_id", parsed.data.workflowStepId)
+          .in("status", ["ready", "in_progress"])
+          .maybeSingle<{
+            id: string;
+            status: string;
+            assigned_user_id: string | null;
+            assigned_role_id: string | null;
+            responsible_user_id: string | null;
+            workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
+          }>()
+      : { data: null };
+
+    if (liveStep) {
+      const stepRel = liveStep.workflow_steps;
+      const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
+      const notifications = createNotificationService(supabase);
+      await notifications.notify({
+        organizationId: ctx.organization.id,
+        recipientProfileId: parsed.data.responsibleUserId,
+        type: "workflow.step.activated",
+        title: "تم إسناد مرحلة إليك",
+        message: name ? `المرحلة: ${name}` : "تم تعيينك مسؤولاً عن مرحلة جاهزة.",
+        entityType: "project",
+        entityId: parsed.data.projectId,
+        href: `/projects/${parsed.data.projectId}?tab=stages`,
+        priority: "normal",
+        dedupKey: `workflow.step.activated:${liveStep.id}:${parsed.data.responsibleUserId}`,
+      });
+    }
+
+    revalidateProjectWorkflow(parsed.data.projectId);
   });
 }
 

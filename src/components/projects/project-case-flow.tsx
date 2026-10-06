@@ -7,6 +7,7 @@ import { displayInitials } from "@/lib/ui/initials";
 import { formatRiyadhDateTimeAr } from "@/modules/projects/deadline";
 import { cn } from "@/lib/utils";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
+import { StageResponsibleAssign, type ResponsibleCandidate } from "@/components/projects/stage-responsible-assign";
 
 const ICON: Record<WorkflowViewNode["visual"], typeof Check> = {
   completed: Check,
@@ -73,11 +74,15 @@ export function CaseFlowStep({
   node,
   current,
   isLast,
+  projectId,
+  candidates,
   children,
 }: {
   node: WorkflowViewNode;
   current: boolean;
   isLast: boolean;
+  projectId?: string;
+  candidates?: ResponsibleCandidate[];
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(current);
@@ -139,6 +144,9 @@ export function CaseFlowStep({
           </button>
           <div className="min-w-0 sm:max-w-[15rem]">
             <ResponsibleBlock node={node} />
+            {projectId && candidates ? (
+              <StageResponsibleAssign node={node} projectId={projectId} candidates={candidates} />
+            ) : null}
             {node.dueAt ? (
               <p className="mt-1 text-xs text-muted sm:text-end">موعد الإغلاق {formatRiyadhDateTimeAr(node.dueAt)}</p>
             ) : null}

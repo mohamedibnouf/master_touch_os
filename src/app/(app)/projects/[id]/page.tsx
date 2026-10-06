@@ -102,6 +102,37 @@ export default async function ProjectDetailPage({
     departmentNames,
     jobTitles,
   });
+  const userActive = new Map<string, boolean>();
+  for (const row of users) {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const employees = Array.isArray(row.employees) ? row.employees : [];
+    const memberActive = row.status === "active";
+    const profileActive = profile?.is_active !== false;
+    const employeeOk = employees.length === 0 || employees.some((emp) => emp.is_active === true);
+    userActive.set(row.profile_id, Boolean(memberActive && profileActive && employeeOk));
+  }
+  const responsibleCandidates: Array<{ id: string; name: string; projectRole: string | null; jobTitle: string | null }> = [];
+  const seenResponsible = new Set<string>();
+  for (const member of members) {
+    if (!member.is_active || !userActive.get(member.profile_id)) continue;
+    const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+    if (profile && profile.is_active === false) continue;
+    seenResponsible.add(member.profile_id);
+    responsibleCandidates.push({
+      id: member.profile_id,
+      name: profile?.full_name_ar || profile?.full_name_en || profileNames.get(member.profile_id) || member.profile_id,
+      projectRole: member.role_label ?? null,
+      jobTitle: jobTitles.get(member.profile_id) ?? null,
+    });
+  }
+  if (project.project_manager_id && userActive.get(project.project_manager_id) && !seenResponsible.has(project.project_manager_id)) {
+    responsibleCandidates.unshift({
+      id: project.project_manager_id,
+      name: profileNames.get(project.project_manager_id) || project.project_manager_id,
+      projectRole: "مدير المشروع",
+      jobTitle: jobTitles.get(project.project_manager_id) ?? null,
+    });
+  }
   const approverOptions = users.flatMap((row) => {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
     const employees = Array.isArray(row.employees) ? row.employees : [];
@@ -340,7 +371,7 @@ export default async function ProjectDetailPage({
               <Card className="p-4 md:p-5">
                 <p className="mb-4 text-sm text-muted">
                   {workflow.definitionName
-                    ? `المسار: ${workflow.definitionName}`
+                    ? `المسار: ${workflow.definitionName}${workflow.mode === "preview" ? " — عيّن المسؤولين قبل بدء المسار" : ""}`
                     : "عرض مراحل المشروع الحالية. إكمال المرحلة يفعّل التالية تلقائياً."}
                 </p>
                 <ProjectCaseFlow>
@@ -350,6 +381,8 @@ export default async function ProjectDetailPage({
                       node={node}
                       current={node.id === workflow.currentNodeId}
                       isLast={index === workflow.nodes.length - 1}
+                      projectId={project.id}
+                      candidates={responsibleCandidates}
                     >
                       <WorkflowStageDetails
                         node={node}
