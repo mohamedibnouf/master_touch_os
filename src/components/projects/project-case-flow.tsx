@@ -45,10 +45,10 @@ function ResponsibleBlock({ node }: { node: WorkflowViewNode }) {
         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-strong text-[11px] font-semibold text-ink"
         aria-hidden
       >
-        {node.assignmentKind === "role" || node.assignmentKind === "department" ? (
-          <Shield className="h-3.5 w-3.5 text-muted" />
-        ) : (
+        {node.assignmentKind === "user" ? (
           displayInitials(label)
+        ) : (
+          <Shield className="h-3.5 w-3.5 text-muted" />
         )}
       </span>
       <div className="min-w-0 sm:text-end">
@@ -57,6 +57,22 @@ function ResponsibleBlock({ node }: { node: WorkflowViewNode }) {
           {label}
         </p>
         {node.assignmentSubtitle ? <p className="truncate text-xs text-muted">{node.assignmentSubtitle}</p> : null}
+        {node.requiredRoleLabel ? (
+          <>
+            <p className="mt-1 text-[11px] text-muted">الدور المطلوب</p>
+            <p className="truncate text-xs text-ink" dir="auto">
+              {node.requiredRoleLabel}
+            </p>
+          </>
+        ) : null}
+        {node.requiredDepartmentLabel && !node.requiredRoleLabel ? (
+          <>
+            <p className="mt-1 text-[11px] text-muted">القسم المطلوب</p>
+            <p className="truncate text-xs text-ink" dir="auto">
+              {node.requiredDepartmentLabel}
+            </p>
+          </>
+        ) : null}
       </div>
     </div>
   );

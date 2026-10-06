@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import type { FormActionState } from "@/server/forms/form-state";
 
@@ -31,13 +31,18 @@ export function ServerActionForm({
   children,
   className,
   testId,
+  onSuccess,
 }: {
   action: (prev: FormActionState, formData: FormData) => Promise<FormActionState>;
   children: React.ReactNode;
   className?: string;
   testId?: string;
+  onSuccess?: () => void;
 }) {
   const [state, formAction, pending] = useActionState<FormActionState, FormData>(action, null);
+  useEffect(() => {
+    if (state?.ok) onSuccess?.();
+  }, [state, onSuccess]);
   return (
     <form action={formAction} className={className} data-testid={testId} aria-busy={pending}>
       <fieldset disabled={pending} className="min-w-0 border-0 p-0">

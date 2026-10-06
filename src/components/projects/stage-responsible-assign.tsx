@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Field, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { assignWorkflowStepResponsibleAction } from "@/server/use-cases/platform";
+import { responsibleCandidateOptionLabel } from "@/modules/projects/workflow-responsibility";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 
 export type ResponsibleCandidate = {
@@ -23,6 +25,11 @@ export function StageResponsibleAssign({
   candidates: ResponsibleCandidate[];
 }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const onSaved = useCallback(() => {
+    setOpen(false);
+    router.refresh();
+  }, [router]);
   if (!node.canAssignResponsible || !node.workflowStepId) return null;
 
   return (
@@ -35,14 +42,14 @@ export function StageResponsibleAssign({
           {candidates.length === 0 ? (
             <p className="text-sm text-muted">لا يوجد أعضاء نشطون في فريق المشروع.</p>
           ) : (
-            <ServerActionForm action={assignWorkflowStepResponsibleAction} className="space-y-2">
+            <ServerActionForm action={assignWorkflowStepResponsibleAction} className="space-y-2" onSuccess={onSaved}>
               <input type="hidden" name="projectId" value={projectId} />
               <input type="hidden" name="workflowStepId" value={node.workflowStepId} />
               <Field label="المسؤول">
                 <Select name="responsibleUserId" required defaultValue={node.responsibleUserId ?? candidates[0]?.id}>
                   {candidates.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {[user.name, user.projectRole, user.jobTitle].filter(Boolean).join(" · ")}
+                      {responsibleCandidateOptionLabel(user)}
                     </option>
                   ))}
                 </Select>

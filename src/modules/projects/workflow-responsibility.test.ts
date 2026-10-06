@@ -1,18 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolveStageAssignment } from "./workflow-view";
+import { indexStepAssignments, resolveStageAssignment } from "./workflow-view";
 import {
   WORKFLOW_ASSIGN_PERMISSION,
   WORKFLOW_STEP_ASSIGNEE_CHANGED,
   assignWorkflowStepResponsibleSchema,
   canReassignWorkflowStepStatus,
   decideResponsibleEligibility,
+  localizeProjectMembershipLabel,
+  responsibleCandidateOptionLabel,
   workflowStepNotificationRecipients,
 } from "./workflow-responsibility";
 
 const sql076 = readFileSync("supabase/migrations/076_project_workflow_step_responsibility.sql", "utf8");
 const sql073 = readFileSync("supabase/migrations/073_project_workflow_approval_gate.sql", "utf8");
 const sql074 = readFileSync("supabase/migrations/074_workflow_step_deadlines.sql", "utf8");
+const platformSrc = readFileSync("src/server/use-cases/platform.ts", "utf8");
+const workflowLoaderSrc = readFileSync("src/server/use-cases/project-workflow.ts", "utf8");
+const assignUiSrc = readFileSync("src/components/projects/stage-responsible-assign.tsx", "utf8");
+const canActSrc = readFileSync("supabase/migrations/014_assignee_enforcement.sql", "utf8");
 
 const baseEligible = {
   candidateOrganizationId: "org-a",
@@ -154,17 +160,118 @@ describe("workflow step responsibility", () => {
   });
 
   it("displays the responsible person ahead of the authorization role", () => {
-    expect(
-      resolveStageAssignment({
-        responsibleUserId: "u1",
-        assignedUserId: null,
-        assignedRoleId: "r1",
-        assignedDepartmentId: null,
-        profileNames: new Map([["u1", "محمد"]]),
-        roleNames: new Map([["r1", "مدير المشروع"]]),
-        departmentNames: new Map(),
-        jobTitles: new Map([["u1", "مهندس"]]),
-      }),
-    ).toEqual({ kind: "user", label: "محمد", subtitle: "مهندس" });
+    const view = resolveStageAssignment({
+      responsibleUserId: "u1",
+      assignedUserId: null,
+      assignedRoleId: "r1",
+      assignedDepartmentId: null,
+      profileNames: new Map([["u1", "محمد الصادق"]]),
+      roleNames: new Map([["r1", "المدير العام"]]),
+      departmentNames: new Map(),
+      jobTitles: new Map(),
+    });
+    expect(view).toMatchObject({
+      kind: "user",
+      label: "محمد الصادق",
+      responsibleUserId: "u1",
+      requiredRoleLabel: "المدير العام",
+    });
+    expect(view.label).not.toBe(view.requiredRoleLabel);
+  });
+
+  it("loads a pre-start project-specific assignment for the matching step", () => {
+    const loaded = indexStepAssignments(
+      [
+        {
+          projectId: "proj-a",
+          workflowStepId: "40000000-0000-0000-0000-000000000201",
+          responsibleUserId: "u-sadiq",
+        },
+      ],
+      "proj-a",
+    );
+    expect(loaded.get("40000000-0000-0000-0000-000000000201")).toBe("u-sadiq");
+    const again = indexStepAssignments(
+      [
+        {
+          projectId: "proj-a",
+          workflowStepId: "40000000-0000-0000-0000-000000000201",
+          responsibleUserId: "u-sadiq",
+        },
+      ],
+      "proj-a",
+    );
+    expect(again.get("40000000-0000-0000-0000-000000000201")).toBe("u-sadiq");
+  });
+
+  it("does not leak Project A assignments into Project B", () => {
+    const forB = indexStepAssignments(
+      [
+        {
+          projectId: "proj-a",
+          workflowStepId: "step-1",
+          responsibleUserId: "user-a",
+        },
+        {
+          projectId: "proj-b",
+          workflowStepId: "step-1",
+          responsibleUserId: "user-b",
+        },
+      ],
+      "proj-b",
+    );
+    expect(forB.get("step-1")).toBe("user-b");
+    expect(forB.size).toBe(1);
+  });
+
+  it("keeps global workflow_steps unchanged by assignment", () => {
+    expect(sql076).not.toMatch(/update public\.workflow_steps/i);
+    expect(platformSrc).not.toMatch(/from\("workflow_steps"\)[\s\S]{0,80}\.update/i);
+  });
+
+  it("uses instance responsible_user_id after workflow start", () => {
+    expect(workflowLoaderSrc).toMatch(/responsibleUserId: step\.responsible_user_id/);
+    expect(sql076).toMatch(/insert into public\.workflow_instance_steps/);
+    expect(sql076).toMatch(/v_responsible,/);
+  });
+
+  it("does not grant workflow authorization to the responsible person", () => {
+    expect(sql076).not.toMatch(/create or replace function public\.can_act_on_workflow_step/);
+    expect(canActSrc).toMatch(/create or replace function public\.can_act_on_workflow_step/);
+    expect(canActSrc).not.toMatch(/responsible_user_id/);
+    expect(workflowLoaderSrc).toMatch(/can_act_on_workflow_step/);
+    expect(workflowLoaderSrc).not.toMatch(/can_act_on_workflow_step[\s\S]{0,120}responsible/);
+  });
+
+  it("reassignment submits the selected responsible user id", () => {
+    expect(assignUiSrc).toMatch(/name="responsibleUserId"/);
+    expect(platformSrc).toMatch(/p_responsible_user_id: parsed\.data\.responsibleUserId/);
+    expect(sql076).toMatch(/on conflict \(project_id, workflow_step_id\)/);
+  });
+
+  it("does not expose a raw member membership code in the picker", () => {
+    expect(localizeProjectMembershipLabel("member")).toBe("عضو الفريق");
+    expect(responsibleCandidateOptionLabel({ name: "إسماعيل عبد الرحمن", projectRole: "member" })).toBe(
+      "إسماعيل عبد الرحمن · عضو الفريق",
+    );
+    expect(responsibleCandidateOptionLabel({ name: "إسماعيل عبد الرحمن", projectRole: "member" })).not.toMatch(/\bmember\b/);
+    expect(assignUiSrc).toMatch(/responsibleCandidateOptionLabel/);
+    expect(assignUiSrc).not.toMatch(/user\.projectRole, user\.jobTitle/);
+  });
+
+  it("keeps unauthorized assignment forbidden", () => {
+    expect(WORKFLOW_ASSIGN_PERMISSION).toBe("workflow.manage");
+    expect(platformSrc).toMatch(/authorize\(await getAuthContext\(\), WORKFLOW_ASSIGN_PERMISSION\)/);
+    expect(sql076).toMatch(/has_permission\('workflow\.manage'/);
+  });
+
+  it("does not start a workflow when assigning a responsible person", () => {
+    const assignFn = platformSrc.slice(
+      platformSrc.indexOf("export async function assignWorkflowStepResponsibleAction"),
+      platformSrc.indexOf("export async function completeWorkflowStepAction"),
+    );
+    expect(assignFn).toMatch(/assign_workflow_step_responsible/);
+    expect(assignFn).not.toMatch(/start_workflow/);
+    expect(sql076).not.toMatch(/perform public\.start_workflow/);
   });
 });

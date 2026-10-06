@@ -10,6 +10,7 @@ import {
   formatOverdueDurationAr,
   mapEngineStatusToVisual,
   pickCurrentNodeId,
+  indexStepAssignments,
   resolveStageAssignment,
   waitingApprovalPhrase,
   workflowVisualLabel,
@@ -50,6 +51,8 @@ export type WorkflowViewNode = {
   responsibleLabel: string | null;
   assignmentKind: StageAssignmentKind;
   assignmentSubtitle: string | null;
+  requiredRoleLabel: string | null;
+  requiredDepartmentLabel: string | null;
   approverLabel: string | null;
   startedAt: string | null;
   dueAt: string | null;
@@ -272,7 +275,7 @@ export async function loadProjectWorkflowProjection(input: {
         departmentNames,
         jobTitles,
       });
-      const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
+      const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
       const assignmentKind = assignment.kind;
       const assignmentSubtitle = assignment.subtitle;
       const approverLabel = openApproval?.approverLabel ?? (requiresApproval ? responsibleLabel : null);
@@ -322,6 +325,8 @@ export async function loadProjectWorkflowProjection(input: {
         responsibleLabel,
         assignmentKind,
         assignmentSubtitle,
+        requiredRoleLabel: assignment.requiredRoleLabel,
+        requiredDepartmentLabel: assignment.requiredDepartmentLabel,
         approverLabel,
         startedAt: step.started_at,
         dueAt: step.due_at,
@@ -333,7 +338,12 @@ export async function loadProjectWorkflowProjection(input: {
           openApproval,
           latestOfficialCode,
           overdueLabel,
-          missingAssignee: requiresApproval && !openApproval && !responsibleLabel,
+          missingAssignee:
+            requiresApproval &&
+            !openApproval &&
+            !responsibleLabel &&
+            !assignment.requiredRoleLabel &&
+            !assignment.requiredDepartmentLabel,
         }),
         overdueLabel,
         activationHint,
@@ -404,17 +414,22 @@ export async function loadProjectWorkflowProjection(input: {
       : { data: [] as Array<Record<string, unknown>> };
     const { data: assignmentRows } = await supabase
       .from("project_workflow_step_assignments")
-      .select("workflow_step_id, responsible_user_id")
+      .select("project_id, workflow_step_id, responsible_user_id")
       .eq("organization_id", ctx.organization.id)
       .eq("project_id", projectId);
 
     if (templateSteps && templateSteps.length > 0) {
-      const assignedByStep = new Map(
-        (assignmentRows ?? []).map((row) => [row.workflow_step_id as string, row.responsible_user_id as string]),
+      const assignedByStep = indexStepAssignments(
+        (assignmentRows ?? []).map((row) => ({
+          projectId: String(row.project_id ?? projectId),
+          workflowStepId: String(row.workflow_step_id),
+          responsibleUserId: String(row.responsible_user_id),
+        })),
+        projectId,
       );
       const canManage = hasPermission(ctx, WORKFLOW_ASSIGN_PERMISSION);
       const nodes: WorkflowViewNode[] = templateSteps.map((step) => {
-        const responsibleUserId = assignedByStep.get(step.id as string) ?? null;
+        const responsibleUserId = assignedByStep.get(String(step.id).toLowerCase()) ?? null;
         const assignment = resolveStageAssignment({
           responsibleUserId,
           assignedUserId: (step.assigned_user_id as string | null) ?? null,
@@ -425,7 +440,7 @@ export async function loadProjectWorkflowProjection(input: {
           departmentNames,
           jobTitles,
         });
-        const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
+        const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
         const visual = mapEngineStatusToVisual({
           engineStatus: "pending",
           requiresApproval: Boolean(step.requires_approval),
@@ -448,6 +463,8 @@ export async function loadProjectWorkflowProjection(input: {
           responsibleLabel,
           assignmentKind: assignment.kind,
           assignmentSubtitle: assignment.subtitle,
+          requiredRoleLabel: assignment.requiredRoleLabel,
+          requiredDepartmentLabel: assignment.requiredDepartmentLabel,
           approverLabel: null,
           startedAt: null,
           dueAt: null,
@@ -525,7 +542,7 @@ export async function loadProjectWorkflowProjection(input: {
       departmentNames,
       jobTitles,
     });
-    const responsibleLabel = assignment.kind === "none" ? null : assignment.label;
+    const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
     return {
       id: stage.id,
       source: "legacy",
@@ -540,6 +557,8 @@ export async function loadProjectWorkflowProjection(input: {
       responsibleLabel,
       assignmentKind: assignment.kind,
       assignmentSubtitle: assignment.subtitle,
+      requiredRoleLabel: assignment.requiredRoleLabel,
+      requiredDepartmentLabel: assignment.requiredDepartmentLabel,
       approverLabel: null,
       startedAt: stage.actual_start,
       dueAt: stage.due_at ?? stage.planned_end,

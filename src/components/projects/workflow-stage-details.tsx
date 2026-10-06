@@ -57,6 +57,12 @@ export function WorkflowStageDetails({
           <dt className="text-muted">المسؤول</dt>
           <dd>{node.responsibleLabel ?? "غير محدد"}</dd>
         </div>
+        {node.requiredRoleLabel ? (
+          <div>
+            <dt className="text-muted">الدور المطلوب</dt>
+            <dd>{node.requiredRoleLabel}</dd>
+          </div>
+        ) : null}
         <div>
           <dt className="text-muted">الموافقة المطلوبة</dt>
           <dd>{node.requiresApproval ? (node.approverLabel ?? "نعم") : "لا"}</dd>

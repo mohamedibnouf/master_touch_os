@@ -372,6 +372,27 @@ export function pickCurrentNodeId(nodes: Array<{ id: string; visual: WorkflowVis
 
 export type StageAssignmentKind = "user" | "role" | "department" | "none";
 
+export type StageAssignmentView = {
+  kind: StageAssignmentKind;
+  label: string;
+  subtitle: string | null;
+  responsibleUserId: string | null;
+  requiredRoleLabel: string | null;
+  requiredDepartmentLabel: string | null;
+};
+
+export function indexStepAssignments(
+  rows: Array<{ projectId: string; workflowStepId: string; responsibleUserId: string }>,
+  projectId: string,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    if (row.projectId !== projectId) continue;
+    map.set(row.workflowStepId.toLowerCase(), row.responsibleUserId);
+  }
+  return map;
+}
+
 export function resolveStageAssignment(input: {
   responsibleUserId?: string | null;
   assignedUserId: string | null;
@@ -381,28 +402,30 @@ export function resolveStageAssignment(input: {
   roleNames: Map<string, string>;
   departmentNames: Map<string, string>;
   jobTitles: Map<string, string>;
-}): { kind: StageAssignmentKind; label: string; subtitle: string | null } {
-  const displayUserId = input.responsibleUserId || input.assignedUserId;
+}): StageAssignmentView {
+  const requiredRoleLabel = input.assignedRoleId
+    ? (input.roleNames.get(input.assignedRoleId) ?? "دور معيّن")
+    : null;
+  const requiredDepartmentLabel = input.assignedDepartmentId
+    ? (input.departmentNames.get(input.assignedDepartmentId) ?? "قسم معيّن")
+    : null;
+  const displayUserId = input.responsibleUserId || input.assignedUserId || null;
   if (displayUserId) {
     return {
       kind: "user",
       label: input.profileNames.get(displayUserId) ?? "مستخدم معيّن",
       subtitle: input.jobTitles.get(displayUserId) ?? null,
+      responsibleUserId: displayUserId,
+      requiredRoleLabel,
+      requiredDepartmentLabel,
     };
   }
-  if (input.assignedRoleId) {
-    return {
-      kind: "role",
-      label: input.roleNames.get(input.assignedRoleId) ?? "دور معيّن",
-      subtitle: "دور",
-    };
-  }
-  if (input.assignedDepartmentId) {
-    return {
-      kind: "department",
-      label: input.departmentNames.get(input.assignedDepartmentId) ?? "قسم معيّن",
-      subtitle: "قسم",
-    };
-  }
-  return { kind: "none", label: "غير محدد", subtitle: null };
+  return {
+    kind: "none",
+    label: "غير محدد",
+    subtitle: null,
+    responsibleUserId: null,
+    requiredRoleLabel,
+    requiredDepartmentLabel,
+  };
 }

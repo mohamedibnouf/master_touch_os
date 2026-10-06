@@ -241,10 +241,17 @@ describe("resolveStageAssignment", () => {
         assignedDepartmentId: "d1",
         ...maps,
       }),
-    ).toEqual({ kind: "user", label: "محمد أحمد", subtitle: "مدير المشروع" });
+    ).toEqual({
+      kind: "user",
+      label: "محمد أحمد",
+      subtitle: "مدير المشروع",
+      responsibleUserId: "u1",
+      requiredRoleLabel: "المدير العام",
+      requiredDepartmentLabel: "الهندسة",
+    });
   });
 
-  it("uses role then department then unassigned", () => {
+  it("keeps template role as metadata instead of filling the person slot", () => {
     expect(
       resolveStageAssignment({
         assignedUserId: null,
@@ -252,7 +259,14 @@ describe("resolveStageAssignment", () => {
         assignedDepartmentId: "d1",
         ...maps,
       }),
-    ).toEqual({ kind: "role", label: "المدير العام", subtitle: "دور" });
+    ).toEqual({
+      kind: "none",
+      label: "غير محدد",
+      subtitle: null,
+      responsibleUserId: null,
+      requiredRoleLabel: "المدير العام",
+      requiredDepartmentLabel: "الهندسة",
+    });
     expect(
       resolveStageAssignment({
         assignedUserId: null,
@@ -260,7 +274,14 @@ describe("resolveStageAssignment", () => {
         assignedDepartmentId: "d1",
         ...maps,
       }),
-    ).toEqual({ kind: "department", label: "الهندسة", subtitle: "قسم" });
+    ).toEqual({
+      kind: "none",
+      label: "غير محدد",
+      subtitle: null,
+      responsibleUserId: null,
+      requiredRoleLabel: null,
+      requiredDepartmentLabel: "الهندسة",
+    });
     expect(
       resolveStageAssignment({
         assignedUserId: null,
@@ -268,6 +289,13 @@ describe("resolveStageAssignment", () => {
         assignedDepartmentId: null,
         ...maps,
       }),
-    ).toEqual({ kind: "none", label: "غير محدد", subtitle: null });
+    ).toEqual({
+      kind: "none",
+      label: "غير محدد",
+      subtitle: null,
+      responsibleUserId: null,
+      requiredRoleLabel: null,
+      requiredDepartmentLabel: null,
+    });
   });
 });

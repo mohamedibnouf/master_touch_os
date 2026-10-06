@@ -68,7 +68,7 @@ function revalidateProjectWorkflow(projectId: string | null) {
   revalidatePath("/approvals");
   revalidatePath("/");
   if (projectId) {
-    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/projects/${projectId}`, "page");
     revalidatePath("/projects");
   }
 }

@@ -47,6 +47,27 @@ export function workflowStepNotificationRecipients(input: {
   return uniqueProfileIds([input.responsibleUserId, input.assignedUserId, ...input.roleHolderIds]);
 }
 
+export function localizeProjectMembershipLabel(roleLabel: string | null | undefined): string | null {
+  if (!roleLabel) return null;
+  const trimmed = roleLabel.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.toLowerCase();
+  if (normalized === "member") return "عضو الفريق";
+  if (normalized === "project_manager") return "مدير المشروع";
+  if (/^[a-z][a-z0-9_]*$/i.test(trimmed)) return "عضو الفريق";
+  return trimmed;
+}
+
+export function responsibleCandidateOptionLabel(input: {
+  name: string;
+  projectRole?: string | null;
+  jobTitle?: string | null;
+}): string {
+  return [input.name, localizeProjectMembershipLabel(input.projectRole ?? null), input.jobTitle ?? null]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function eligibleResponsibleRejectMessage(reason: EligibleResponsibleDecision): { ar: string; en: string } {
   if (reason === "cross_org") {
     return { ar: "لا يمكن تعيين مستخدم من مؤسسة أخرى.", en: "A user from another organization cannot be assigned." };
