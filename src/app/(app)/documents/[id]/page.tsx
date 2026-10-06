@@ -11,6 +11,11 @@ import { DocumentArchiveControl, DocumentRestoreControl } from "@/components/doc
 import { OperationalDocumentRevisionForm } from "@/components/documents/operational-revision-form";
 import { documentFileSourceLabelAr } from "@/modules/documents/file-source";
 import { canOfferOperationalRevision, nextOperationalRevision } from "@/modules/documents/operational-revision";
+import { DocumentAiAnalysisPanel } from "@/components/ai/document-ai-analysis";
+import { classifyDocumentSource, isInteractiveDocumentAiSource } from "@/modules/ai/classify-source";
+import { getAiPlatformConfig } from "@/modules/ai/config-env";
+import { canUseAiCapability } from "@/modules/ai/security/permissions";
+import { isGooglePickerReady, readGooglePickerPublicConfig } from "@/modules/documents/google-picker-config";
 
 export default async function DocumentDetailPage({
   params,
@@ -35,7 +40,7 @@ export default async function DocumentDetailPage({
   const [{ data: versions }, { data: project }] = await Promise.all([
     supabase
       .from("document_versions")
-      .select("id, revision, file_source, external_url, file_path, file_name, is_current, is_superseded, uploaded_at")
+      .select("id, revision, file_source, external_url, file_path, file_name, mime_type, is_current, is_superseded, uploaded_at")
       .eq("document_id", id)
       .eq("organization_id", ctx.organization.id)
       .order("uploaded_at", { ascending: false }),
@@ -61,6 +66,27 @@ export default async function DocumentDetailPage({
       isArchived,
       isRegisterControlled: Boolean(doc.is_register_controlled),
     });
+
+  const sourceClass = classifyDocumentSource({
+    fileSource: current?.file_source,
+    mimeType: current?.mime_type,
+    filePath: current?.file_path,
+  });
+  const canSeeDocumentAi = canUseAiCapability(ctx, "ai.document.analyze");
+  const pickerConfig = readGooglePickerPublicConfig({
+    NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_PICKER_ENABLED,
+    NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+    NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY,
+  });
+  const googlePickerClientId = isGooglePickerReady(pickerConfig) ? pickerConfig.clientId : "";
+  const unsupportedAiMessage =
+    isArchived
+      ? "لا يمكن تحليل مستند مؤرشف."
+      : !current
+        ? "لا يوجد إصدار حالي يمكن تحليله."
+        : sourceClass === "UNSUPPORTED"
+          ? "نوع الملف غير مدعوم للتحليل حالياً (المدعوم: PDF وDOCX وTXT ومستندات Google Docs)."
+          : "تحليل المحتوى غير متاح لهذا المصدر حالياً.";
 
   return (
     <PageContainer className="space-y-5" data-testid="document-detail">
@@ -144,6 +170,25 @@ export default async function DocumentDetailPage({
           {canArchive && isArchived ? <DocumentRestoreControl documentId={doc.id} /> : null}
         </div>
       </Card>
+
+      {canSeeDocumentAi ? (
+        <Card data-testid="document-ai-entry">
+          <h2 className="mb-3 font-semibold text-navy">التحليل بالذكاء الاصطناعي</h2>
+          {!isArchived && isInteractiveDocumentAiSource(sourceClass) ? (
+            <DocumentAiAnalysisPanel
+              documentId={doc.id}
+              enabled={getAiPlatformConfig().enabled}
+              sourceClass={sourceClass}
+              defaultBusinessCase={doc.category === "business_case" || doc.category === "BUSINESS_CASE"}
+              googlePickerClientId={googlePickerClientId}
+            />
+          ) : (
+            <p className="text-sm text-muted" data-testid="document-ai-unavailable">
+              {unsupportedAiMessage}
+            </p>
+          )}
+        </Card>
+      ) : null}
 
       {canAddVersion && nextRevision ? (
         <Card>

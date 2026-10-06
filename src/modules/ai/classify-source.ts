@@ -23,3 +23,7 @@ export function classifyDocumentSource(input: {
   if (!input.filePath) return "METADATA_ONLY";
   return "CONTENT_AVAILABLE";
 }
+
+export function isInteractiveDocumentAiSource(sourceClass: DocumentSourceClass): boolean {
+  return sourceClass === "CONTENT_AVAILABLE" || sourceClass === "DRIVE_FETCH_REQUIRED";
+}

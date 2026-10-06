@@ -345,6 +345,9 @@ describe("use-case and UI wiring", () => {
     expect(formSrc).toContain("إضافة إصدار جديد");
     expect(formSrc).not.toContain("إضافة مستند");
     expect(pageSrc).toContain("OperationalDocumentRevisionForm");
+    expect(pageSrc).toContain("DocumentAiAnalysisPanel");
+    expect(pageSrc).toContain("التحليل بالذكاء الاصطناعي");
+    expect(pageSrc).toContain("DocumentOpenControl");
     expect(canOfferOperationalRevision({ hasDocumentUpload: true, isArchived: false, isRegisterControlled: false })).toBe(
       true,
     );

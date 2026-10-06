@@ -28,7 +28,7 @@ import { clearAiCacheForTests } from "@/modules/ai/cache";
 import { mapToAiClientError } from "@/modules/ai/errors";
 import { RateLimitedError, AppError } from "@/lib/errors";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
-import { classifyDocumentSource } from "@/modules/ai/classify-source";
+import { classifyDocumentSource, isInteractiveDocumentAiSource } from "@/modules/ai/classify-source";
 
 const ORG_A = "11111111-1111-1111-1111-111111111111";
 const ORG_B = "22222222-2222-2222-2222-222222222222";
@@ -301,6 +301,10 @@ describe("document intelligence helpers", () => {
       }),
     ).toBe("CONTENT_AVAILABLE");
     expect(classifyDocumentSource({ fileSource: "storage", mimeType: "image/png", filePath: "x" })).toBe("UNSUPPORTED");
+    expect(isInteractiveDocumentAiSource("DRIVE_FETCH_REQUIRED")).toBe(true);
+    expect(isInteractiveDocumentAiSource("CONTENT_AVAILABLE")).toBe(true);
+    expect(isInteractiveDocumentAiSource("UNSUPPORTED")).toBe(false);
+    expect(isInteractiveDocumentAiSource("METADATA_ONLY")).toBe(false);
   });
 
   it("analyzes supported text and refuses empty", async () => {
