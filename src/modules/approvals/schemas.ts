@@ -12,6 +12,13 @@ export const createApprovalSchema = z.object({
   dueAt: z.string().optional(),
 });
 
+export const createCurrentWorkflowGateApprovalSchema = z.object({
+  projectId: z.string().uuid(),
+  approverProfileId: z.string().uuid(),
+  title: z.string().trim().min(2).max(240).optional(),
+  documentVersionIds: z.array(z.string().uuid()).min(1).max(20),
+});
+
 export const decideApprovalSchema = z.object({
   stepId: z.string().uuid(),
   officialCode: z.enum(["A", "B", "C", "D", "E"]),

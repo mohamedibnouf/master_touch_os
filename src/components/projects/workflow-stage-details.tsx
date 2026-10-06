@@ -1,12 +1,12 @@
-import { Badge, Button, Field, Select } from "@/components/ui/primitives";
+import { Badge, Button } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { ApprovalActionPanel } from "@/components/projects/approval-action-panel";
 import { WorkflowDeadlinePanel } from "@/components/projects/workflow-deadline-panel";
 import {
   completeProjectStageAction,
   completeWorkflowStepAction,
-  createApprovalAction,
 } from "@/server/use-cases/platform";
+import { WorkflowGateSubmitFields, type GateSupportingDocumentOption } from "@/components/projects/workflow-gate-approval-card";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 
 function formatStamp(value: string | null): string {
@@ -21,11 +21,13 @@ export function WorkflowStageDetails({
   projectId,
   projectCode,
   approvers,
+  documents,
 }: {
   node: WorkflowViewNode;
   projectId: string;
   projectCode: string;
   approvers: Array<{ id: string; name: string }>;
+  documents: GateSupportingDocumentOption[];
 }) {
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
@@ -101,23 +103,14 @@ export function WorkflowStageDetails({
 
       <ApprovalActionPanel node={node} projectId={projectId} />
 
-      {node.canSubmitApproval && node.instanceStepId ? (
-        <ServerActionForm action={createApprovalAction} className="space-y-3">
-          <input type="hidden" name="entityType" value="workflow_instance_step" />
-          <input type="hidden" name="entityId" value={node.instanceStepId} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="title" value={`اعتماد مرحلة ${node.nameAr} — ${projectCode}`} />
-          <Field label="المعتمد">
-            <Select name="approverProfileId" required>
-              {approvers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Button type="submit">إرسال للاعتماد</Button>
-        </ServerActionForm>
+      {node.canSubmitApproval ? (
+        <WorkflowGateSubmitFields
+          projectId={projectId}
+          projectCode={projectCode}
+          stageNameAr={node.nameAr}
+          approvers={approvers}
+          documents={documents}
+        />
       ) : null}
 
       {node.canComplete && node.instanceStepId ? (

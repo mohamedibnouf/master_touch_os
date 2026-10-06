@@ -72,6 +72,8 @@ const ACTION_LABELS: Record<string, string> = {
   "project.member.assigned": "تم تعيين عضو للمشروع",
   "project.health_changed": "تغيرت حالة صحة المشروع",
   "approval.created": "أُنشئ طلب اعتماد",
+  "workflow.approval.requested": "أُرسلت المرحلة للاعتماد",
+  "approval.document.linked": "رُبط مستند داعم بالاعتماد",
   "approval.overdue": "طلب اعتماد متأخر",
   "approval.approved": "تم اعتماد الطلب",
   "approval.rejected": "رُفض طلب الاعتماد",

@@ -21,6 +21,7 @@ import {
 import {
   completeWorkflowStepSchema,
   createApprovalSchema,
+  createCurrentWorkflowGateApprovalSchema,
   decideApprovalSchema,
   updateWorkflowStepDeadlineSchema,
 } from "@/modules/approvals/schemas";
@@ -32,6 +33,10 @@ import {
 } from "@/modules/projects/deadline";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
+import {
+  ignoredBrowserGateFields,
+  parseGateApprovalForm,
+} from "@/modules/projects/workflow-gate-approval";
 import {
   mapStartWorkflowRpcError,
   parseStartWorkflowForm,
@@ -785,6 +790,93 @@ export async function createApprovalAction(
   });
 
   revalidateProjectWorkflow(projectId);
+  });
+}
+
+export async function createCurrentWorkflowGateApprovalAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إرسال المرحلة للاعتماد. حاول مرة أخرى.", async () => {
+    const ctx = authorize(await getAuthContext(), "approval.create");
+    void ignoredBrowserGateFields(formData);
+    const parsedForm = parseGateApprovalForm(formData);
+    if (!parsedForm.ok) {
+      throw new ValidationError("بيانات اعتماد المرحلة غير مكتملة.", "Gate approval data is incomplete.");
+    }
+    const parsed = createCurrentWorkflowGateApprovalSchema.safeParse({
+      projectId: parsedForm.projectId,
+      approverProfileId: parsedForm.approverProfileId,
+      title: parsedForm.title,
+      documentVersionIds: parsedForm.documentVersionIds,
+    });
+    if (!parsed.success) {
+      throw new ValidationError("بيانات اعتماد المرحلة غير مكتملة.", "Gate approval data is incomplete.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id, organization_id, project_code, name_ar")
+      .eq("id", parsed.data.projectId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{ id: string; organization_id: string; project_code: string; name_ar: string }>();
+    if (!project) {
+      throw new ValidationError("المشروع غير صالح.", "The project is not valid.");
+    }
+
+    const { data: requestId, error } = await supabase.rpc("create_current_workflow_gate_approval", {
+      p_project_id: parsed.data.projectId,
+      p_approver_profile_id: parsed.data.approverProfileId,
+      p_title: parsed.data.title ?? null,
+      p_document_version_ids: parsed.data.documentVersionIds,
+    });
+    if (error) throwMappedWorkflowRpc(error);
+
+    const createdId = String(requestId);
+    const { data: linked } = await supabase
+      .from("approval_request_documents")
+      .select("revision, documents(title)")
+      .eq("approval_request_id", createdId)
+      .eq("organization_id", ctx.organization.id);
+    const docSummary = (linked ?? [])
+      .map((row) => {
+        const docs = row.documents as { title?: string } | { title?: string }[] | null;
+        const title = Array.isArray(docs) ? docs[0]?.title : docs?.title;
+        return `${title ?? "مستند"} (مراجعة ${row.revision as string})`;
+      })
+      .join("، ");
+
+    const { data: gateRequest } = await supabase
+      .from("approval_requests")
+      .select("entity_id, title")
+      .eq("id", createdId)
+      .maybeSingle<{ entity_id: string; title: string }>();
+    const { data: wfStep } = gateRequest
+      ? await supabase
+          .from("workflow_instance_steps")
+          .select("step_key, workflow_steps(name_ar)")
+          .eq("id", gateRequest.entity_id)
+          .maybeSingle<{ step_key: string; workflow_steps: { name_ar: string } | { name_ar: string }[] | null }>()
+      : { data: null };
+    const stepNameRaw = wfStep?.workflow_steps;
+    const stepName = Array.isArray(stepNameRaw) ? stepNameRaw[0]?.name_ar : stepNameRaw?.name_ar;
+
+    const notifications = createNotificationService(supabase);
+    await notifications.notify({
+      organizationId: ctx.organization.id,
+      recipientProfileId: parsed.data.approverProfileId,
+      type: "approval.created",
+      title: "طلب اعتماد مرحلة",
+      message: `${project.project_code} — ${stepName ?? "المرحلة الحالية"}${docSummary ? ` — ${docSummary}` : ""}`,
+      entityType: "approval_request",
+      entityId: createdId,
+      priority: "high",
+      href: `/projects/${project.id}?tab=approvals`,
+      dedupKey: `approval.created:${createdId}:${parsed.data.approverProfileId}`,
+    });
+
+    revalidateProjectWorkflow(project.id);
   });
 }
 

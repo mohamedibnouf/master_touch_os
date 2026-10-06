@@ -65,11 +65,53 @@ export function mapWorkflowRpcError(message: string): {
   ar: string;
   en: string;
 } {
+  if (message.includes("DUPLICATE_OPEN_GATE")) {
+    return {
+      kind: "CONFLICT",
+      ar: "يوجد طلب اعتماد مفتوح لهذه المرحلة.",
+      en: "An open approval already exists for this stage.",
+    };
+  }
   if (message.includes("CONFLICT")) {
     return { kind: "CONFLICT", ar: "تم اتخاذ هذا الإجراء مسبقاً.", en: "This action was already processed." };
   }
   if (message.includes("FORBIDDEN")) {
     return { kind: "FORBIDDEN", ar: "ليست لديك صلاحية لتنفيذ هذه العملية.", en: "You cannot perform this action." };
+  }
+  if (message.includes("NO_ACTIVE_WORKFLOW")) {
+    return {
+      kind: "VALIDATION",
+      ar: "لا يوجد مسار عمل نشط لهذا المشروع.",
+      en: "This project has no active workflow instance.",
+    };
+  }
+  if (message.includes("NO_ACTIONABLE_GATE") || message.includes("GATE_NOT_REQUIRED")) {
+    return {
+      kind: "VALIDATION",
+      ar: "المرحلة الحالية ليست بوابة اعتماد جاهزة.",
+      en: "The current stage is not an actionable approval gate.",
+    };
+  }
+  if (message.includes("DOCUMENT_ARCHIVED")) {
+    return {
+      kind: "VALIDATION",
+      ar: "لا يمكن ربط مستند مؤرشف بطلب الاعتماد.",
+      en: "An archived document cannot be linked to this approval.",
+    };
+  }
+  if (message.includes("DOCUMENT_PROJECT_MISMATCH") || message.includes("DOCUMENT_INVALID")) {
+    return {
+      kind: "VALIDATION",
+      ar: "المستند الداعم لا ينتمي إلى هذا المشروع.",
+      en: "The supporting document does not belong to this project.",
+    };
+  }
+  if (message.includes("DOCUMENT_REQUIRED")) {
+    return {
+      kind: "VALIDATION",
+      ar: "اختر مستنداً داعماً واحداً على الأقل.",
+      en: "Select at least one supporting document.",
+    };
   }
   if (message.includes("WORKFLOW_GATE_REQUIRED")) {
     return {

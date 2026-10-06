@@ -13,6 +13,7 @@ import {
   createApprovalAction,
   startWorkflowAction,
 } from "@/server/use-cases/platform";
+import { WorkflowGateApprovalCard, type FrozenGateDocument, type GateSupportingDocumentOption } from "@/components/projects/workflow-gate-approval-card";
 import { loadProjectWorkflowProjection } from "@/server/use-cases/project-workflow";
 import { DocumentSourceForm } from "@/components/documents/document-source-form";
 import {
@@ -143,6 +144,86 @@ export default async function ProjectDetailPage({
     return [{ id: row.profile_id, name: profile?.full_name_ar || row.profile_id }];
   });
   const managerName = project.project_manager_id ? (profileNames.get(project.project_manager_id) ?? null) : null;
+
+  const versionIds = documents.map((d) => d.id);
+  const { data: currentVersionRows } =
+    versionIds.length === 0
+      ? { data: [] as Array<{
+          id: string;
+          document_id: string;
+          revision: string;
+          file_source: string | null;
+          file_path: string | null;
+          external_url: string | null;
+          is_current: boolean;
+        }> }
+      : await supabase
+          .from("document_versions")
+          .select("id, document_id, revision, file_source, file_path, external_url, is_current")
+          .eq("organization_id", ctx.organization.id)
+          .eq("is_current", true)
+          .in("document_id", versionIds);
+  const versionByDoc = new Map((currentVersionRows ?? []).map((row) => [row.document_id as string, row]));
+  const gateDocumentOptions: GateSupportingDocumentOption[] = documents.flatMap((doc) => {
+    const ver = versionByDoc.get(doc.id);
+    if (!ver) return [];
+    return [
+      {
+        documentId: doc.id,
+        documentVersionId: ver.id as string,
+        title: doc.title,
+        revision: (ver.revision as string) || doc.current_revision,
+        fileSource: (ver.file_source as string | null) ?? null,
+        isCurrent: ver.is_current === true,
+        filePath: (ver.file_path as string | null) ?? null,
+        externalUrl: (ver.external_url as string | null) ?? null,
+      },
+    ];
+  });
+
+  const currentWorkflowNode = workflow.nodes.find((n) => n.id === workflow.currentNodeId) ?? null;
+  const showWorkflowGateCard = Boolean(
+    workflow.mode === "workflow" &&
+      currentWorkflowNode &&
+      currentWorkflowNode.requiresApproval &&
+      (currentWorkflowNode.engineStatus === "ready" || currentWorkflowNode.engineStatus === "in_progress"),
+  );
+  let frozenGateDocuments: FrozenGateDocument[] = [];
+  let gateSubmittedAt: string | null = null;
+  if (currentWorkflowNode?.openApproval?.requestId) {
+    const [{ data: requestMeta }, { data: linkedDocs }] = await Promise.all([
+      supabase
+        .from("approval_requests")
+        .select("created_at")
+        .eq("id", currentWorkflowNode.openApproval.requestId)
+        .eq("organization_id", ctx.organization.id)
+        .maybeSingle<{ created_at: string }>(),
+      supabase
+        .from("approval_request_documents")
+        .select("document_id, document_version_id, revision, documents(title), document_versions(file_source, file_path, external_url)")
+        .eq("approval_request_id", currentWorkflowNode.openApproval.requestId)
+        .eq("organization_id", ctx.organization.id),
+    ]);
+    gateSubmittedAt = requestMeta?.created_at ?? null;
+    frozenGateDocuments = (linkedDocs ?? []).map((row) => {
+      const docs = row.documents as { title?: string } | { title?: string }[] | null;
+      const vers = row.document_versions as
+        | { file_source?: string | null; file_path?: string | null; external_url?: string | null }
+        | Array<{ file_source?: string | null; file_path?: string | null; external_url?: string | null }>
+        | null;
+      const title = Array.isArray(docs) ? docs[0]?.title : docs?.title;
+      const file = Array.isArray(vers) ? vers[0] : vers;
+      return {
+        documentId: row.document_id as string,
+        documentVersionId: row.document_version_id as string,
+        title: title ?? "مستند",
+        revision: row.revision as string,
+        fileSource: file?.file_source ?? null,
+        filePath: file?.file_path ?? null,
+        externalUrl: file?.external_url ?? null,
+      };
+    });
+  }
 
   const activityIds = [project.id, workflow.instanceId, ...workflow.nodes.map((n) => n.id)].filter(
     (value): value is string => Boolean(value),
@@ -389,6 +470,7 @@ export default async function ProjectDetailPage({
                         projectId={project.id}
                         projectCode={project.project_code}
                         approvers={approverOptions}
+                        documents={gateDocumentOptions}
                       />
                     </CaseFlowStep>
                   ))}
@@ -788,10 +870,27 @@ export default async function ProjectDetailPage({
       ) : null}
 
       {tab === "approvals" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          {showWorkflowGateCard && currentWorkflowNode ? (
+            <WorkflowGateApprovalCard
+              node={currentWorkflowNode}
+              projectId={project.id}
+              projectCode={project.project_code}
+              approvers={approverOptions}
+              documents={gateDocumentOptions}
+              frozenDocuments={frozenGateDocuments}
+              submittedAt={gateSubmittedAt}
+              canCreate={hasPermission(ctx, "approval.create")}
+              canOpenStorage={canOpenStorage}
+            />
+          ) : null}
+          <div className="grid gap-4 lg:grid-cols-2">
           {hasPermission(ctx, "approval.create") ? (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">طلب موافقة</h2>
+            <Card data-testid="generic-project-approval-card">
+              <h2 className="mb-1 font-semibold text-navy">طلبات موافقة عامة</h2>
+              <p className="mb-3 text-sm text-muted">
+                هذا الطلب يرتبط بالمشروع فقط، ولا يحرّك مرحلة مسار العمل. لاستخدام بوابة الاعتماد استخدم «اعتماد المرحلة الحالية».
+              </p>
               <ServerActionForm action={createApprovalAction} className="space-y-3">
                 <input type="hidden" name="entityType" value="project" />
                 <input type="hidden" name="entityId" value={project.id} />
@@ -811,11 +910,11 @@ export default async function ProjectDetailPage({
                     })}
                   </Select>
                 </Field>
-                <Button type="submit">إنشاء طلب</Button>
+                <Button type="submit">إنشاء طلب عام</Button>
               </ServerActionForm>
             </Card>
           ) : null}
-          {hasPermission(ctx, "workflow.start") ? (
+          {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
             <Card>
               <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
               {(definitions.data ?? []).length === 0 ? (
@@ -838,6 +937,7 @@ export default async function ProjectDetailPage({
               )}
             </Card>
           ) : null}
+          </div>
         </div>
       ) : null}
 
