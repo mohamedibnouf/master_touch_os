@@ -45,7 +45,7 @@ import { unassignRoleSchema } from "@/modules/roles/schemas";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
-import { authorize, hasPermission } from "@/server/policies/authorize";
+import { authorize, hasPermission, requireUser } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
@@ -597,7 +597,7 @@ export async function completeWorkflowStepAction(
   formData: FormData,
 ): Promise<FormActionState> {
   return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
-  authorize(await getAuthContext(), "workflow.advance");
+  requireUser(await getAuthContext());
   const parsed = completeWorkflowStepSchema.safeParse({
     instanceStepId: formData.get("instanceStepId"),
     outcome: formData.get("outcome"),

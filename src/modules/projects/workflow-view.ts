@@ -137,6 +137,35 @@ export function waitingApprovalPhrase(approverLabel: string | null): string {
   return "بانتظار موافقة";
 }
 
+/** Keep execute / submit-approval / decide-approval as independent flags. */
+export function deriveWorkflowStepActions(input: {
+  isActive: boolean;
+  canExecuteStep: boolean;
+  canCreateApproval: boolean;
+  canDecideThisApproval: boolean;
+  requiresApproval: boolean;
+  openApproval: OpenApprovalSnapshot | null;
+  latestOfficialCode: OfficialApprovalCode | null;
+}): {
+  canExecuteStep: boolean;
+  canSubmitApproval: boolean;
+  canDecideApproval: boolean;
+  canComplete: boolean;
+} {
+  const canExecuteStep = Boolean(input.isActive && input.canExecuteStep);
+  const canSubmitApproval = Boolean(
+    canExecuteStep && input.canCreateApproval && input.requiresApproval && !input.openApproval && input.isActive,
+  );
+  const canDecideApproval = Boolean(input.canDecideThisApproval);
+  const canComplete = Boolean(
+    canExecuteStep &&
+      input.isActive &&
+      !input.openApproval &&
+      (!input.requiresApproval || input.latestOfficialCode === "A" || input.latestOfficialCode === "B"),
+  );
+  return { canExecuteStep, canSubmitApproval, canDecideApproval, canComplete };
+}
+
 export function blockReasonForNode(input: {
   visual: WorkflowVisualState;
   requiresApproval: boolean;

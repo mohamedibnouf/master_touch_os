@@ -7,6 +7,7 @@ import {
   blockReasonForNode,
   buildProjectAttention,
   deriveStageProgress,
+  deriveWorkflowStepActions,
   formatOverdueDurationAr,
   mapEngineStatusToVisual,
   pickCurrentNodeId,
@@ -31,6 +32,8 @@ import {
   WORKFLOW_ASSIGN_PERMISSION,
   canReassignWorkflowStepStatus,
 } from "@/modules/projects/workflow-responsibility";
+import { resolveWorkflowStepExecutionLookup } from "@/modules/projects/workflow-step-execution";
+import { logger } from "@/lib/logger";
 
 function asOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -215,12 +218,31 @@ export async function loadProjectWorkflowProjection(input: {
     const canApprove = hasPermission(ctx, "approval.approve") || hasPermission(ctx, "approval.reject");
 
     const activeEngine = steps.find((s) => s.status === "ready" || s.status === "in_progress");
-    let canActOnActive = canManage;
-    if (!canActOnActive && canAdvance && activeEngine) {
-      const { data } = await supabase.rpc("can_act_on_workflow_step", {
-        p_step_id: activeEngine.id,
+    let canExecuteActive = false;
+    if (activeEngine) {
+      const { data: execOk, error: execErr } = await supabase.rpc("can_execute_workflow_instance_step", {
+        p_instance_step_id: activeEngine.id,
       });
-      canActOnActive = data === true;
+      const lookup = resolveWorkflowStepExecutionLookup({
+        canManage,
+        canAdvance,
+        executeOk: execOk === true,
+        executeError: execErr,
+        legacyCanAct: null,
+      });
+      if (lookup.shouldCallLegacyCanAct) {
+        const { data } = await supabase.rpc("can_act_on_workflow_step", {
+          p_step_id: activeEngine.id,
+        });
+        canExecuteActive = data === true;
+      } else {
+        canExecuteActive = lookup.canExecute;
+      }
+      if (lookup.failedClosed) {
+        logger.warn("workflow execution predicate failed closed", {
+          code: execErr && "code" in execErr && typeof execErr.code === "string" ? execErr.code : null,
+        });
+      }
     }
 
     const nodes: WorkflowViewNode[] = steps.map((step, index) => {
@@ -280,15 +302,23 @@ export async function loadProjectWorkflowProjection(input: {
       const assignmentSubtitle = assignment.subtitle;
       const approverLabel = openApproval?.approverLabel ?? (requiresApproval ? responsibleLabel : null);
       const isActive = step.id === activeEngine?.id;
-      const canAct = Boolean(isActive && canAdvance && canActOnActive);
-      const canDecideApproval = Boolean(
-        canApprove &&
-          openApproval &&
-          openApproval.approverUserId === ctx.userId &&
-          (openStep?.status === "pending" || openStep?.status === "in_progress"),
-      );
-      const canSubmitApproval = Boolean(canAct && canCreateApproval && requiresApproval && !openApproval && isActive);
-      const canComplete = Boolean(canAct && isActive && !openApproval && (!requiresApproval || latestOfficialCode === "A" || latestOfficialCode === "B"));
+      const actions = deriveWorkflowStepActions({
+        isActive,
+        canExecuteStep: canExecuteActive,
+        canCreateApproval,
+        canDecideThisApproval: Boolean(
+          canApprove &&
+            openApproval &&
+            openApproval.approverUserId === ctx.userId &&
+            (openStep?.status === "pending" || openStep?.status === "in_progress"),
+        ),
+        requiresApproval,
+        openApproval,
+        latestOfficialCode,
+      });
+      const canDecideApproval = actions.canDecideApproval;
+      const canSubmitApproval = actions.canSubmitApproval;
+      const canComplete = actions.canComplete;
       const warningHours = def?.warning_hours ?? null;
       const deadlineState = deriveDeadlineState({
         engineStatus: step.status,
