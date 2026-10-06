@@ -166,6 +166,8 @@ describe("redaction and href", () => {
     expect(safeNotificationHref("https://evil.test")).toBeNull();
     expect(safeNotificationHref("//evil.test")).toBeNull();
     expect(safeNotificationHref("/approvals")).toBe("/approvals");
+    expect(safeNotificationHref("/projects/x?tab=stages")).toBe("/projects/x?tab=stages");
+    expect(safeNotificationHref("javascript:alert(1)")).toBeNull();
   });
   it("validates push subscriptions", () => {
     expect(() => validatePushSubscription({ endpoint: "http://x", keys: { p256dh: "12345678", auth: "12345678" } })).toThrow();

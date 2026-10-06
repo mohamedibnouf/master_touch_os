@@ -268,6 +268,8 @@ export type NotificationRecord = {
   message: string;
   entity_type: string | null;
   entity_id: string | null;
+  href?: string | null;
+  dedup_key?: string | null;
   priority: NotificationPriority;
   read_at: string | null;
   created_at: string;

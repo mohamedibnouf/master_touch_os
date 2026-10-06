@@ -15,6 +15,7 @@ import {
   workflowStepActivatedDedupKey,
   workflowStepActivatedMessage,
 } from "@/modules/projects/workflow-activation-notify";
+import { workflowStageHref } from "@/lib/notifications/href";
 
 export async function processPendingNotificationDeliveries(
   admin: SupabaseClient,
@@ -193,7 +194,6 @@ export async function notifyWorkflowReadyAssignees(input: {
     .select("id, assigned_user_id, assigned_role_id, responsible_user_id, due_at, workflow_steps(name_ar)")
     .eq("instance_id", input.instanceId)
     .eq("status", "ready");
-  const href = input.projectId ? `/projects/${input.projectId}?tab=stages` : null;
   const notifications = createNotificationService(input.supabase);
   for (const row of (ready ?? []) as ReadyStepRow[]) {
     const stepRel = row.workflow_steps;
@@ -213,7 +213,7 @@ export async function notifyWorkflowReadyAssignees(input: {
         message: workflowStepActivatedMessage({ nameAr: name ?? null, dueLabel }),
         entityType: input.projectId ? "project" : "workflow_instance_step",
         entityId: input.projectId ?? row.id,
-        href,
+        href: input.projectId ? workflowStageHref(input.projectId, row.id) : null,
         priority: "normal",
         dedupKey: workflowStepActivatedDedupKey(row.id, userId),
       });

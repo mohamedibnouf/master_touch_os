@@ -17,7 +17,8 @@ import { hasPermission } from "@/server/policies/authorize";
 import { logger } from "@/lib/logger";
 import { commercialEntityHref } from "@/lib/commercial/entity-routes";
 import { pendingActionHref } from "@/lib/work-item-href";
-import { notificationEntityHref } from "@/lib/notifications/href";
+import { resolveNotificationHref } from "@/lib/notifications/href";
+import { NotificationNavLink } from "@/components/notifications/notification-nav-link";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import type { AuthContext } from "@/types/models";
 
@@ -436,7 +437,13 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
         ) : (
           <ul className="space-y-1">
             {recentNotes.map((item) => {
-              const href = notificationEntityHref(item.entity_type, item.entity_id);
+              const href = resolveNotificationHref({
+                type: item.type,
+                entityType: item.entity_type,
+                entityId: item.entity_id,
+                storedHref: item.href,
+                dedupKey: item.dedup_key,
+              });
               const inner = (
                 <div className="flex items-start gap-2.5 rounded-[var(--radius-control)] px-2 py-2">
                   <span
@@ -459,9 +466,14 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
               return (
                 <li key={item.id}>
                   {href ? (
-                    <Link href={href} className="block rounded-[var(--radius-control)] duration-150 hover:bg-white">
+                    <NotificationNavLink
+                      id={item.id}
+                      href={href}
+                      unread={!item.read_at}
+                      className="block rounded-[var(--radius-control)] duration-150 hover:bg-white"
+                    >
                       {inner}
-                    </Link>
+                    </NotificationNavLink>
                   ) : (
                     inner
                   )}

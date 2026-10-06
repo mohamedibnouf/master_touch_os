@@ -37,7 +37,7 @@ import {
   ROLE_LIST_COLUMNS,
   APPROVAL_LIST_SELECT,
 } from "@/lib/query-projections";
-import { notificationEntityHref } from "@/lib/notifications/href";
+import { resolveNotificationHref } from "@/lib/notifications/href";
 
 function fail(error: { message?: string; code?: string } | null): never {
   logger.error("supabase query failed", { code: error?.code ?? null });
@@ -426,7 +426,13 @@ export class CoreRepository {
         title: n.title as string,
         created_at: n.created_at as string,
         read_at: (n.read_at as string | null) ?? null,
-        href: notificationEntityHref(n.entity_type as string | null, n.entity_id as string | null),
+        href: resolveNotificationHref({
+          type: (n.type as string | null) ?? null,
+          entityType: n.entity_type as string | null,
+          entityId: n.entity_id as string | null,
+          storedHref: (n.href as string | null) ?? null,
+          dedupKey: (n.dedup_key as string | null) ?? null,
+        }),
       })),
     };
   }

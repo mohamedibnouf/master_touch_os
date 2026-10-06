@@ -60,6 +60,7 @@ import { authorize, hasPermission, requireUser } from "@/server/policies/authori
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
+import { workflowStageHref } from "@/lib/notifications/href";
 import { notifyWorkflowReadyAssignees as dispatchWorkflowReadyAssignees } from "@/server/services/notification-delivery-worker";
 import { StorageService } from "@/server/services/storage.service";
 import { parseGoogleDriveUrl } from "@/modules/documents/google-drive-url";
@@ -584,7 +585,7 @@ export async function assignWorkflowStepResponsibleAction(
         message: name ? `المرحلة: ${name}` : "تم تعيينك مسؤولاً عن مرحلة جاهزة.",
         entityType: "project",
         entityId: parsed.data.projectId,
-        href: `/projects/${parsed.data.projectId}?tab=stages`,
+        href: workflowStageHref(parsed.data.projectId, liveStep.id),
         priority: "normal",
         dedupKey: `workflow.step.activated:${liveStep.id}:${parsed.data.responsibleUserId}`,
       });
@@ -1275,7 +1276,6 @@ export async function markNotificationReadAction(
     .eq("recipient_profile_id", ctx.userId);
   if (error) throw new DatabaseError(error);
   revalidatePath("/notifications");
-  revalidatePath("/");
   });
 }
 

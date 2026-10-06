@@ -15,6 +15,7 @@ import {
 } from "@/server/use-cases/platform";
 import { WorkflowGateApprovalCard, type FrozenGateDocument, type GateSupportingDocumentOption } from "@/components/projects/workflow-gate-approval-card";
 import { loadProjectWorkflowProjection } from "@/server/use-cases/project-workflow";
+import { workflowStageFocusId } from "@/lib/notifications/workflow-stage-focus";
 import { DocumentSourceForm } from "@/components/documents/document-source-form";
 import {
   DocumentDetailsLink,
@@ -48,7 +49,7 @@ export default async function ProjectDetailPage({
   if (!ctx || !hasPermission(ctx, "project.read")) redirect("/login");
 
   const { id } = await params;
-  const { tab = "overview" } = await searchParams;
+  const { tab = "overview", stage: stageParam } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const project = await repo.getProject(ctx.organization.id, id);
@@ -103,6 +104,11 @@ export default async function ProjectDetailPage({
     departmentNames,
     jobTitles,
   });
+  const focusedStageId = workflowStageFocusId(
+    workflow.nodes.map((node) => node.id),
+    workflow.currentNodeId,
+    stageParam,
+  );
   const userActive = new Map<string, boolean>();
   for (const row of users) {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -460,7 +466,7 @@ export default async function ProjectDetailPage({
                     <CaseFlowStep
                       key={node.id}
                       node={node}
-                      current={node.id === workflow.currentNodeId}
+                      current={node.id === focusedStageId}
                       isLast={index === workflow.nodes.length - 1}
                       projectId={project.id}
                       candidates={responsibleCandidates}

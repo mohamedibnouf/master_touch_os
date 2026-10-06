@@ -35,6 +35,7 @@ describe("workflow activation notifications", () => {
     expect(startFn).toMatch(/notifyWorkflowReadyAssignees/);
     expect(workerSrc).toMatch(/status", "ready"/);
     expect(workerSrc).toMatch(/type: "workflow\.step\.activated"/);
+    expect(workerSrc).toMatch(/workflowStageHref\(input\.projectId, row\.id\)/);
     expect(workerSrc).toMatch(/responsibleUserId: row\.responsible_user_id/);
     expect(
       workflowStepActivatedMessage({ nameAr: "البداية", dueLabel: "الثلاثاء" }),

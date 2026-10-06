@@ -107,7 +107,7 @@ export function CaseFlowStep({
   const seq = String(node.sequence).padStart(2, "0");
 
   return (
-    <li className="flex gap-3">
+    <li className="flex gap-3" id={`workflow-stage-${node.id}`} data-testid={`workflow-stage-${node.id}`}>
       <div className="flex w-8 shrink-0 flex-col items-center">
         <button
           type="button"

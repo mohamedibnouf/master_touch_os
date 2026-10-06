@@ -27,9 +27,10 @@ export const DOCUMENT_CURRENT_VERSION_COLUMNS =
   "document_id, file_source, external_url, file_path, is_current" as const;
 
 export const NOTIFICATION_LIST_COLUMNS =
-  "id, title, message, type, priority, read_at, created_at, entity_type, entity_id" as const;
+  "id, title, message, type, priority, read_at, created_at, entity_type, entity_id, href, dedup_key" as const;
 
-export const NOTIFICATION_HEADER_COLUMNS = "id, title, created_at, read_at, entity_type, entity_id" as const;
+export const NOTIFICATION_HEADER_COLUMNS =
+  "id, title, created_at, read_at, entity_type, entity_id, href, type, dedup_key" as const;
 
 export const DEPARTMENT_LIST_COLUMNS =
   "id, organization_id, code, name_ar, name_en, description, parent_department_id, manager_user_id, is_active" as const;

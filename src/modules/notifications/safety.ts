@@ -22,12 +22,14 @@ export function assertNoSensitivePayload(metadata: Record<string, unknown> | und
 /** Same-origin app path only. Rejects protocol-relative and absolute URLs. */
 export function safeNotificationHref(href: string | null | undefined): string | null {
   if (!href) return null;
-  const trimmed = href.trim();
+  const trimmed = href.trim().slice(0, 300);
   if (!trimmed.startsWith("/")) return null;
   if (trimmed.startsWith("//")) return null;
-  if (trimmed.includes("://")) return null;
-  if (trimmed.includes("\\")) return null;
-  return trimmed.slice(0, 300);
+  if (trimmed.includes("://") || trimmed.includes("\\")) return null;
+  if (trimmed.toLowerCase().includes("javascript:")) return null;
+  if (trimmed.includes("..")) return null;
+  if (!/^\/[A-Za-z0-9_\-./?=&%~]*$/.test(trimmed)) return null;
+  return trimmed;
 }
 
 export function validatePushSubscription(input: {

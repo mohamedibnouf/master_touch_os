@@ -2,7 +2,8 @@ import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { notificationEntityHref } from "@/lib/notifications/href";
+import { resolveNotificationHref } from "@/lib/notifications/href";
+import { NotificationNavLink } from "@/components/notifications/notification-nav-link";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
@@ -45,7 +46,13 @@ export default async function NotificationsPage() {
       ) : (
         <div className="mt-surface divide-y divide-line overflow-hidden">
           {notifications.map((item) => {
-            const href = notificationEntityHref(item.entity_type, item.entity_id);
+            const href = resolveNotificationHref({
+              type: item.type,
+              entityType: item.entity_type,
+              entityId: item.entity_id,
+              storedHref: item.href,
+              dedupKey: item.dedup_key,
+            });
             const accent = notificationAccent(item.type, item.priority);
             return (
             <div
@@ -78,9 +85,14 @@ export default async function NotificationsPage() {
                     {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
                   </p>
                   {href ? (
-                    <Link href={href} className="mt-2 inline-block text-sm font-medium text-primary">
+                    <NotificationNavLink
+                      id={item.id}
+                      href={href}
+                      unread={!item.read_at}
+                      className="mt-2 inline-block text-sm font-medium text-primary"
+                    >
                       فتح السجل المرتبط
-                    </Link>
+                    </NotificationNavLink>
                   ) : null}
                 </div>
                 {!item.read_at ? (
