@@ -2,9 +2,6 @@ import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createNotificationService } from "@/server/services/notification.service";
-import { createEmailProvider, createPushProvider, createWhatsAppProvider } from "@/modules/notifications/providers";
-import { NotificationOrchestrator } from "@/modules/notifications/orchestrator";
-import { MemoryHubStore } from "@/modules/notifications/memory-store";
 import { buildApprovalReminderEvents, buildProjectDeadlineEvents } from "@/modules/notifications/scan";
 import {
   buildWorkflowDeadlineEvents,
@@ -14,9 +11,9 @@ import {
   uniqueProfileIds,
 } from "@/modules/projects/deadline";
 import { maybeAiDigestSummary, type DigestFacts } from "@/modules/notifications/digest";
-import { nextRetryAt } from "@/modules/notifications/schedule";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { logger } from "@/lib/logger";
+import { processPendingNotificationDeliveries } from "@/server/services/notification-delivery-worker";
 
 /**
  * Daily cron remains retry/recovery (`0 6 * * *`). W3 WhatsApp near-real-time
@@ -288,144 +285,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
     reminders += 1;
   }
 
-  let deliveries = 0;
-  const { data: claimed, error: claimErr } = await admin.rpc("claim_notification_deliveries", { p_limit: 25 });
-  if (!claimErr && Array.isArray(claimed)) {
-    const store = new MemoryHubStore();
-    const orch = new NotificationOrchestrator(
-      store,
-      createEmailProvider(),
-      createWhatsAppProvider(),
-      createPushProvider(),
-      process.env.NEXT_PUBLIC_APP_URL ?? "",
-    );
-    for (const row of claimed as Array<{
-      id: string;
-      notification_id: string;
-      organization_id: string;
-      recipient_profile_id: string;
-      channel: "in_app" | "email" | "whatsapp" | "push";
-      attempt_count: number;
-      status: string;
-    }>) {
-      if (row.channel === "in_app") {
-        await admin
-          .from("notification_deliveries")
-          .update({ status: "delivered", delivered_at: now.toISOString() })
-          .eq("id", row.id);
-        deliveries += 1;
-        continue;
-      }
-      const { data: note } = await admin
-        .from("notifications")
-        .select("id, organization_id, recipient_profile_id, event_type, type, title, message, href, dedup_key")
-        .eq("id", row.notification_id)
-        .eq("organization_id", row.organization_id)
-        .maybeSingle();
-      store.notifications = note
-        ? [
-            {
-              id: note.id as string,
-              organizationId: note.organization_id as string,
-              recipientId: note.recipient_profile_id as string,
-              eventType: String(note.event_type ?? note.type ?? ""),
-              dedupKey: String(note.dedup_key ?? ""),
-              title: String(note.title ?? ""),
-              body: String(note.message ?? ""),
-              href: (note.href as string | null) ?? null,
-              created: false,
-            },
-          ]
-        : [];
-      let destRes = await admin
-        .from("organizations")
-        .select("management_notification_email, management_notification_whatsapp")
-        .eq("id", row.organization_id)
-        .maybeSingle();
-      if (destRes.error && /management_notification_whatsapp|schema cache|column/i.test(destRes.error.message ?? "")) {
-        destRes = await admin
-          .from("organizations")
-          .select("management_notification_email")
-          .eq("id", row.organization_id)
-          .maybeSingle();
-      }
-      const managementEmail =
-        destRes.error || typeof destRes.data?.management_notification_email !== "string"
-          ? null
-          : destRes.data.management_notification_email;
-      const destWhatsapp = destRes.data as { management_notification_whatsapp?: string | null } | null;
-      const managementWhatsApp =
-        destRes.error || typeof destWhatsapp?.management_notification_whatsapp !== "string"
-          ? null
-          : destWhatsapp.management_notification_whatsapp;
-      store.managementEmail.set(row.organization_id, managementEmail);
-      store.managementWhatsApp.set(row.organization_id, managementWhatsApp);
-      store.deliveries = [
-        {
-          id: row.id,
-          notificationId: row.notification_id,
-          organizationId: row.organization_id,
-          recipientId: row.recipient_profile_id,
-          channel: row.channel,
-          status: row.status,
-          attemptCount: row.attempt_count,
-        },
-      ];
-      let profile = (
-        await admin
-          .from("profiles")
-          .select("full_name_ar, phone, whatsapp_opt_in")
-          .eq("id", row.recipient_profile_id)
-          .maybeSingle()
-      ).data as { full_name_ar?: string | null; phone?: string | null; whatsapp_opt_in?: boolean } | null;
-      if (!profile) {
-        const fallback = await admin
-          .from("profiles")
-          .select("full_name_ar, phone")
-          .eq("id", row.recipient_profile_id)
-          .maybeSingle();
-        profile = fallback.data;
-      }
-      store.contacts.set(row.recipient_profile_id, {
-        email: null,
-        phone: profile?.phone ?? null,
-        name: profile?.full_name_ar ?? null,
-        whatsappOptIn: profile?.whatsapp_opt_in === true,
-      });
-      try {
-        const user = await admin.auth.admin.getUserById(row.recipient_profile_id);
-        store.contacts.set(row.recipient_profile_id, {
-          email: user.data.user?.email ?? null,
-          phone: profile?.phone ?? null,
-          name: profile?.full_name_ar ?? null,
-          whatsappOptIn: profile?.whatsapp_opt_in === true,
-        });
-      } catch {
-        /* email lookup is best-effort */
-      }
-      const outcome = await orch.processDelivery(store.deliveries[0]);
-      const patch: Record<string, unknown> = { updated_at: now.toISOString() };
-      if (outcome.status === "sent") {
-        patch.status = row.channel === "email" ? "sent" : "delivered";
-        if (row.channel === "email") patch.sent_at = now.toISOString();
-        else patch.delivered_at = now.toISOString();
-        patch.next_attempt_at = null;
-        patch.last_error_code = null;
-        if (outcome.providerMessageId) patch.provider_message_id = outcome.providerMessageId;
-      } else if (outcome.status === "cancelled") {
-        patch.status = "cancelled";
-        patch.next_attempt_at = null;
-        patch.last_error_code = outcome.lastErrorCode ?? "disabled";
-      } else {
-        patch.status = "failed";
-        const next = nextRetryAt(row.attempt_count, now);
-        patch.next_attempt_at = next ? next.toISOString() : null;
-        patch.last_error_code = outcome.lastErrorCode ?? "transient";
-      }
-      await admin.from("notification_deliveries").update(patch).eq("id", row.id);
-      deliveries += 1;
-    }
-  }
+  const deliveries = await processPendingNotificationDeliveries(admin, { limit: 25, now });
 
   if (options?.digestFacts) {
     const summary = await maybeAiDigestSummary(options.digestFacts);

@@ -49,6 +49,7 @@ import { authorize, hasPermission } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
+import { notifyWorkflowReadyAssignees as dispatchWorkflowReadyAssignees } from "@/server/services/notification-delivery-worker";
 import { StorageService } from "@/server/services/storage.service";
 import { parseGoogleDriveUrl } from "@/modules/documents/google-drive-url";
 import { isStorageFileRequired } from "@/modules/documents/schemas";
@@ -101,46 +102,13 @@ async function notifyWorkflowReadyAssignees(input: {
   instanceId: string;
   projectId: string | null;
 }) {
-  const { data: ready } = await input.supabase
-    .from("workflow_instance_steps")
-    .select("id, assigned_user_id, assigned_role_id, responsible_user_id, due_at, workflow_steps(name_ar)")
-    .eq("instance_id", input.instanceId)
-    .eq("status", "ready");
-  const href = input.projectId ? `/projects/${input.projectId}?tab=stages` : null;
-  const notifications = createNotificationService(input.supabase);
-  for (const row of ready ?? []) {
-    const stepRel = row.workflow_steps as { name_ar: string } | { name_ar: string }[] | null;
-    const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
-    const dueLabel = row.due_at ? formatRiyadhDateTimeAr(row.due_at as string) : null;
-    const recipients = workflowStepNotificationRecipients({
-      responsibleUserId: (row.responsible_user_id as string | null) ?? null,
-      assignedUserId: (row.assigned_user_id as string | null) ?? null,
-      roleHolderIds: await activeRoleHolderIds(
-        input.supabase,
-        input.organizationId,
-        (row.assigned_role_id as string | null) ?? null,
-      ),
-    });
-    for (const userId of recipients) {
-      await notifications.notify({
-        organizationId: input.organizationId,
-        recipientProfileId: userId,
-        type: "workflow.step.activated",
-        title: "تم إسناد مرحلة جديدة إليك",
-        message: [
-          name ? `المرحلة: ${name}` : "تم تفعيل مرحلة تالية في مسار العمل.",
-          dueLabel ? `موعد الإغلاق: ${dueLabel}` : null,
-        ]
-          .filter(Boolean)
-          .join(" — "),
-        entityType: input.projectId ? "project" : "workflow_instance_step",
-        entityId: input.projectId ?? (row.id as string),
-        href,
-        priority: "normal",
-        dedupKey: `workflow.step.activated:${row.id}:${userId}`,
-      });
-    }
-  }
+  await dispatchWorkflowReadyAssignees({
+    supabase: input.supabase,
+    organizationId: input.organizationId,
+    instanceId: input.instanceId,
+    projectId: input.projectId,
+    roleHolderIds: (roleId) => activeRoleHolderIds(input.supabase, input.organizationId, roleId),
+  });
 }
 
 async function notifyWorkflowCompleted(input: {
