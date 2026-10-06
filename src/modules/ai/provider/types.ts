@@ -22,6 +22,7 @@ export type AiGenerateStructuredInput<T> = {
   timeoutMs?: number;
   modelKind?: "default" | "document";
   observe?: AiProviderObserve;
+  jsonSchema?: Record<string, unknown> | null;
 };
 
 export type AiUsageMeta = {

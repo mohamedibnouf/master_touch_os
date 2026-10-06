@@ -7,7 +7,18 @@ import {
   extractSafeOpenAiError,
   invalidProviderResponseError,
   providerFailureAppError,
+  safeProviderErrorToken,
 } from "../provider-errors";
+import {
+  BUSINESS_CASE_SCHEMA_NAME,
+  DOCUMENT_ANALYSIS_SCHEMA_NAME,
+  extractChatMessageContent,
+  jsonSchemaForStructuredName,
+  parseDocumentAnalysisJson,
+  summarizeZodIssues,
+  validateBusinessCasePayload,
+  validateDocumentAnalysisPayload,
+} from "../document-analysis-contract";
 import type {
   AiGenerateStructuredInput,
   AiGenerateTextInput,
@@ -56,6 +67,9 @@ function logProviderFailure(input: {
     versionId: input.observe?.versionId ?? null,
     providerErrorCode: typeof details.providerErrorCode === "string" ? details.providerErrorCode : null,
     providerErrorType: typeof details.providerErrorType === "string" ? details.providerErrorType : null,
+    finishReason: typeof details.finishReason === "string" ? details.finishReason : null,
+    responseLength: typeof details.responseLength === "number" ? details.responseLength : null,
+    schemaIssues: Array.isArray(details.schemaIssues) ? details.schemaIssues : null,
   });
 }
 
@@ -76,7 +90,9 @@ export function createOpenAIProvider(opts: {
     json: boolean;
     model: string;
     observe?: AiProviderObserve;
-  }): Promise<{ content: string; usage: AiUsageMeta; latencyMs: number; model: string }> {
+    jsonSchemaName?: string | null;
+    jsonSchema?: Record<string, unknown> | null;
+  }): Promise<{ content: string; usage: AiUsageMeta; latencyMs: number; model: string; finishReason: string | null }> {
     const started = Date.now();
     let lastError: unknown;
     const operation = input.observe?.operation ?? (input.json ? "structured" : "text");
@@ -94,7 +110,20 @@ export function createOpenAIProvider(opts: {
           body: JSON.stringify({
             model: input.model,
             temperature: AI_LIMITS.temperature,
-            ...(input.json ? { response_format: { type: "json_object" } } : {}),
+            ...(input.json
+              ? input.jsonSchema && input.jsonSchemaName
+                ? {
+                    response_format: {
+                      type: "json_schema",
+                      json_schema: {
+                        name: input.jsonSchemaName,
+                        strict: true,
+                        schema: input.jsonSchema,
+                      },
+                    },
+                  }
+                : { response_format: { type: "json_object" } }
+              : {}),
             messages: [
               { role: "system", content: input.systemPrompt },
               { role: "user", content: input.userPayload },
@@ -134,22 +163,35 @@ export function createOpenAIProvider(opts: {
           throw failure;
         }
 
-        let json: { choices?: Array<{ message?: { content?: string } }> };
+        let json: {
+          choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+        };
         try {
-          json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          json = (await res.json()) as {
+            choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+          };
         } catch {
           const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
             httpStatus: res.status,
             model: input.model,
             latencyMs: Date.now() - started,
             operation,
+            responseLength: 0,
           });
           logProviderFailure({ error: failure, observe: input.observe, model: input.model });
           throw failure;
         }
-        const content = json.choices?.[0]?.message?.content;
+        const finishReason = safeProviderErrorToken(json.choices?.[0]?.finish_reason);
+        const content = extractChatMessageContent(json.choices?.[0]?.message);
         if (!content) {
-          const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE");
+          const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
+            httpStatus: res.status,
+            model: input.model,
+            latencyMs: Date.now() - started,
+            operation,
+            finishReason,
+            responseLength: 0,
+          });
           logProviderFailure({ error: failure, observe: input.observe, model: input.model });
           throw failure;
         }
@@ -158,6 +200,7 @@ export function createOpenAIProvider(opts: {
           usage: parseUsage(json),
           latencyMs: Date.now() - started,
           model: input.model,
+          finishReason,
         };
       } catch (e) {
         if (e instanceof AppError) throw e;
@@ -210,6 +253,16 @@ export function createOpenAIProvider(opts: {
       return { text: result.content, usage: result.usage, model: result.model, latencyMs: result.latencyMs };
     },
     async generateStructured<T>(input: AiGenerateStructuredInput<T>): Promise<AiStructuredResult<T>> {
+      const namedSchema = jsonSchemaForStructuredName(input.schemaName);
+      const jsonSchema = input.jsonSchema ?? namedSchema;
+      const jsonSchemaName =
+        input.schemaName === "document-analysis"
+          ? DOCUMENT_ANALYSIS_SCHEMA_NAME
+          : input.schemaName === "business-case"
+            ? BUSINESS_CASE_SCHEMA_NAME
+            : jsonSchema
+              ? input.schemaName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
+              : null;
       const result = await complete({
         systemPrompt: input.systemPrompt,
         userPayload: input.userPayload,
@@ -217,18 +270,58 @@ export function createOpenAIProvider(opts: {
         json: true,
         model: input.modelKind === "document" ? opts.documentModel : opts.model,
         observe: input.observe,
+        jsonSchema: jsonSchema ?? null,
+        jsonSchemaName,
       });
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.content);
-      } catch {
-        const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE");
+      const parsedJson = parseDocumentAnalysisJson(result.content);
+      if (!parsedJson.ok) {
+        const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
+          model: result.model,
+          finishReason: result.finishReason,
+          responseLength: result.content.length,
+          operation: input.observe?.operation ?? "structured",
+        });
         logProviderFailure({ error: failure, observe: input.observe, model: result.model });
         throw failure;
       }
-      const checked = input.schema.safeParse(parsed);
+      if (input.schemaName === "document-analysis") {
+        const checked = validateDocumentAnalysisPayload(parsedJson.value);
+        if (!checked.ok) {
+          const failure = invalidProviderResponseError("AI_PROVIDER_SCHEMA_ERROR", {
+            model: result.model,
+            finishReason: result.finishReason,
+            responseLength: result.content.length,
+            operation: input.observe?.operation ?? "document_analysis",
+            schemaIssues: checked.issues,
+          });
+          logProviderFailure({ error: failure, observe: input.observe, model: result.model });
+          throw failure;
+        }
+        return { value: checked.value as T, usage: result.usage, model: result.model, latencyMs: result.latencyMs };
+      }
+      if (input.schemaName === "business-case") {
+        const checked = validateBusinessCasePayload(parsedJson.value);
+        if (!checked.ok) {
+          const failure = invalidProviderResponseError("AI_PROVIDER_SCHEMA_ERROR", {
+            model: result.model,
+            finishReason: result.finishReason,
+            responseLength: result.content.length,
+            operation: input.observe?.operation ?? "document_analysis",
+            schemaIssues: checked.issues,
+          });
+          logProviderFailure({ error: failure, observe: input.observe, model: result.model });
+          throw failure;
+        }
+        return { value: checked.value as T, usage: result.usage, model: result.model, latencyMs: result.latencyMs };
+      }
+      const checked = input.schema.safeParse(parsedJson.value);
       if (!checked.success) {
-        const failure = invalidProviderResponseError("AI_PROVIDER_SCHEMA_ERROR");
+        const failure = invalidProviderResponseError("AI_PROVIDER_SCHEMA_ERROR", {
+          model: result.model,
+          finishReason: result.finishReason,
+          responseLength: result.content.length,
+          schemaIssues: summarizeZodIssues(checked.error),
+        });
         logProviderFailure({ error: failure, observe: input.observe, model: result.model });
         throw failure;
       }
