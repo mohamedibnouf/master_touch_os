@@ -8,7 +8,9 @@ import { hasPermission } from "@/server/policies/authorize";
 import { documentStatusLabel } from "@/lib/ui/operational-labels";
 import { DocumentOpenControl, DocumentSourceBadge } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl, DocumentRestoreControl } from "@/components/documents/document-lifecycle-controls";
+import { OperationalDocumentRevisionForm } from "@/components/documents/operational-revision-form";
 import { documentFileSourceLabelAr } from "@/modules/documents/file-source";
+import { canOfferOperationalRevision, nextOperationalRevision } from "@/modules/documents/operational-revision";
 
 export default async function DocumentDetailPage({
   params,
@@ -33,7 +35,7 @@ export default async function DocumentDetailPage({
   const [{ data: versions }, { data: project }] = await Promise.all([
     supabase
       .from("document_versions")
-      .select("id, revision, file_source, external_url, file_path, file_name, is_current, uploaded_at")
+      .select("id, revision, file_source, external_url, file_path, file_name, is_current, is_superseded, uploaded_at")
       .eq("document_id", id)
       .eq("organization_id", ctx.organization.id)
       .order("uploaded_at", { ascending: false }),
@@ -51,6 +53,14 @@ export default async function DocumentDetailPage({
   const canOpenStorage = hasPermission(ctx, "document.read");
   const canArchive = hasPermission(ctx, "document.archive");
   const isArchived = Boolean(doc.archived_at);
+  const nextRevision = nextOperationalRevision(doc.current_revision);
+  const canAddVersion =
+    Boolean(nextRevision) &&
+    canOfferOperationalRevision({
+      hasDocumentUpload: hasPermission(ctx, "document.upload"),
+      isArchived,
+      isRegisterControlled: Boolean(doc.is_register_controlled),
+    });
 
   return (
     <PageContainer className="space-y-5" data-testid="document-detail">
@@ -135,6 +145,20 @@ export default async function DocumentDetailPage({
         </div>
       </Card>
 
+      {canAddVersion && nextRevision ? (
+        <Card>
+          <OperationalDocumentRevisionForm
+            documentId={doc.id}
+            projectId={doc.project_id}
+            title={doc.title}
+            category={doc.category}
+            confidentiality={doc.confidentiality}
+            currentRevision={doc.current_revision}
+            nextRevision={nextRevision}
+          />
+        </Card>
+      ) : null}
+
       <Card>
         <h2 className="mb-3 font-semibold text-navy">الإصدارات</h2>
         <TableScroll>
@@ -144,20 +168,32 @@ export default async function DocumentDetailPage({
                 <th className="px-2 py-2 font-medium">الإصدار</th>
                 <th className="px-2 py-2 font-medium">المصدر</th>
                 <th className="px-2 py-2 font-medium">الملف</th>
+                <th className="px-2 py-2 font-medium">الحالة</th>
                 <th className="px-2 py-2 font-medium">التاريخ</th>
+                <th className="px-2 py-2 font-medium">فتح</th>
               </tr>
             </thead>
             <tbody>
               {(versions ?? []).map((v) => (
                 <tr key={v.id} className="border-t border-line">
-                  <td className="px-2 py-2">
-                    {v.revision}
-                    {v.is_current ? " · الحالي" : ""}
-                  </td>
+                  <td className="px-2 py-2">{v.revision}</td>
                   <td className="px-2 py-2">{documentFileSourceLabelAr(v.file_source)}</td>
                   <td className="px-2 py-2">{v.file_name}</td>
+                  <td className="px-2 py-2">{v.is_current ? "الحالي" : v.is_superseded ? "سابق" : "سجل"}</td>
                   <td className="px-2 py-2 text-muted">
                     {new Date(v.uploaded_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                  </td>
+                  <td className="px-2 py-2">
+                    <DocumentOpenControl
+                      documentId={doc.id}
+                      versionId={v.id}
+                      file={{
+                        file_source: v.file_source,
+                        external_url: v.external_url,
+                        file_path: v.file_path,
+                      }}
+                      canOpenStorage={canOpenStorage}
+                    />
                   </td>
                 </tr>
               ))}

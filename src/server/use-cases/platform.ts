@@ -13,6 +13,12 @@ import {
 } from "@/modules/users/schemas";
 import { uploadDocumentSchema } from "@/modules/documents/schemas";
 import {
+  OPERATIONAL_ORPHAN_CLEANUP,
+  OPERATIONAL_REVISION_RPC,
+  nextOperationalRevision,
+  throwOperationalRevisionRpcError,
+} from "@/modules/documents/operational-revision";
+import {
   completeWorkflowStepSchema,
   createApprovalSchema,
   decideApprovalSchema,
@@ -55,15 +61,6 @@ import { parseGoogleDriveUrl } from "@/modules/documents/google-drive-url";
 import { isStorageFileRequired } from "@/modules/documents/schemas";
 import { assertProjectBelongsToOrganization } from "@/modules/documents/project-scope";
 import type { Project } from "@/types/models";
-
-function nextRevision(current: string): string {
-  const match = current.match(/^([A-Z]+)(\d*)$/i);
-  if (!match) {
-    return "B";
-  }
-  const letters = match[1] ?? "A";
-  return String.fromCharCode(letters.charCodeAt(0) + 1);
-}
 
 function revalidateProjectWorkflow(projectId: string | null) {
   revalidatePath("/approvals");
@@ -948,18 +945,51 @@ export async function uploadDocumentAction(
   const storage = new StorageService(supabase);
   let documentId = parsed.data.documentId || "";
   let revision = "A";
+  let storageProjectId = projectId;
+  let expectedCurrentRevision: string | null = null;
 
   if (documentId) {
     const { data: existing } = await supabase
       .from("documents")
-      .select("id, current_revision, organization_id")
+      .select(
+        "id, current_revision, organization_id, project_id, is_register_controlled, archived_at",
+      )
       .eq("id", documentId)
       .eq("organization_id", ctx.organization.id)
-      .maybeSingle<{ id: string; current_revision: string; organization_id: string }>();
+      .maybeSingle<{
+        id: string;
+        current_revision: string;
+        organization_id: string;
+        project_id: string | null;
+        is_register_controlled: boolean;
+        archived_at: string | null;
+      }>();
     if (!existing) {
       throw new NotFoundError("المستند", "Document");
     }
-    revision = nextRevision(existing.current_revision);
+    if (existing.is_register_controlled) {
+      throw new ValidationError(
+        "لا يمكن إضافة إصدار تشغيلي لمستند سجل رسمي.",
+        "Register-controlled documents cannot use operational letter revisions.",
+      );
+    }
+    if (existing.archived_at) {
+      throw new ValidationError("لا يمكن إضافة إصدار لمستند مؤرشف.", "Archived documents cannot receive a new revision.");
+    }
+    const next = nextOperationalRevision(existing.current_revision);
+    if (!next) {
+      throw new ValidationError("تعذر حساب الإصدار التالي.", "The next revision could not be calculated.");
+    }
+    revision = next;
+    expectedCurrentRevision = existing.current_revision;
+    storageProjectId = existing.project_id;
+    const formExpected = String(formData.get("expectedCurrentRevision") ?? "").trim();
+    if (formExpected && formExpected !== existing.current_revision) {
+      throw new ConflictError(
+        "تم إنشاء إصدار أحدث. حدّث الصفحة ثم أعد المحاولة.",
+        "A newer revision already exists. Refresh and try again.",
+      );
+    }
   } else {
     const { data: created, error } = await supabase
       .from("documents")
@@ -979,13 +1009,59 @@ export async function uploadDocumentAction(
     documentId = created.id;
   }
 
-  await supabase
-    .from("document_versions")
-    .update({ is_current: false, is_superseded: true, superseded_at: new Date().toISOString() })
-    .eq("document_id", documentId)
-    .eq("is_current", true);
-
-  if (parsed.data.fileSource === "google_drive" && driveRef) {
+  if (expectedCurrentRevision) {
+    let uploadedPath: string | null = null;
+    try {
+      if (parsed.data.fileSource === "google_drive" && driveRef) {
+        const { error: rpcError } = await supabase.rpc(OPERATIONAL_REVISION_RPC, {
+          p_document_id: documentId,
+          p_expected_current_revision: expectedCurrentRevision,
+          p_file_source: "google_drive",
+          p_file_name: parsed.data.title,
+          p_file_path: null,
+          p_mime_type: driveMimeType,
+          p_size_bytes: null,
+          p_checksum: null,
+          p_external_provider: "google_drive",
+          p_external_file_id: driveRef.fileId,
+          p_external_url: driveRef.canonicalUrl,
+        });
+        if (rpcError) throwOperationalRevisionRpcError(rpcError.message ?? "");
+      } else {
+        const uploaded = await storage.upload({
+          organizationId: ctx.organization.id,
+          projectId: storageProjectId,
+          documentId,
+          revision,
+          file: file as File,
+        });
+        uploadedPath = uploaded.path;
+        const { error: rpcError } = await supabase.rpc(OPERATIONAL_REVISION_RPC, {
+          p_document_id: documentId,
+          p_expected_current_revision: expectedCurrentRevision,
+          p_file_source: "storage",
+          p_file_name: (file as File).name,
+          p_file_path: uploaded.path,
+          p_mime_type: (file as File).type,
+          p_size_bytes: (file as File).size,
+          p_checksum: uploaded.checksum,
+          p_external_provider: null,
+          p_external_file_id: null,
+          p_external_url: null,
+        });
+        if (rpcError) throwOperationalRevisionRpcError(rpcError.message ?? "");
+      }
+    } catch (err) {
+      if (uploadedPath && OPERATIONAL_ORPHAN_CLEANUP === "log_only") {
+        logger.warn("operational document version orphan storage object", {
+          documentId,
+          revision,
+          cleanup: OPERATIONAL_ORPHAN_CLEANUP,
+        });
+      }
+      throw err;
+    }
+  } else if (parsed.data.fileSource === "google_drive" && driveRef) {
     const { error: versionError } = await supabase.from("document_versions").insert({
       organization_id: ctx.organization.id,
       document_id: documentId,
@@ -1030,29 +1106,27 @@ export async function uploadDocumentAction(
     if (versionError) throw new DatabaseError(versionError);
   }
 
-  if (revision !== "A") {
-    await supabase
-      .from("documents")
-      .update({ current_revision: revision, status: "submitted" })
-      .eq("id", documentId);
+  if (!expectedCurrentRevision) {
+    const audit = new AuditService(supabase);
+    await audit.log({
+      organizationId: ctx.organization.id,
+      action: "document.uploaded",
+      entityType: "document",
+      entityId: documentId,
+      newValues: {
+        revision,
+        title: parsed.data.title,
+        source: parsed.data.fileSource === "google_drive" ? "google_drive" : "storage",
+      },
+    });
   }
-
-  const audit = new AuditService(supabase);
-  await audit.log({
-    organizationId: ctx.organization.id,
-    action: revision === "A" ? "document.uploaded" : "document.revised",
-    entityType: "document",
-    entityId: documentId,
-    newValues: {
-      revision,
-      title: parsed.data.title,
-      source: parsed.data.fileSource === "google_drive" ? "google_drive" : "storage",
-    },
-  });
 
   revalidatePath("/documents");
   revalidatePath(`/documents/${documentId}`);
-  if (projectId) {
+  if (storageProjectId) {
+    revalidatePath(`/projects/${storageProjectId}`);
+  }
+  if (projectId && projectId !== storageProjectId) {
     revalidatePath(`/projects/${projectId}`);
   }
   });
@@ -1069,17 +1143,22 @@ export async function openStorageDocumentAction(
       throw new ForbiddenError({ permission: "document.read" });
     }
     const documentId = String(formData.get("documentId") ?? "");
+    const versionId = String(formData.get("versionId") ?? "").trim();
     if (!documentId) {
       throw new ValidationError("المستند غير صالح.", "The document is not valid.");
     }
     const supabase = await createServerSupabaseClient();
-    const { data: version, error } = await supabase
+    let query = supabase
       .from("document_versions")
       .select("file_source, file_path")
       .eq("document_id", documentId)
-      .eq("organization_id", ctx.organization.id)
-      .eq("is_current", true)
-      .maybeSingle<{ file_source: string; file_path: string | null }>();
+      .eq("organization_id", ctx.organization.id);
+    if (versionId) {
+      query = query.eq("id", versionId);
+    } else {
+      query = query.eq("is_current", true);
+    }
+    const { data: version, error } = await query.maybeSingle<{ file_source: string; file_path: string | null }>();
     if (error || !version || version.file_source !== "storage" || !version.file_path) {
       throw new ValidationError("ملف التخزين غير متاح.", "The stored file is not available.");
     }

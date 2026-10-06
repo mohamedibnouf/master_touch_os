@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { StorageError, ValidationError } from "@/lib/errors";
+import { operationalStorageObjectPath } from "@/modules/documents/operational-revision";
 
 export const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -39,13 +40,13 @@ export class StorageService {
   }): Promise<{ path: string; checksum: string }> {
     this.validate(input.file);
     const safeName = input.file.name.replace(/[^a-zA-Z0-9._-أ-ي]/g, "_");
-    const path = [
-      input.organizationId,
-      input.projectId ?? "org",
-      input.documentId,
-      input.revision,
-      safeName,
-    ].join("/");
+    const path = operationalStorageObjectPath({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      documentId: input.documentId,
+      revision: input.revision,
+      safeFileName: safeName,
+    });
 
     const buffer = new Uint8Array(await input.file.arrayBuffer());
     const checksum = await sha256(buffer);

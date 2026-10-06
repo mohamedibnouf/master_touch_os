@@ -14,10 +14,12 @@ export function DocumentOpenControl({
   documentId,
   file,
   canOpenStorage,
+  versionId,
 }: {
   documentId: string;
   file: DocumentFileRef | null;
   canOpenStorage: boolean;
+  versionId?: string;
 }) {
   const driveHref = driveOpenHref(file);
   if (driveHref) {
@@ -27,7 +29,7 @@ export function DocumentOpenControl({
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-3 py-2 text-sm font-medium text-navy shadow-[var(--shadow-1)]"
-        data-testid={`document-open-drive-${documentId}`}
+        data-testid={`document-open-drive-${versionId ?? documentId}`}
       >
         فتح الملف
       </a>
@@ -37,7 +39,8 @@ export function DocumentOpenControl({
     return (
       <ServerActionForm action={openStorageDocumentAction}>
         <input type="hidden" name="documentId" value={documentId} />
-        <Button type="submit" variant="secondary" data-testid={`document-open-storage-${documentId}`}>
+        {versionId ? <input type="hidden" name="versionId" value={versionId} /> : null}
+        <Button type="submit" variant="secondary" data-testid={`document-open-storage-${versionId ?? documentId}`}>
           فتح الملف
         </Button>
       </ServerActionForm>
