@@ -97,7 +97,7 @@ export async function persistAiRun(input: {
       completed_at: new Date().toISOString(),
     });
     if (error) {
-      logger.info("ai_runs persist skipped", { code: error.code ?? "unknown", analysisType: input.analysisType });
+      logger.warn("ai_runs persist skipped", { code: error.code ?? "unknown", analysisType: input.analysisType, status: input.status });
     }
   } catch {
     logger.info("ai_runs persist skipped", { analysisType: input.analysisType });

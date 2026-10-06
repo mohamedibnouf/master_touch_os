@@ -1,9 +1,17 @@
 import type { z } from "zod";
 
+export type AiProviderObserve = {
+  operation?: string;
+  organizationId?: string;
+  documentId?: string;
+  versionId?: string;
+};
+
 export type AiGenerateTextInput = {
   systemPrompt: string;
   userPayload: string;
   timeoutMs?: number;
+  observe?: AiProviderObserve;
 };
 
 export type AiGenerateStructuredInput<T> = {
@@ -13,6 +21,7 @@ export type AiGenerateStructuredInput<T> = {
   userPayload: string;
   timeoutMs?: number;
   modelKind?: "default" | "document";
+  observe?: AiProviderObserve;
 };
 
 export type AiUsageMeta = {

@@ -38,6 +38,11 @@ const BLOCKED_LOG_KEYS = new Set([
   "authorization",
   "cookie",
   "secret",
+  "prompt",
+  "systemprompt",
+  "userpayload",
+  "documenttext",
+  "extractedtext",
 ]);
 
 function isSensitiveLogKey(key: string): boolean {

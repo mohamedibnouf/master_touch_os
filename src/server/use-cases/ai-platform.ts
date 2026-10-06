@@ -15,9 +15,11 @@ import {
 import { AuditService } from "@/server/services/audit.service";
 import { logger } from "@/lib/logger";
 import { getAiPlatformConfig, createPlatformAiProvider } from "@/modules/ai/config";
+import { aiRuntimeConfigSnapshot } from "@/modules/ai/config-env";
 import { canAnalyzeProjectAi, canUseAiCapability, canViewManagementAi } from "@/modules/ai/security/permissions";
 import { assertAiRateLimit, withAiInflight } from "@/modules/ai/security/rate-limit";
 import { mapToAiClientError, AI_ERROR_MESSAGE_AR } from "@/modules/ai/errors";
+import { isAiProviderFailureCode } from "@/modules/ai/provider-errors";
 import {
   assistantRequestSchema,
   documentIdRequestSchema,
@@ -253,6 +255,18 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
   }>
 > {
   const started = Date.now();
+  let persistFailure:
+    | {
+        supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+        organizationId: string;
+        actorUserId: string;
+        projectId: string | null;
+        documentId: string;
+        providerId: string;
+        model: string | null;
+        analysisType: string;
+      }
+    | null = null;
   try {
     const ctx = await requireAiActor();
     if (!canUseAiCapability(ctx, "ai.document.analyze")) throw new ForbiddenError();
@@ -264,6 +278,7 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
 
     const cfg = getAiPlatformConfig();
     const provider = createPlatformAiProvider();
+    logger.warn("ai.config.runtime", { ...aiRuntimeConfigSnapshot(), operation: "document_analysis" });
     if (!cfg.enabled || !provider) {
       return { ok: false, code: "AI_DISABLED", error: AI_ERROR_MESSAGE_AR.AI_DISABLED };
     }
@@ -289,6 +304,20 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
       .maybeSingle();
     if (!version) throw new NotFoundError("إصدار المستند", "Document version");
 
+    const analysisType =
+      parsed.data.analysisType ??
+      (doc.category === "business_case" || doc.category === "BUSINESS_CASE" ? "business_case" : "document");
+    persistFailure = {
+      supabase,
+      organizationId: ctx.organization.id,
+      actorUserId: ctx.profile.id,
+      projectId: doc.project_id,
+      documentId: doc.id,
+      providerId: provider.id,
+      model: provider.model,
+      analysisType: analysisType === "business_case" ? "business_case" : "document_analysis",
+    };
+
     const extracted = await extractAuthorizedDocumentText({
       supabase,
       ctx,
@@ -301,10 +330,6 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
       browserFileId: (input as { fileId?: string }).fileId ?? null,
       browserMime: (input as { mimeType?: string }).mimeType ?? null,
     });
-
-    const analysisType =
-      parsed.data.analysisType ??
-      (doc.category === "business_case" || doc.category === "BUSINESS_CASE" ? "business_case" : "document");
 
     const result = await analyzeDocumentText({
       provider,
@@ -323,7 +348,7 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
       actorUserId: ctx.profile.id,
       projectId: doc.project_id,
       documentId: doc.id,
-      analysisType: analysisType === "business_case" ? "business_case" : "document_analysis",
+      analysisType: persistFailure.analysisType,
       provider: provider.id,
       model: provider.model,
       promptVersion: result.promptVersion,
@@ -354,6 +379,26 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
       },
     };
   } catch (e) {
+    if (persistFailure && isAppError(e) && isAiProviderFailureCode(e.details?.aiCode)) {
+      await persistAiRun({
+        supabase: persistFailure.supabase,
+        organizationId: persistFailure.organizationId,
+        actorUserId: persistFailure.actorUserId,
+        projectId: persistFailure.projectId,
+        documentId: persistFailure.documentId,
+        analysisType: persistFailure.analysisType,
+        provider: persistFailure.providerId,
+        model: persistFailure.model,
+        promptVersion: "document-analysis:v1",
+        status: "failed",
+        latencyMs: Date.now() - started,
+        inputChars: 0,
+        outputChars: 0,
+        promptTokens: null,
+        completionTokens: null,
+        errorCategory: String(e.details?.aiCode),
+      });
+    }
     return fail(e);
   }
 }

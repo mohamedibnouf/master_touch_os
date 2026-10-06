@@ -9,6 +9,7 @@ import { getAiPlatformConfig, readAiApiKeyFromEnv } from "./config-env";
 export {
   getAiPlatformConfig,
   isAiKillSwitchOff,
+  aiRuntimeConfigSnapshot,
   type AiPlatformConfig,
   type AiProviderId,
 } from "./config-env";

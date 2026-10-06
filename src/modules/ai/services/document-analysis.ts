@@ -99,6 +99,12 @@ export async function analyzeDocumentText(input: {
       userPayload,
       modelKind: "document",
       timeoutMs: AI_LIMITS.documentTimeoutMs,
+      observe: {
+        operation: "document_analysis",
+        organizationId: input.organizationId,
+        documentId: input.documentId,
+        versionId: input.versionId,
+      },
     });
     setCachedAiArtifact({
       organizationId: input.organizationId,
@@ -122,6 +128,12 @@ export async function analyzeDocumentText(input: {
     userPayload,
     modelKind: "document",
     timeoutMs: AI_LIMITS.documentTimeoutMs,
+    observe: {
+      operation: "document_analysis",
+      organizationId: input.organizationId,
+      documentId: input.documentId,
+      versionId: input.versionId,
+    },
   });
   const document: DocumentAnalysis = {
     ...structured.value,

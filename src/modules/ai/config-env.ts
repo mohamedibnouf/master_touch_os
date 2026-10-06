@@ -96,3 +96,21 @@ export function getAiPlatformConfig(): AiPlatformConfig {
 
   return DISABLED;
 }
+
+/** Presence/status only. Never includes the API key or any prefix/suffix/length. */
+export function aiRuntimeConfigSnapshot(): {
+  enabled: boolean;
+  provider: AiProviderId;
+  hasApiKey: boolean;
+  model: string | null;
+  documentModel: string | null;
+} {
+  const cfg = getAiPlatformConfig();
+  return {
+    enabled: cfg.enabled,
+    provider: cfg.provider,
+    hasApiKey: cfg.hasApiKey,
+    model: cfg.model,
+    documentModel: cfg.documentModel,
+  };
+}
