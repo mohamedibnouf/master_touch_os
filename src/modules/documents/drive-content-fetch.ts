@@ -1,5 +1,7 @@
 import { ValidationError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { driveDownloadUrl, type DriveAiFetchPlan } from "./drive-ai-content";
+import { DRIVE_AI_ACCESS_MESSAGE_AR, DRIVE_AI_ACCESS_MESSAGE_EN, safeGoogleDriveErrorReason } from "./drive-ai-auth";
 
 export type DriveFetchResult = {
   buffer: Uint8Array;
@@ -16,18 +18,16 @@ function mapDriveHttpError(status: number): ValidationError {
     );
   }
   if (status === 403) {
-    return new ValidationError(
-      "لا يمكن قراءة هذا الملف من Google Drive بصلاحيات التطبيق الحالية.",
-      "This Google Drive file cannot be read with the current app authorization.",
-      { aiCode: "DRIVE_FORBIDDEN", httpStatus: status },
-    );
+    return new ValidationError(DRIVE_AI_ACCESS_MESSAGE_AR, DRIVE_AI_ACCESS_MESSAGE_EN, {
+      aiCode: "DRIVE_FORBIDDEN",
+      httpStatus: status,
+    });
   }
   if (status === 404) {
-    return new ValidationError(
-      "ملف Google Drive غير موجود أو تم حذفه.",
-      "The Google Drive file was not found or was deleted.",
-      { aiCode: "DRIVE_NOT_FOUND", httpStatus: status },
-    );
+    return new ValidationError(DRIVE_AI_ACCESS_MESSAGE_AR, DRIVE_AI_ACCESS_MESSAGE_EN, {
+      aiCode: "DRIVE_NOT_FOUND",
+      httpStatus: status,
+    });
   }
   return new ValidationError(
     "تعذر تنزيل ملف Google Drive.",
@@ -85,6 +85,7 @@ export async function fetchDriveFileBytes(input: {
   plan: DriveAiFetchPlan;
   maxBytes: number;
   fetchImpl?: typeof fetch;
+  logContext?: { documentId?: string; versionId?: string };
 }): Promise<DriveFetchResult> {
   const url = driveDownloadUrl(input.fileId, input.plan);
   const fetchFn = input.fetchImpl ?? fetch;
@@ -97,6 +98,20 @@ export async function fetchDriveFileBytes(input: {
   });
 
   if (!response.ok) {
+    let googleReason: string | null = null;
+    try {
+      const payload: unknown = await response.clone().json();
+      googleReason = safeGoogleDriveErrorReason(payload);
+    } catch {
+      googleReason = null;
+    }
+    logger.warn("drive.fetch.failed", {
+      httpStatus: response.status,
+      endpoint: input.plan.kind,
+      googleReason,
+      documentId: input.logContext?.documentId ?? null,
+      versionId: input.logContext?.versionId ?? null,
+    });
     throw mapDriveHttpError(response.status);
   }
 

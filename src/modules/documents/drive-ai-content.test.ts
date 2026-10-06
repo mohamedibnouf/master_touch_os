@@ -11,6 +11,7 @@ import { nextOperationalRevision } from "./operational-revision";
 import { GOOGLE_DRIVE_FILE_SCOPE } from "./google-picker-config";
 import { DRIVE_DOCUMENT_FORM_FIELDS, driveSubmitIncludesTokenField } from "./google-picker-normalize";
 import { fetchDriveFileBytes } from "./drive-content-fetch";
+import { logger } from "@/lib/logger";
 import {
   authorizeDriveAiFetch,
   classifyDriveAiSource,
@@ -235,6 +236,30 @@ describe("Drive content fetch", () => {
         fetchImpl: async () => new Response("no", { status: 403 }),
       }),
     ).rejects.toMatchObject({ details: { httpStatus: 403 } });
+  });
+
+  it("10. 404 is fail-closed, logs status without token, and does not call AI", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const provider = createMockAiProvider();
+    const spy = vi.spyOn(provider, "generateStructured");
+    await expect(
+      fetchDriveFileBytes({
+        fileId: FILE_ID,
+        accessToken: TOKEN,
+        plan: driveAiFetchPlan("text/plain")!,
+        maxBytes: 100,
+        logContext: { documentId: "dddddddd-dddd-dddd-dddd-dddddddddddd" },
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ error: { status: "NOT_FOUND", errors: [{ reason: "notFound" }] } }), {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    ).rejects.toMatchObject({ details: { httpStatus: 404, aiCode: "DRIVE_NOT_FOUND" } });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(TOKEN);
+    expect(JSON.stringify(warn.mock.calls)).toContain("404");
+    expect(spy).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("10. oversized content-length rejected", async () => {

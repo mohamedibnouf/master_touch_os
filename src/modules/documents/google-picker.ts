@@ -4,6 +4,7 @@ import { requestGoogleDriveFileAccessToken, googlePickerErrorFromUnknown } from 
 import { googlePickerErrorMessage, type GooglePickerUiError } from "./google-picker-errors";
 import { normalizeGooglePickerDocument, type NormalizedGooglePickerFile } from "./google-picker-normalize";
 import { loadGooglePickerScript } from "./google-script-loader";
+import { googlePickerAppIdFromClientId } from "./drive-ai-auth";
 
 export type GooglePickerSelectResult =
   | { ok: true; file: NormalizedGooglePickerFile }
@@ -16,9 +17,13 @@ function fail(code: GooglePickerUiError): GooglePickerSelectResult {
 export async function pickGoogleDriveFile(input: {
   clientId: string;
   apiKey: string;
+  interactive?: boolean;
+  title?: string;
 }): Promise<GooglePickerSelectResult> {
   try {
-    const token = await requestGoogleDriveFileAccessToken(input.clientId);
+    const token = await requestGoogleDriveFileAccessToken(input.clientId, {
+      interactive: Boolean(input.interactive),
+    });
     await loadGooglePickerScript();
     const pickerApi = window.google?.picker;
     if (!pickerApi) return fail("script_failed");
@@ -48,6 +53,10 @@ export async function pickGoogleDriveFile(input: {
           }
           resolve({ ok: true, file });
         });
+
+      const appId = googlePickerAppIdFromClientId(input.clientId);
+      if (appId) builder.setAppId?.(appId);
+      if (input.title) builder.setTitle(input.title);
 
       builder.build().setVisible(true);
     });

@@ -50,7 +50,9 @@ function fail(error: unknown): AiActionResult<never> {
     return { ok: false, code: "AI_DISABLED", error: AI_ERROR_MESSAGE_AR.AI_DISABLED };
   }
   const mapped = mapToAiClientError(error);
-  return { ok: false, code: mapped.code, error: mapped.message };
+  const detailCode =
+    isAppError(error) && typeof error.details?.aiCode === "string" ? String(error.details.aiCode) : null;
+  return { ok: false, code: detailCode && detailCode !== "AI_DISABLED" ? detailCode : mapped.code, error: mapped.message };
 }
 
 async function requireAiActor() {

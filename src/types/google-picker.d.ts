@@ -26,6 +26,7 @@ type GooglePickerBuilder = {
   addView: (view: GoogleDocsView | string) => GooglePickerBuilder;
   setOAuthToken: (token: string) => GooglePickerBuilder;
   setDeveloperKey: (key: string) => GooglePickerBuilder;
+  setAppId?: (appId: string) => GooglePickerBuilder;
   setCallback: (callback: (data: GooglePickerCallbackData) => void) => GooglePickerBuilder;
   setOrigin: (origin: string) => GooglePickerBuilder;
   setTitle: (title: string) => GooglePickerBuilder;

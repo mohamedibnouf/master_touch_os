@@ -66,7 +66,7 @@ export default async function DocumentIntelligencePage({
 
   const { data: version } = await supabase
     .from("document_versions")
-    .select("id, revision, mime_type, file_name, checksum, is_current, file_source, file_path")
+    .select("id, revision, mime_type, file_name, checksum, is_current, file_source, file_path, external_file_id")
     .eq("document_id", id)
     .eq("organization_id", ctx.organization.id)
     .eq("is_current", true)
@@ -288,6 +288,10 @@ export default async function DocumentIntelligencePage({
           sourceClass={sourceClass}
           defaultBusinessCase
           googlePickerClientId={googlePickerClientId}
+          googlePickerApiKey={googlePickerClientId ? pickerConfig.apiKey : ""}
+          authorizedDriveFileId={
+            version?.file_source === "google_drive" && version.external_file_id ? version.external_file_id : undefined
+          }
         />
       ) : null}
     </PageContainer>

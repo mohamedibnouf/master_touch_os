@@ -3,6 +3,7 @@ import "client-only";
 import { GOOGLE_DRIVE_FILE_SCOPE } from "./google-picker-config";
 import { mapGisTokenClientError, mapGisTokenResponseError, type GooglePickerUiError } from "./google-picker-errors";
 import { loadGoogleIdentityScript } from "./google-script-loader";
+import { planGisTokenRequest } from "./drive-ai-auth";
 
 type CachedToken = { accessToken: string; expiresAt: number };
 
@@ -16,8 +17,16 @@ export function clearGoogleAccessToken(): void {
   cached = null;
 }
 
-export async function requestGoogleDriveFileAccessToken(clientId: string): Promise<string> {
-  if (tokenStillValid() && cached) return cached.accessToken;
+export async function requestGoogleDriveFileAccessToken(
+  clientId: string,
+  options?: { interactive?: boolean },
+): Promise<string> {
+  const plan = planGisTokenRequest({
+    interactive: Boolean(options?.interactive),
+    hasCachedValidToken: tokenStillValid(),
+  });
+  if (plan.clearCache) cached = null;
+  if (plan.useCache && cached) return cached.accessToken;
 
   await loadGoogleIdentityScript();
   const oauth = window.google?.accounts?.oauth2;
@@ -40,7 +49,7 @@ export async function requestGoogleDriveFileAccessToken(clientId: string): Promi
         reject(Object.assign(new Error("token_error"), { code: mapGisTokenClientError(error) }));
       },
     });
-    client.requestAccessToken({ prompt: "" });
+    client.requestAccessToken({ prompt: plan.prompt });
   });
 
   return accessToken;

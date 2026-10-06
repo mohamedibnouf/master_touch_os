@@ -85,6 +85,7 @@ export async function extractAuthorizedDocumentText(input: {
       accessToken: (input.googleAccessToken ?? "").trim(),
       plan: authz.plan,
       maxBytes: DOCUMENT_AI_LIMITS.maxFileBytes,
+      logContext: { documentId: input.documentId, versionId: input.version.id },
     });
     const extracted = await extractDocumentText({
       buffer: downloaded.buffer,

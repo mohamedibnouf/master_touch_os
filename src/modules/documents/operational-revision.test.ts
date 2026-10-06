@@ -344,6 +344,7 @@ describe("use-case and UI wiring", () => {
     expect(formSrc).toContain("uploadDocumentAction");
     expect(formSrc).toContain("إضافة إصدار جديد");
     expect(formSrc).not.toContain("إضافة مستند");
+    expect(pageSrc).toContain("authorizedDriveFileId");
     expect(pageSrc).toContain("OperationalDocumentRevisionForm");
     expect(pageSrc).toContain("DocumentAiAnalysisPanel");
     expect(pageSrc).toContain("التحليل بالذكاء الاصطناعي");

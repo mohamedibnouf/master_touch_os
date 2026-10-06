@@ -40,7 +40,7 @@ export default async function DocumentDetailPage({
   const [{ data: versions }, { data: project }] = await Promise.all([
     supabase
       .from("document_versions")
-      .select("id, revision, file_source, external_url, file_path, file_name, mime_type, is_current, is_superseded, uploaded_at")
+      .select("id, revision, file_source, external_url, external_file_id, file_path, file_name, mime_type, is_current, is_superseded, uploaded_at")
       .eq("document_id", id)
       .eq("organization_id", ctx.organization.id)
       .order("uploaded_at", { ascending: false }),
@@ -181,6 +181,10 @@ export default async function DocumentDetailPage({
               sourceClass={sourceClass}
               defaultBusinessCase={doc.category === "business_case" || doc.category === "BUSINESS_CASE"}
               googlePickerClientId={googlePickerClientId}
+              googlePickerApiKey={googlePickerClientId ? pickerConfig.apiKey : ""}
+              authorizedDriveFileId={
+                current?.file_source === "google_drive" && current.external_file_id ? current.external_file_id : undefined
+              }
             />
           ) : (
             <p className="text-sm text-muted" data-testid="document-ai-unavailable">

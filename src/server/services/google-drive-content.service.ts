@@ -8,11 +8,13 @@ export async function downloadAuthorizedDriveBytes(input: {
   accessToken: string;
   plan: DriveAiFetchPlan;
   maxBytes: number;
+  logContext?: { documentId?: string; versionId?: string };
 }): Promise<DriveFetchResult> {
   return fetchDriveFileBytes({
     fileId: input.fileId,
     accessToken: input.accessToken,
     plan: input.plan,
     maxBytes: input.maxBytes,
+    logContext: input.logContext,
   });
 }

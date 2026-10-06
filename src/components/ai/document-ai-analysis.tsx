@@ -6,8 +6,17 @@ import { AiDisclaimer, AiSparkle } from "@/components/ai/ai-chrome";
 import { analyzeDocumentAiAction } from "@/server/use-cases/ai-platform";
 import type { BusinessCaseAnalysis, DocumentAnalysis } from "@/modules/ai/schemas";
 import type { DocumentSourceClass } from "@/modules/ai/classify-source";
-import { requestGoogleDriveFileAccessToken, googlePickerErrorFromUnknown } from "@/modules/documents/google-gis";
+import {
+  clearGoogleAccessToken,
+  requestGoogleDriveFileAccessToken,
+  googlePickerErrorFromUnknown,
+} from "@/modules/documents/google-gis";
 import { googlePickerErrorMessage } from "@/modules/documents/google-picker-errors";
+import { pickGoogleDriveFile } from "@/modules/documents/google-picker";
+import {
+  assertPickerMatchesAuthorizedFile,
+  driveAiRecoveryVisibility,
+} from "@/modules/documents/drive-ai-auth";
 
 function Section({ title, items }: { title: string; items: string[] }) {
   return (
@@ -36,23 +45,32 @@ export function DocumentAiAnalysisPanel({
   sourceClass,
   defaultBusinessCase,
   googlePickerClientId,
+  googlePickerApiKey,
+  authorizedDriveFileId,
 }: {
   documentId: string;
   enabled: boolean;
   sourceClass: DocumentSourceClass;
   defaultBusinessCase: boolean;
   googlePickerClientId?: string;
+  googlePickerApiKey?: string;
+  authorizedDriveFileId?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [recoveryUsed, setRecoveryUsed] = useState(false);
   const [doc, setDoc] = useState<DocumentAnalysis | null>(null);
   const [bc, setBc] = useState<BusinessCaseAnalysis | null>(null);
   const needsDrive = sourceClass === "DRIVE_FETCH_REQUIRED";
   const canRun = enabled && (sourceClass === "CONTENT_AVAILABLE" || (needsDrive && Boolean(googlePickerClientId)));
   const clientId = useMemo(() => googlePickerClientId ?? "", [googlePickerClientId]);
+  const apiKey = googlePickerApiKey ?? "";
+  const showRecovery = needsDrive && driveAiRecoveryVisibility({ recoveryUsed, errorCode }).showRecovery;
 
-  function run(analysisType: "document" | "business_case") {
+  function run(analysisType: "document" | "business_case", mode: "initial" | "recovery") {
     setError(null);
+    setErrorCode(null);
     startTransition(async () => {
       try {
         let googleAccessToken: string | undefined;
@@ -61,11 +79,38 @@ export function DocumentAiAnalysisPanel({
             setError(googlePickerErrorMessage("not_configured"));
             return;
           }
-          googleAccessToken = await obtainDriveToken(clientId);
+          if (mode === "recovery") {
+            if (recoveryUsed) return;
+            setRecoveryUsed(true);
+            clearGoogleAccessToken();
+            if (authorizedDriveFileId && apiKey) {
+              const picked = await pickGoogleDriveFile({
+                clientId,
+                apiKey,
+                interactive: true,
+                title: "اختر نفس ملف Google Drive الأصلي",
+              });
+              if (!picked.ok) {
+                setError(picked.message);
+                return;
+              }
+              const same = assertPickerMatchesAuthorizedFile(picked.file.fileId, authorizedDriveFileId);
+              if (!same.ok) {
+                setError(same.messageAr);
+                return;
+              }
+              googleAccessToken = await requestGoogleDriveFileAccessToken(clientId, { interactive: false });
+            } else {
+              googleAccessToken = await requestGoogleDriveFileAccessToken(clientId, { interactive: true });
+            }
+          } else {
+            googleAccessToken = await obtainDriveToken(clientId);
+          }
         }
         const res = await analyzeDocumentAiAction({ documentId, analysisType, refresh: true, googleAccessToken });
         if (!res.ok) {
           setError(res.error);
+          setErrorCode(res.code);
           return;
         }
         setDoc(res.data.document ?? null);
@@ -81,7 +126,7 @@ export function DocumentAiAnalysisPanel({
     sourceClass === "CONTENT_AVAILABLE"
       ? "المحتوى متاح للتحليل من تخزين النظام."
       : sourceClass === "DRIVE_FETCH_REQUIRED"
-        ? "سيتم قراءة محتوى الملف من Google Drive بعد تفويض قصير، دون حفظ الرمز."
+        ? "سيتم قراءة محتوى الملف من Google Drive بعد تفويض قصير، دون حفظ الرمز. فتح الملف في المتصفح لا يكفي؛ التطبيق يحتاج تفويض drive.file لنفس الحساب."
         : sourceClass === "METADATA_ONLY"
           ? "بيانات وصفية فقط — تحليل المحتوى غير متاح لهذا المصدر."
           : "نوع الملف غير مدعوم للتحليل حالياً.";
@@ -94,15 +139,36 @@ export function DocumentAiAnalysisPanel({
       </div>
       <p className="text-sm text-muted">{sourceNote}</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={!canRun || pending} onClick={() => run("document")}>
+        <Button type="button" disabled={!canRun || pending} onClick={() => run("document", "initial")}>
           تحليل المستند بالذكاء الاصطناعي
         </Button>
         {defaultBusinessCase ? (
-          <Button type="button" variant="outline" disabled={!canRun || pending} onClick={() => run("business_case")}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canRun || pending}
+            onClick={() => run("business_case", "initial")}
+          >
             تحليل دراسة الحالة
           </Button>
         ) : null}
+        {showRecovery ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canRun || pending}
+            data-testid="document-ai-drive-recover"
+            onClick={() => run("document", "recovery")}
+          >
+            إعادة تفويض Google Drive
+          </Button>
+        ) : null}
       </div>
+      {showRecovery ? (
+        <p className="text-sm text-muted" data-testid="document-ai-drive-recover-hint">
+          اختر حساب Google الذي يحتوي الملف، ثم أعد اختيار نفس الملف من Google Drive. لن يُنشأ إصدار جديد.
+        </p>
+      ) : null}
       {pending ? <p className="text-sm text-muted">جاري قراءة المستند...</p> : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       {doc ? (
