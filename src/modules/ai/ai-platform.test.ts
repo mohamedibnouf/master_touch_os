@@ -291,7 +291,7 @@ describe("assistant scope and prompt injection", () => {
 describe("document intelligence helpers", () => {
   it("classifies drive as metadata only and pdf as content when path exists", () => {
     expect(classifyDocumentSource({ fileSource: "google_drive", mimeType: "application/pdf", filePath: null })).toBe(
-      "METADATA_ONLY",
+      "DRIVE_FETCH_REQUIRED",
     );
     expect(
       classifyDocumentSource({

@@ -3,7 +3,7 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogContext = Record<string, unknown>;
 
 function emit(level: LogLevel, message: string, context?: LogContext): void {
-  const safe = sanitize(context);
+  const safe = sanitizeLogContext(context);
   const entry = {
     ...safe,
     level,
@@ -24,27 +24,43 @@ function emit(level: LogLevel, message: string, context?: LogContext): void {
   }
 }
 
-function sanitize(context?: LogContext): LogContext {
+const BLOCKED_LOG_KEYS = new Set([
+  "password",
+  "token",
+  "access_token",
+  "googleaccesstoken",
+  "google_access_token",
+  "refresh_token",
+  "service_role",
+  "api_key",
+  "apikey",
+  "resend",
+  "authorization",
+  "cookie",
+  "secret",
+]);
+
+function isSensitiveLogKey(key: string): boolean {
+  const k = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (BLOCKED_LOG_KEYS.has(key.toLowerCase()) || BLOCKED_LOG_KEYS.has(k)) return true;
+  return k.includes("token") || k.includes("secret") || k.includes("authorization") || k.includes("bearer");
+}
+
+function looksLikeSecretValue(value: string): boolean {
+  return /^(ya29\.|1\/\/|Bearer\s)/i.test(value.trim());
+}
+
+export function sanitizeLogContext(context?: LogContext): LogContext {
   if (!context) {
     return {};
   }
 
-  const blocked = new Set([
-    "password",
-    "token",
-    "access_token",
-    "refresh_token",
-    "service_role",
-    "api_key",
-    "apikey",
-    "resend",
-    "authorization",
-    "cookie",
-    "secret",
-  ]);
-
   return Object.fromEntries(
-    Object.entries(context).filter(([key]) => !blocked.has(key.toLowerCase())),
+    Object.entries(context).flatMap(([key, value]) => {
+      if (isSensitiveLogKey(key)) return [];
+      if (typeof value === "string" && looksLikeSecretValue(value)) return [];
+      return [[key, value]];
+    }),
   );
 }
 

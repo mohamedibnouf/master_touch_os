@@ -26,13 +26,11 @@ import {
 import { buildProjectIntelligence } from "@/modules/ai/services/project-intelligence";
 import { answerProjectAssistant } from "@/modules/ai/services/assistant";
 import { buildExecutiveReportAi } from "@/modules/ai/services/executive-report";
-import { analyzeDocumentText, classifyDocumentSource } from "@/modules/ai/services/document-analysis";
+import { analyzeDocumentText } from "@/modules/ai/services/document-analysis";
 import { explainManagementInsights } from "@/modules/ai/services/management-insights";
 import { persistAiRun, hashAiInput } from "@/modules/ai/cache";
 import { estimateChars } from "@/modules/ai/security/sanitize";
-import { extractDocumentText } from "@/modules/document-intelligence/extract-text";
-import { DOCUMENT_AI_LIMITS } from "@/modules/document-intelligence/limits";
-import { isStorageIntelligenceEligible } from "@/modules/documents/file-source";
+import { extractAuthorizedDocumentText } from "@/server/use-cases/document-ai-source";
 import { loadAuthorizedProjectAiFacts } from "@/server/use-cases/ai-project-context";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { AI_DISCLAIMER_AR } from "@/modules/ai/limits";
@@ -40,8 +38,8 @@ import type { ProjectIntelligenceView } from "@/modules/ai/schemas";
 import type { ExecutiveReport } from "@/modules/ai/schemas";
 import type { AssistantAnswer } from "@/modules/ai/schemas";
 import type { BusinessCaseAnalysis, DocumentAnalysis } from "@/modules/ai/schemas";
-import type { ManagementInsight } from "@/modules/ai/schemas";
-import type { ManagementInsightFacts } from "@/modules/ai/schemas";
+import type { ManagementInsight, ManagementInsightFacts } from "@/modules/ai/schemas";
+import type { DocumentSourceClass } from "@/modules/ai/classify-source";
 
 export type AiActionResult<T> =
   | { ok: true; data: T }
@@ -249,7 +247,7 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
     businessCase?: BusinessCaseAnalysis;
     cached: boolean;
     disclaimerAr: string;
-    sourceClass: ReturnType<typeof classifyDocumentSource>;
+    sourceClass: DocumentSourceClass;
   }>
 > {
   const started = Date.now();
@@ -280,56 +278,31 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
 
     const { data: version } = await supabase
       .from("document_versions")
-      .select("id, file_path, file_name, mime_type, size_bytes, file_source, is_current")
+      .select(
+        "id, document_id, file_path, file_name, mime_type, size_bytes, file_source, is_current, external_file_id, external_provider",
+      )
       .eq("document_id", doc.id)
       .eq("organization_id", ctx.organization.id)
       .eq("is_current", true)
       .maybeSingle();
     if (!version) throw new NotFoundError("إصدار المستند", "Document version");
 
-    const sourceClass = classifyDocumentSource({
-      fileSource: version.file_source,
-      mimeType: version.mime_type,
-      filePath: version.file_path,
+    const extracted = await extractAuthorizedDocumentText({
+      supabase,
+      ctx,
+      documentId: doc.id,
+      documentOrgId: doc.organization_id,
+      hasDocumentRead: hasPermission(ctx, "document.read") || hasPermission(ctx, "document_control.read"),
+      hasAiDocumentAnalyze: canUseAiCapability(ctx, "ai.document.analyze"),
+      version,
+      googleAccessToken: parsed.data.googleAccessToken,
+      browserFileId: (input as { fileId?: string }).fileId ?? null,
+      browserMime: (input as { mimeType?: string }).mimeType ?? null,
     });
-    if (sourceClass === "METADATA_ONLY") {
-      return {
-        ok: false,
-        code: "DOCUMENT_UNSUPPORTED",
-        error: "المحتوى غير متاح للتحليل (بيانات وصفية فقط — مثل Google Drive).",
-      };
-    }
-    if (sourceClass === "UNSUPPORTED" || !isStorageIntelligenceEligible(version)) {
-      return { ok: false, code: "DOCUMENT_UNSUPPORTED", error: AI_ERROR_MESSAGE_AR.DOCUMENT_UNSUPPORTED };
-    }
-    if ((version.size_bytes ?? 0) > DOCUMENT_AI_LIMITS.maxFileBytes) {
-      throw new ValidationError("حجم الملف يتجاوز حد التحليل.", "File exceeds analysis size limit.");
-    }
 
     const analysisType =
       parsed.data.analysisType ??
       (doc.category === "business_case" || doc.category === "BUSINESS_CASE" ? "business_case" : "document");
-
-    const { data: fileData, error: dlErr } = await supabase.storage.from("documents").download(version.file_path!);
-    if (dlErr || !fileData) {
-      throw new ValidationError("تعذر تنزيل ملف المستند من التخزين.", "Could not download document file.");
-    }
-    const buffer = new Uint8Array(await fileData.arrayBuffer());
-    let extracted;
-    try {
-      extracted = await extractDocumentText({
-        buffer,
-        mimeType: version.mime_type || "application/octet-stream",
-        fileName: version.file_name || "document",
-      });
-    } catch (e) {
-      if (isAppError(e) && e.code === "VALIDATION") {
-        throw new ValidationError(AI_ERROR_MESSAGE_AR.NO_EXTRACTABLE_TEXT, "No extractable text.", {
-          aiCode: "NO_EXTRACTABLE_TEXT",
-        });
-      }
-      throw e;
-    }
 
     const result = await analyzeDocumentText({
       provider,
@@ -375,7 +348,7 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
         businessCase: result.businessCase,
         cached: result.cached,
         disclaimerAr: result.disclaimerAr,
-        sourceClass,
+        sourceClass: extracted.sourceClass,
       },
     };
   } catch (e) {

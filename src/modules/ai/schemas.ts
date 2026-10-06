@@ -170,4 +170,5 @@ export const projectIdRequestSchema = z.object({
 export const documentIdRequestSchema = z.object({
   documentId: z.string().uuid(),
   analysisType: z.enum(["document", "business_case"]).optional(),
+  googleAccessToken: z.string().max(8192).optional(),
 });

@@ -10,17 +10,15 @@ import {
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
-  ValidationError,
   isAppError,
 } from "@/lib/errors";
 import { AuditService } from "@/server/services/audit.service";
 import { DocumentIntelligenceRepository } from "@/server/repositories/document-intelligence.repository";
 import { assertDocumentAIRateLimit } from "@/modules/document-intelligence/rate-limit";
-import { extractDocumentText } from "@/modules/document-intelligence/extract-text";
+import { extractAuthorizedDocumentText } from "@/server/use-cases/document-ai-source";
+import { canUseAiCapability } from "@/modules/ai/security/permissions";
 import { chunkDocumentText } from "@/modules/document-intelligence/chunking";
 import { extractBusinessCaseWithAI, getDocumentAIConfig } from "@/modules/document-intelligence/ai-extract";
-import { DOCUMENT_AI_LIMITS } from "@/modules/document-intelligence/limits";
-import { DRIVE_INTELLIGENCE_UNAVAILABLE_AR, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
 
 async function loadAuthorizedDocument(documentId: string) {
   const ctx = await getAuthContext();
@@ -40,7 +38,9 @@ async function loadAuthorizedDocument(documentId: string) {
 
   const { data: version, error: vErr } = await supabase
     .from("document_versions")
-    .select("id, revision, file_path, file_name, mime_type, size_bytes, checksum, is_current, file_source")
+    .select(
+      "id, revision, file_path, file_name, mime_type, size_bytes, checksum, is_current, file_source, external_file_id, external_provider, document_id",
+    )
     .eq("document_id", documentId)
     .eq("organization_id", ctx.organization.id)
     .eq("is_current", true)
@@ -56,6 +56,7 @@ export type AnalyzeDocumentResult =
 
 export async function analyzeDocumentIntelligenceAction(input: {
   documentId: string;
+  googleAccessToken?: string;
 }): Promise<AnalyzeDocumentResult> {
   try {
     const { ctx, supabase, doc, version } = await loadAuthorizedDocument(input.documentId);
@@ -68,14 +69,6 @@ export async function analyzeDocumentIntelligenceAction(input: {
         ok: false,
         code: "ARCHIVED",
         error: "لا يمكن تحليل مستند مؤرشف كمستند تشغيلي.",
-      };
-    }
-
-    if (!isStorageIntelligenceEligible(version)) {
-      return {
-        ok: false,
-        code: "DRIVE_UNAVAILABLE",
-        error: DRIVE_INTELLIGENCE_UNAVAILABLE_AR,
       };
     }
 
@@ -114,25 +107,15 @@ export async function analyzeDocumentIntelligenceAction(input: {
     }
 
     try {
-      if ((version.size_bytes ?? 0) > DOCUMENT_AI_LIMITS.maxFileBytes) {
-        throw new ValidationError(
-          "حجم الملف يتجاوز حد التحليل.",
-          "File exceeds analysis size limit.",
-        );
-      }
-
-      const { data: fileData, error: dlErr } = await supabase.storage
-        .from("documents")
-        .download(version.file_path);
-      if (dlErr || !fileData) {
-        throw new ValidationError("تعذر تنزيل ملف المستند من التخزين.", "Could not download document file.");
-      }
-
-      const buffer = new Uint8Array(await fileData.arrayBuffer());
-      const extracted = await extractDocumentText({
-        buffer,
-        mimeType: version.mime_type || "application/octet-stream",
-        fileName: version.file_name || "document",
+      const extracted = await extractAuthorizedDocumentText({
+        supabase,
+        ctx,
+        documentId: doc.id,
+        documentOrgId: doc.organization_id,
+        hasDocumentRead: hasPermission(ctx, "document.read") || hasPermission(ctx, "document_control.read"),
+        hasAiDocumentAnalyze: canUseAiCapability(ctx, "ai.document.analyze"),
+        version,
+        googleAccessToken: input.googleAccessToken,
       });
       const chunks = chunkDocumentText(extracted.text);
       const { extraction, provider, model } = await extractBusinessCaseWithAI({ chunks });
@@ -143,7 +126,7 @@ export async function analyzeDocumentIntelligenceAction(input: {
         provider,
         model,
         payload: extraction,
-        warnings: extracted.warnings,
+        warnings: [],
         characterCount: extracted.characterCount,
         chunkCount: chunks.length,
       });

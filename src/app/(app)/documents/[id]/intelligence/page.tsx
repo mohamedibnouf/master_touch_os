@@ -16,6 +16,7 @@ import { DocumentAiAnalysisPanel } from "@/components/ai/document-ai-analysis";
 import { classifyDocumentSource } from "@/modules/ai/classify-source";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
 import { canUseAiCapability } from "@/modules/ai/security/permissions";
+import { isGooglePickerReady, readGooglePickerPublicConfig } from "@/modules/documents/google-picker-config";
 
 function TrustBadge({ status }: { status: string | null }) {
   if (status === "VERIFIED") return <Badge tone="navy" data-testid="trust-verified">Verified</Badge>;
@@ -78,12 +79,24 @@ export default async function DocumentIntelligencePage({
 
   const payload = (intel?.extraction_payload ?? null) as BusinessCaseExtraction | null;
   const ai = getDocumentAIConfig();
+  const sourceClass = classifyDocumentSource({
+    fileSource: version?.file_source,
+    mimeType: version?.mime_type,
+    filePath: version?.file_path,
+  });
+  const driveEligible = sourceClass === "DRIVE_FETCH_REQUIRED";
   const canAnalyze =
     (hasPermission(ctx, "document.upload") || hasPermission(ctx, "document.update")) &&
-    isStorageIntelligenceEligible(version ?? {}) &&
+    (isStorageIntelligenceEligible(version ?? {}) || driveEligible) &&
     !doc.archived_at;
   const canVerify = hasPermission(ctx, "document.approve");
-  const driveBlocked = version != null && !isStorageIntelligenceEligible(version);
+  const driveBlocked = Boolean(version?.file_source === "google_drive" && !driveEligible);
+  const pickerConfig = readGooglePickerPublicConfig({
+    NEXT_PUBLIC_GOOGLE_PICKER_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_PICKER_ENABLED,
+    NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+    NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY,
+  });
+  const googlePickerClientId = isGooglePickerReady(pickerConfig) ? pickerConfig.clientId : "";
 
   let project: {
     id: string;
@@ -166,6 +179,8 @@ export default async function DocumentIntelligencePage({
             canAnalyze={canAnalyze}
             canVerify={canVerify}
             aiEnabled={ai.enabled}
+            needsDriveToken={driveEligible}
+            googlePickerClientId={googlePickerClientId}
           />
         </div>
         {!ai.enabled ? (
@@ -270,12 +285,9 @@ export default async function DocumentIntelligencePage({
         <DocumentAiAnalysisPanel
           documentId={doc.id}
           enabled={getAiPlatformConfig().enabled}
-          sourceClass={classifyDocumentSource({
-            fileSource: version?.file_source,
-            mimeType: version?.mime_type,
-            filePath: version?.file_path,
-          })}
+          sourceClass={sourceClass}
           defaultBusinessCase
+          googlePickerClientId={googlePickerClientId}
         />
       ) : null}
     </PageContainer>
