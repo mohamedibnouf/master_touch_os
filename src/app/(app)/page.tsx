@@ -11,7 +11,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ManagementAiInsights } from "@/components/ai/management-ai-insights";
 import { canViewManagementAi } from "@/modules/ai/security/permissions";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
-import { getManagementInsightFactsAction } from "@/server/use-cases/ai-platform";
+import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 
 export default async function DashboardPage() {
   const ctx = await getAuthContext();
@@ -30,7 +30,21 @@ export default async function DashboardPage() {
   const viz = await loadDashboardViz(ctx, supabase);
   const showAi = canViewManagementAi(ctx);
   const aiStatus = showAi ? getAiPlatformConfig() : null;
-  const insightFacts = showAi ? await getManagementInsightFactsAction() : null;
+  const insightFacts =
+    showAi && viz
+      ? {
+          followUpProjects: viz.progressRows.length,
+          overdueStages: viz.kpis.overdueStages ?? 0,
+          pendingApprovals: viz.kpis.pendingApprovals ?? 0,
+          projectNotes: viz.progressRows.slice(0, 5).map((row) => ({
+            id: row.id,
+            nameAr: row.label,
+            reasonAr: row.hint ?? "مشروع نشط مصرّح بعرضه",
+            href: row.href,
+          })),
+          dataAsOf: riyadhTodayYmd(),
+        }
+      : null;
 
   return (
     <PageContainer data-testid="employee-home" className="space-y-4 md:space-y-5">
@@ -46,8 +60,8 @@ export default async function DashboardPage() {
 
       {viz ? <HomeDashboardViz viz={viz} /> : null}
 
-      {insightFacts?.ok ? (
-        <ManagementAiInsights enabled={Boolean(aiStatus?.enabled)} initialFacts={insightFacts.data.facts} />
+      {insightFacts ? (
+        <ManagementAiInsights enabled={Boolean(aiStatus?.enabled)} initialFacts={insightFacts} />
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch xl:gap-5">

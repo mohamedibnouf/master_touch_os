@@ -14,11 +14,12 @@ function SubmitButton() {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ nextPath = "" }: { nextPath?: string }) {
   const [state, formAction] = useActionState(signInAction, { error: null as string | null });
 
   return (
     <form action={formAction} className="space-y-4" data-testid="login-form">
+      {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
       <Field label="الرقم الوظيفي">
         <Input
           name="identifier"

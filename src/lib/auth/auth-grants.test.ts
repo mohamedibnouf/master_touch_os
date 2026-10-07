@@ -2,19 +2,24 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mapUserRoleRowsToGrants } from "@/lib/auth/auth-grants";
-import { POST_LOGIN_PATH } from "@/lib/auth/employee-login";
+import { POST_LOGIN_PATH, safePostLoginPath } from "@/lib/auth/employee-login";
 import { homeShowsSelfServiceCard } from "@/lib/home/self-service";
 import { BASE_EMPLOYEE_PERMISSIONS, ROLE_PERMISSION_MAP } from "@/lib/permissions/catalog";
 
 const ORG = "11111111-1111-1111-1111-111111111111";
 
 describe("post-login destination (digest 744597307)", () => {
-  it("sends every successful login to / — middleware next is not consumed", () => {
+  it("falls back to / and only honors a same-origin next path", () => {
     expect(POST_LOGIN_PATH).toBe("/");
+    expect(safePostLoginPath(null)).toBe("/");
+    expect(safePostLoginPath("https://evil.test/phish")).toBe("/");
+    expect(safePostLoginPath("//evil.test")).toBe("/");
+    expect(safePostLoginPath("/login")).toBe("/");
+    expect(safePostLoginPath("/projects/x?tab=stages")).toBe("/projects/x?tab=stages");
     const action = readFileSync(join(process.cwd(), "src/modules/auth/actions.ts"), "utf8");
     expect(action).toContain("revalidatePath(\"/\", \"layout\")");
-    expect(action).toContain("redirect(POST_LOGIN_PATH)");
-    expect(action).not.toMatch(/searchParams\.get\([\"']next[\"']\)/);
+    expect(action).toContain("safePostLoginPath");
+    expect(action).toContain('formData.get("next")');
     const errorPage = readFileSync(join(process.cwd(), "src/app/error.tsx"), "utf8");
     expect(errorPage).toContain('href="/"');
     expect(errorPage).toContain("الرئيسية");

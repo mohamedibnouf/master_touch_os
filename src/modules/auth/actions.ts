@@ -11,6 +11,7 @@ import {
   EMPLOYEE_LOGIN_FAILURE_AR,
   LOGIN_RATE_LIMIT_AR,
   POST_LOGIN_PATH,
+  safePostLoginPath,
   assertLoginRateLimit,
   isEmailIdentifier,
   isEmployeeLoginAllowed,
@@ -114,7 +115,8 @@ export async function signInAction(
   }
 
   revalidatePath("/", "layout");
-  redirect(POST_LOGIN_PATH);
+  const nextRaw = String(formData.get("next") ?? "");
+  redirect(safePostLoginPath(nextRaw || POST_LOGIN_PATH));
 }
 
 export async function signOutAction() {

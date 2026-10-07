@@ -3,12 +3,24 @@
  * Schema: unique (organization_id, employee_number) — not globally unique (003).
  */
 
+import { safeNotificationHref } from "@/modules/notifications/safety";
+
 export const EMPLOYEE_LOGIN_FAILURE_AR = "الرقم الوظيفي أو كلمة المرور غير صحيحة.";
 
-/** Canonical destination after successful sign-in. Login ignores middleware `next`. */
+/** Canonical destination after successful sign-in when `next` is absent or unsafe. */
 export const POST_LOGIN_PATH = "/";
 
 export const LOGIN_RATE_LIMIT_AR = "تعذر إتمام تسجيل الدخول حالياً. حاول بعد قليل.";
+
+/** Same-origin path only. Falls back to home when `next` is missing or unsafe. */
+export function safePostLoginPath(next: string | null | undefined): string {
+  const safe = safeNotificationHref(next);
+  if (!safe) return POST_LOGIN_PATH;
+  if (safe === "/login" || safe.startsWith("/login?") || safe.startsWith("/auth/")) {
+    return POST_LOGIN_PATH;
+  }
+  return safe;
+}
 
 export type LoginCandidate = {
   profile_id: string;

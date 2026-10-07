@@ -42,6 +42,15 @@ import { MOBILIZATION_STEP_KEY, parseMobilizationReadiness } from "@/modules/pro
 import { EXECUTION_STEP_KEY, parseExecutionProgress } from "@/modules/projects/stage07-execution";
 import { COMMISSIONING_STEP_KEY, parseCommissioningProgress } from "@/modules/projects/stage08-commissioning";
 import { HANDOVER_STEP_KEY, parseHandoverReadiness } from "@/modules/projects/stage09-handover";
+import {
+  currentPackageStepKeys,
+  projectNeedsActivity,
+  projectNeedsCommercialBundle,
+  projectNeedsDocumentCatalog,
+  projectNeedsEngineeringBundle,
+  projectNeedsOrgUserDirectory,
+  projectNeedsStagePackages,
+} from "@/modules/projects/project-detail-loaders";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -71,19 +80,31 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const [stages, members, documents, users, definitions, health] = await Promise.all([
+  const needDocs = projectNeedsDocumentCatalog(tab);
+  const needUsers = projectNeedsOrgUserDirectory(tab);
+  const needActivity = projectNeedsActivity(tab);
+  const needEng = projectNeedsEngineeringBundle(tab);
+  const needCom = projectNeedsCommercialBundle(tab);
+  const needPackages = projectNeedsStagePackages(tab);
+
+  const [stages, members, documents, users, definitions, health, roleRows, departmentRows] = await Promise.all([
     repo.listProjectStages(project.id),
     repo.listProjectMembers(project.id),
-    repo.listDocuments(ctx.organization.id, project.id),
-    repo.listUsers(ctx.organization.id),
+    needDocs ? repo.listDocuments(ctx.organization.id, project.id) : Promise.resolve([]),
+    needUsers ? repo.listUsers(ctx.organization.id) : Promise.resolve([]),
     supabase.from("workflow_definitions").select("id, name_ar").eq("status", "published").eq("entity_type", "project"),
     supabase.rpc("compute_project_health", { p_project_id: project.id }),
+    supabase.from("roles").select("id, name_ar").or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`),
+    supabase.from("departments").select("id, name_ar").eq("organization_id", ctx.organization.id),
   ]);
 
-  const currentFiles = await repo.listCurrentDocumentFiles(
-    ctx.organization.id,
-    documents.map((d) => d.id),
-  );
+  const currentFiles =
+    documents.length > 0
+      ? await repo.listCurrentDocumentFiles(
+          ctx.organization.id,
+          documents.map((d) => d.id),
+        )
+      : [];
   const fileByDoc = new Map(currentFiles.map((row) => [row.document_id, row]));
   const canUploadDocs = hasPermission(ctx, "document.upload");
   const canOpenStorage = hasPermission(ctx, "document.read");
@@ -99,16 +120,13 @@ export default async function ProjectDetailPage({
     const title = employees.find((emp) => emp.job_title_ar)?.job_title_ar;
     if (title) jobTitles.set(row.profile_id, title);
   }
-  const { data: roleRows } = await supabase
-    .from("roles")
-    .select("id, name_ar")
-    .or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`);
-  const roleNames = new Map((roleRows ?? []).map((r) => [r.id as string, r.name_ar as string]));
-  const { data: departmentRows } = await supabase
-    .from("departments")
-    .select("id, name_ar")
-    .eq("organization_id", ctx.organization.id);
-  const departmentNames = new Map((departmentRows ?? []).map((d) => [d.id as string, d.name_ar as string]));
+  for (const member of members) {
+    const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+    const name = profile?.full_name_ar || profile?.full_name_en;
+    if (name && !profileNames.has(member.profile_id)) profileNames.set(member.profile_id, name);
+  }
+  const roleNames = new Map((roleRows.data ?? []).map((r) => [r.id as string, r.name_ar as string]));
+  const departmentNames = new Map((departmentRows.data ?? []).map((d) => [d.id as string, d.name_ar as string]));
 
   const workflow = await loadProjectWorkflowProjection({
     supabase,
@@ -131,81 +149,61 @@ export default async function ProjectDetailPage({
     hasPermission(ctx, "purchase_order.read") ||
     hasPermission(ctx, "procurement.read");
   const canCreatePr = hasPermission(ctx, "purchase_request.create");
-  let procurementReadiness = null;
-  if (workflow.nodes.some((node) => node.stepKey === PROCUREMENT_STEP_KEY)) {
-    const { data: readinessRaw, error: readinessError } = await supabase.rpc(
-      "get_project_procurement_readiness",
-      { p_project_id: project.id },
-    );
-    if (readinessError) {
-      logger.warn("project procurement readiness failed", {
-        code: "PROJECT_PROCUREMENT_READINESS_FAILED",
-        projectId: project.id,
-      });
-    } else {
-      procurementReadiness = parseProcurementReadiness(readinessRaw);
-    }
+  const packageKeys = needPackages ? currentPackageStepKeys(workflow.nodes) : [];
+  const wantPackage = (key: string) => packageKeys.includes(key);
+  const skipRpc = { data: null, error: null };
+  const [procRes, mobRes, execRes, commRes, handRes] = await Promise.all([
+    wantPackage(PROCUREMENT_STEP_KEY)
+      ? supabase.rpc("get_project_procurement_readiness", { p_project_id: project.id })
+      : Promise.resolve(skipRpc),
+    wantPackage(MOBILIZATION_STEP_KEY)
+      ? supabase.rpc("get_project_mobilization_readiness", { p_project_id: project.id })
+      : Promise.resolve(skipRpc),
+    wantPackage(EXECUTION_STEP_KEY)
+      ? supabase.rpc("get_project_execution_progress", { p_project_id: project.id })
+      : Promise.resolve(skipRpc),
+    wantPackage(COMMISSIONING_STEP_KEY)
+      ? supabase.rpc("get_project_commissioning_progress", { p_project_id: project.id })
+      : Promise.resolve(skipRpc),
+    wantPackage(HANDOVER_STEP_KEY)
+      ? supabase.rpc("get_project_handover_readiness", { p_project_id: project.id })
+      : Promise.resolve(skipRpc),
+  ]);
+  if (procRes.error) {
+    logger.warn("project procurement readiness failed", {
+      code: "PROJECT_PROCUREMENT_READINESS_FAILED",
+      projectId: project.id,
+    });
   }
-  let mobilizationReadiness = null;
-  if (workflow.nodes.some((node) => node.stepKey === MOBILIZATION_STEP_KEY)) {
-    const { data: mobilizationRaw, error: mobilizationError } = await supabase.rpc(
-      "get_project_mobilization_readiness",
-      { p_project_id: project.id },
-    );
-    if (mobilizationError) {
-      logger.warn("project mobilization readiness failed", {
-        code: "PROJECT_MOBILIZATION_READINESS_FAILED",
-        projectId: project.id,
-      });
-    } else {
-      mobilizationReadiness = parseMobilizationReadiness(mobilizationRaw);
-    }
+  if (mobRes.error) {
+    logger.warn("project mobilization readiness failed", {
+      code: "PROJECT_MOBILIZATION_READINESS_FAILED",
+      projectId: project.id,
+    });
   }
-  let executionProgress = null;
-  if (workflow.nodes.some((node) => node.stepKey === EXECUTION_STEP_KEY)) {
-    const { data: executionRaw, error: executionError } = await supabase.rpc(
-      "get_project_execution_progress",
-      { p_project_id: project.id },
-    );
-    if (executionError) {
-      logger.warn("project execution progress failed", {
-        code: "PROJECT_EXECUTION_PROGRESS_FAILED",
-        projectId: project.id,
-      });
-    } else {
-      executionProgress = parseExecutionProgress(executionRaw);
-    }
+  if (execRes.error) {
+    logger.warn("project execution progress failed", {
+      code: "PROJECT_EXECUTION_PROGRESS_FAILED",
+      projectId: project.id,
+    });
   }
-  let commissioningProgress = null;
-  if (workflow.nodes.some((node) => node.stepKey === COMMISSIONING_STEP_KEY)) {
-    const { data: commissioningRaw, error: commissioningError } = await supabase.rpc(
-      "get_project_commissioning_progress",
-      { p_project_id: project.id },
-    );
-    if (commissioningError) {
-      logger.warn("project commissioning progress failed", {
-        code: "PROJECT_COMMISSIONING_PROGRESS_FAILED",
-        projectId: project.id,
-      });
-    } else {
-      commissioningProgress = parseCommissioningProgress(commissioningRaw);
-    }
+  if (commRes.error) {
+    logger.warn("project commissioning progress failed", {
+      code: "PROJECT_COMMISSIONING_PROGRESS_FAILED",
+      projectId: project.id,
+    });
   }
-  let handoverReadiness = null;
-  if (workflow.nodes.some((node) => node.stepKey === HANDOVER_STEP_KEY)) {
-    const { data: handoverRaw, error: handoverError } = await supabase.rpc(
-      "get_project_handover_readiness",
-      { p_project_id: project.id },
-    );
-    if (handoverError) {
-      logger.warn("project handover readiness failed", {
-        code: "PROJECT_HANDOVER_READINESS_FAILED",
-        projectId: project.id,
-      });
-    } else {
-      handoverReadiness = parseHandoverReadiness(handoverRaw);
-    }
+  if (handRes.error) {
+    logger.warn("project handover readiness failed", {
+      code: "PROJECT_HANDOVER_READINESS_FAILED",
+      projectId: project.id,
+    });
   }
+  const procurementReadiness = procRes.error ? null : parseProcurementReadiness(procRes.data);
+  const mobilizationReadiness = mobRes.error ? null : parseMobilizationReadiness(mobRes.data);
+  const executionProgress = execRes.error ? null : parseExecutionProgress(execRes.data);
+  const commissioningProgress = commRes.error ? null : parseCommissioningProgress(commRes.data);
+  const handoverReadiness = handRes.error ? null : parseHandoverReadiness(handRes.data);
   const userActive = new Map<string, boolean>();
   for (const row of users) {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -331,13 +329,22 @@ export default async function ProjectDetailPage({
   const activityIds = [project.id, workflow.instanceId, ...workflow.nodes.map((n) => n.id)].filter(
     (value): value is string => Boolean(value),
   );
-  const { data: activityRows } = await supabase
-    .from("audit_logs")
-    .select(AUDIT_FEED_COLUMNS)
-    .eq("organization_id", ctx.organization.id)
-    .in("entity_id", activityIds)
-    .order("created_at", { ascending: false })
-    .limit(30);
+  const { data: activityRows } = needActivity
+    ? await supabase
+        .from("audit_logs")
+        .select(AUDIT_FEED_COLUMNS)
+        .eq("organization_id", ctx.organization.id)
+        .in("entity_id", activityIds)
+        .order("created_at", { ascending: false })
+        .limit(30)
+    : { data: [] as Array<{
+        id: string;
+        action: string;
+        entity_type: string;
+        created_at: string;
+        actor_id: string | null;
+        new_values: unknown;
+      }> };
   const activityItems = (activityRows ?? []).map((row) => ({
     id: row.id as string,
     action: row.action as string,
@@ -349,6 +356,7 @@ export default async function ProjectDetailPage({
 
   const canSeeFinance =
     hasPermission(ctx, "finance.read") || hasPermission(ctx, "commercial_reports.read");
+  const emptyList = { data: [] as never[], error: null };
   const tabs = [
     { id: "overview", label: "نظرة عامة" },
     { id: "stages", label: "المراحل" },
@@ -370,70 +378,90 @@ export default async function ProjectDetailPage({
 
   const [projectRfis, projectMats, projectShds, projectIrs, projectNcrs, projectReports, projectCors, projectPrs, projectPos, projectSupplierInv, commercialSummary, commercialHealth] =
     await Promise.all([
-      supabase
-        .from("rfis")
-        .select("id, rfi_number, subject, status")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("material_submittals")
-        .select("id, mat_number, material_category, status, official_decision")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("shop_drawings")
-        .select("id, shd_number, drawing_title, status, approved_for_execution")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("inspection_requests")
-        .select("id, ir_number, related_activity, status")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("ncrs")
-        .select("id, ncr_number, severity, status, description")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("project_reports")
-        .select("id, report_type, period_start, period_end, status")
-        .eq("project_id", project.id)
-        .order("period_start", { ascending: false })
-        .limit(20),
-      supabase
-        .from("correspondence")
-        .select("id, reference_number, subject, direction, status")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("purchase_requests")
-        .select("id, pr_number, status, estimated_cost, currency")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(20),
-      supabase
-        .from("purchase_orders")
-        .select("id, po_number, status, total, currency")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(20),
-      supabase
-        .from("supplier_invoices")
-        .select("id, invoice_number, status, total, currency, due_date")
-        .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(20),
-      canSeeFinance
+      needEng
+        ? supabase
+            .from("rfis")
+            .select("id, rfi_number, subject, status")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("material_submittals")
+            .select("id, mat_number, material_category, status, official_decision")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("shop_drawings")
+            .select("id, shd_number, drawing_title, status, approved_for_execution")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("inspection_requests")
+            .select("id, ir_number, related_activity, status")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("ncrs")
+            .select("id, ncr_number, severity, status, description")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("project_reports")
+            .select("id, report_type, period_start, period_end, status")
+            .eq("project_id", project.id)
+            .order("period_start", { ascending: false })
+            .limit(20)
+        : Promise.resolve(emptyList),
+      needEng
+        ? supabase
+            .from("correspondence")
+            .select("id, reference_number, subject, direction, status")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : Promise.resolve(emptyList),
+      needCom
+        ? supabase
+            .from("purchase_requests")
+            .select("id, pr_number, status, estimated_cost, currency")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve(emptyList),
+      needCom
+        ? supabase
+            .from("purchase_orders")
+            .select("id, po_number, status, total, currency")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve(emptyList),
+      needCom
+        ? supabase
+            .from("supplier_invoices")
+            .select("id, invoice_number, status, total, currency, due_date")
+            .eq("project_id", project.id)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve(emptyList),
+      needCom && canSeeFinance
         ? supabase.rpc("compute_project_commercial_summary", { p_project_id: project.id })
         : Promise.resolve({ data: null, error: null }),
-      canSeeFinance
+      needCom && canSeeFinance
         ? supabase.rpc("compute_project_commercial_health", { p_project_id: project.id })
         : Promise.resolve({ data: null, error: null }),
     ]);
@@ -493,13 +521,14 @@ export default async function ProjectDetailPage({
 
       <div className="mb-6 min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
         {tabs.map((item) => (
-          <a
+          <Link
             key={item.id}
             href={`/projects/${project.id}?tab=${item.id}`}
-            className={`shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm ${tab === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted"}`}
+            prefetch={false}
+            className={`inline-block shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm ${tab === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted"}`}
           >
             {item.label}
-          </a>
+          </Link>
         ))}
         {laterTabs.map((item) => (
           <span key={item} className="shrink-0 rounded-md px-3 py-2 text-sm text-muted/50">

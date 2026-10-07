@@ -4,7 +4,7 @@ import { LoginForm } from "@/components/auth/login-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ disabled?: string }>;
+  searchParams: Promise<{ disabled?: string; next?: string }>;
 }) {
   const params = await searchParams;
 
@@ -23,7 +23,7 @@ export default async function LoginPage({
             تم إيقاف صلاحية الدخول لهذا الحساب.
           </p>
         ) : null}
-        <LoginForm />
+        <LoginForm nextPath={params.next ?? ""} />
       </div>
     </main>
   );
