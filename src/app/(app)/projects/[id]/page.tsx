@@ -39,6 +39,7 @@ import { logger } from "@/lib/logger";
 import { hasCatalogProjectRead } from "@/lib/projects/assigned-access";
 import { PROCUREMENT_STEP_KEY, parseProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 import { MOBILIZATION_STEP_KEY, parseMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
+import { EXECUTION_STEP_KEY, parseExecutionProgress } from "@/modules/projects/stage07-execution";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -156,6 +157,21 @@ export default async function ProjectDetailPage({
       });
     } else {
       mobilizationReadiness = parseMobilizationReadiness(mobilizationRaw);
+    }
+  }
+  let executionProgress = null;
+  if (workflow.nodes.some((node) => node.stepKey === EXECUTION_STEP_KEY)) {
+    const { data: executionRaw, error: executionError } = await supabase.rpc(
+      "get_project_execution_progress",
+      { p_project_id: project.id },
+    );
+    if (executionError) {
+      logger.warn("project execution progress failed", {
+        code: "PROJECT_EXECUTION_PROGRESS_FAILED",
+        projectId: project.id,
+      });
+    } else {
+      executionProgress = parseExecutionProgress(executionRaw);
     }
   }
   const userActive = new Map<string, boolean>();
@@ -530,6 +546,7 @@ export default async function ProjectDetailPage({
                         canOpenProcurement={canOpenProcurement}
                         canCreatePr={canCreatePr}
                         mobilizationReadiness={mobilizationReadiness}
+                        executionProgress={executionProgress}
                       />
                     </CaseFlowStep>
                   ))}

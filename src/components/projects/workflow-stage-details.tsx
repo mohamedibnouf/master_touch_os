@@ -10,8 +10,10 @@ import { WorkflowGateSubmitFields, type GateSupportingDocumentOption } from "@/c
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 import { ProcurementReadinessCard } from "@/components/projects/procurement-readiness-card";
 import { MobilizationReadinessCard } from "@/components/projects/mobilization-readiness-card";
+import { ExecutionProgressCard } from "@/components/projects/execution-progress-card";
 import { PROCUREMENT_STEP_KEY, type ProjectProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 import { MOBILIZATION_STEP_KEY, type ProjectMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
+import { EXECUTION_STEP_KEY, type ProjectExecutionProgress } from "@/modules/projects/stage07-execution";
 
 function formatStamp(value: string | null): string {
   if (!value) return "—";
@@ -30,6 +32,7 @@ export function WorkflowStageDetails({
   canOpenProcurement = false,
   canCreatePr = false,
   mobilizationReadiness = null,
+  executionProgress = null,
 }: {
   node: WorkflowViewNode;
   projectId: string;
@@ -40,6 +43,7 @@ export function WorkflowStageDetails({
   canOpenProcurement?: boolean;
   canCreatePr?: boolean;
   mobilizationReadiness?: ProjectMobilizationReadiness | null;
+  executionProgress?: ProjectExecutionProgress | null;
 }) {
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
@@ -133,6 +137,14 @@ export function WorkflowStageDetails({
         />
       ) : null}
 
+      {node.stepKey === EXECUTION_STEP_KEY && executionProgress ? (
+        <ExecutionProgressCard
+          progress={executionProgress}
+          projectId={projectId}
+          canMutate={node.canComplete}
+        />
+      ) : null}
+
       {node.canSubmitApproval ? (
         <WorkflowGateSubmitFields
           projectId={projectId}
@@ -153,7 +165,8 @@ export function WorkflowStageDetails({
             variant="success"
             disabled={
               (node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness?.ready === false) ||
-              (node.stepKey === MOBILIZATION_STEP_KEY && mobilizationReadiness?.ready === false)
+              (node.stepKey === MOBILIZATION_STEP_KEY && mobilizationReadiness?.ready === false) ||
+              (node.stepKey === EXECUTION_STEP_KEY && executionProgress?.ready === false)
             }
           >
             إكمال المرحلة

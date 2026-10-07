@@ -127,6 +127,13 @@ export function mapWorkflowRpcError(message: string): {
       en: "Required mobilization checks must be completed before this stage can be closed.",
     };
   }
+  if (message.includes("WORKFLOW_EXECUTION_NOT_READY")) {
+    return {
+      kind: "VALIDATION",
+      ar: "يجب إكمال عناصر التنفيذ المطلوبة قبل إكمال المرحلة.",
+      en: "Required execution work items must be completed before this stage can be closed.",
+    };
+  }
   if (message.includes("WORKFLOW_GATE_REQUIRED")) {
     return {
       kind: "VALIDATION",

@@ -27,6 +27,7 @@ export const DOMAIN_EVENTS = [
   "workflow.step.deadline_warning",
   "workflow.step.overdue",
   "workflow.mobilization.readiness_changed",
+  "workflow.execution.item_updated",
   "workflow.completed",
   "workflow.cancelled",
   "employee.created",

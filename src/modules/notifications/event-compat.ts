@@ -85,6 +85,7 @@ export const NO_EMAIL_TYPES = new Set([
   "workflow.step.completed",
   "workflow.step.assignee_changed",
   "workflow.mobilization.readiness_changed",
+  "workflow.execution.item_updated",
 ]);
 
 export function categoryForNotificationType(type: string): NotificationCategory {
