@@ -230,6 +230,8 @@ describe("rpc error mapping", () => {
     expect(mapWorkflowRpcError("WORKFLOW_PROCUREMENT_NOT_READY").ar).toContain("أمر شراء");
     expect(mapWorkflowRpcError("WORKFLOW_MOBILIZATION_NOT_READY").ar).toContain("التجهيز");
     expect(mapWorkflowRpcError("WORKFLOW_EXECUTION_NOT_READY").ar).toContain("التنفيذ");
+    expect(mapWorkflowRpcError("WORKFLOW_COMMISSIONING_NOT_READY").ar).toContain("اختبارات التشغيل");
+    expect(mapWorkflowRpcError("WORKFLOW_HANDOVER_NOT_READY").ar).toContain("متطلبات التسليم");
   });
 });
 

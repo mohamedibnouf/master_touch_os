@@ -134,6 +134,20 @@ export function mapWorkflowRpcError(message: string): {
       en: "Required execution work items must be completed before this stage can be closed.",
     };
   }
+  if (message.includes("WORKFLOW_COMMISSIONING_NOT_READY")) {
+    return {
+      kind: "VALIDATION",
+      ar: "يجب اجتياز جميع اختبارات التشغيل قبل إكمال المرحلة.",
+      en: "All commissioning tests must pass before this stage can be closed.",
+    };
+  }
+  if (message.includes("WORKFLOW_HANDOVER_NOT_READY")) {
+    return {
+      kind: "VALIDATION",
+      ar: "يجب إكمال جميع متطلبات التسليم قبل إكمال المرحلة.",
+      en: "Required handover checks must be completed before this stage can be closed.",
+    };
+  }
   if (message.includes("WORKFLOW_GATE_REQUIRED")) {
     return {
       kind: "VALIDATION",

@@ -73,6 +73,8 @@ export const NO_WHATSAPP_TYPES = new Set([
   "LEAVE_MANAGER_APPROVED",
   "workflow.mobilization.readiness_changed",
   "workflow.execution.item_updated",
+  "workflow.commissioning.item_updated",
+  "workflow.handover.item_updated",
 ]);
 
 export function whatsappAudienceFor(type: string): WhatsAppAudience {

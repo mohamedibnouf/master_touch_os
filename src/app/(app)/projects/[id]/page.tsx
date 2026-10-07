@@ -40,6 +40,8 @@ import { hasCatalogProjectRead } from "@/lib/projects/assigned-access";
 import { PROCUREMENT_STEP_KEY, parseProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 import { MOBILIZATION_STEP_KEY, parseMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
 import { EXECUTION_STEP_KEY, parseExecutionProgress } from "@/modules/projects/stage07-execution";
+import { COMMISSIONING_STEP_KEY, parseCommissioningProgress } from "@/modules/projects/stage08-commissioning";
+import { HANDOVER_STEP_KEY, parseHandoverReadiness } from "@/modules/projects/stage09-handover";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -172,6 +174,36 @@ export default async function ProjectDetailPage({
       });
     } else {
       executionProgress = parseExecutionProgress(executionRaw);
+    }
+  }
+  let commissioningProgress = null;
+  if (workflow.nodes.some((node) => node.stepKey === COMMISSIONING_STEP_KEY)) {
+    const { data: commissioningRaw, error: commissioningError } = await supabase.rpc(
+      "get_project_commissioning_progress",
+      { p_project_id: project.id },
+    );
+    if (commissioningError) {
+      logger.warn("project commissioning progress failed", {
+        code: "PROJECT_COMMISSIONING_PROGRESS_FAILED",
+        projectId: project.id,
+      });
+    } else {
+      commissioningProgress = parseCommissioningProgress(commissioningRaw);
+    }
+  }
+  let handoverReadiness = null;
+  if (workflow.nodes.some((node) => node.stepKey === HANDOVER_STEP_KEY)) {
+    const { data: handoverRaw, error: handoverError } = await supabase.rpc(
+      "get_project_handover_readiness",
+      { p_project_id: project.id },
+    );
+    if (handoverError) {
+      logger.warn("project handover readiness failed", {
+        code: "PROJECT_HANDOVER_READINESS_FAILED",
+        projectId: project.id,
+      });
+    } else {
+      handoverReadiness = parseHandoverReadiness(handoverRaw);
     }
   }
   const userActive = new Map<string, boolean>();
@@ -547,6 +579,8 @@ export default async function ProjectDetailPage({
                         canCreatePr={canCreatePr}
                         mobilizationReadiness={mobilizationReadiness}
                         executionProgress={executionProgress}
+                        commissioningProgress={commissioningProgress}
+                        handoverReadiness={handoverReadiness}
                       />
                     </CaseFlowStep>
                   ))}

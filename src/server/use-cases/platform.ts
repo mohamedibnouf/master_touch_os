@@ -40,6 +40,12 @@ import {
   isExecutionItemStatus,
   isValidExecutionProgressCombo,
 } from "@/modules/projects/stage07-execution";
+import {
+  COMMISSIONING_NOTE_MAX,
+  isCommissioningItemKey,
+  isCommissioningItemStatus,
+} from "@/modules/projects/stage08-commissioning";
+import { HANDOVER_NOTE_MAX, isHandoverItemKey } from "@/modules/projects/stage09-handover";
 import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
 import {
   ignoredBrowserGateFields,
@@ -665,6 +671,65 @@ export async function setExecutionItemAction(
       p_item_key: itemKey,
       p_status: statusRaw,
       p_progress_percent: progress,
+      p_note: note.length > 0 ? note : null,
+    });
+    if (error) throwMappedWorkflowRpc(error);
+    revalidateProjectWorkflow(projectId);
+  });
+}
+
+export async function setCommissioningItemAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
+    requireUser(await getAuthContext());
+    const projectId = String(formData.get("projectId") ?? "");
+    const itemKey = String(formData.get("itemKey") ?? "");
+    const statusRaw = String(formData.get("status") ?? "");
+    const noteRaw = formData.get("note");
+    if (!isPostgresUuid(projectId) || !isCommissioningItemKey(itemKey) || !isCommissioningItemStatus(statusRaw)) {
+      throw new ValidationError("بيانات الاختبار غير صالحة.", "Invalid commissioning data.");
+    }
+    const note = typeof noteRaw === "string" ? noteRaw.trim() : "";
+    if (note.length > COMMISSIONING_NOTE_MAX) {
+      throw new ValidationError("الملاحظة أطول من المسموح.", "Note is too long.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("set_project_commissioning_item", {
+      p_project_id: projectId,
+      p_item_key: itemKey,
+      p_status: statusRaw,
+      p_note: note.length > 0 ? note : null,
+    });
+    if (error) throwMappedWorkflowRpc(error);
+    revalidateProjectWorkflow(projectId);
+  });
+}
+
+export async function setHandoverItemAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
+    requireUser(await getAuthContext());
+    const projectId = String(formData.get("projectId") ?? "");
+    const itemKey = String(formData.get("itemKey") ?? "");
+    const confirmedRaw = String(formData.get("isConfirmed") ?? "");
+    const noteRaw = formData.get("note");
+    if (!isPostgresUuid(projectId) || !isHandoverItemKey(itemKey)) {
+      throw new ValidationError("بيانات التسليم غير صالحة.", "Invalid handover data.");
+    }
+    const isConfirmed = confirmedRaw === "true";
+    const note = typeof noteRaw === "string" ? noteRaw.trim() : "";
+    if (note.length > HANDOVER_NOTE_MAX) {
+      throw new ValidationError("الملاحظة أطول من المسموح.", "Note is too long.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("set_project_handover_item", {
+      p_project_id: projectId,
+      p_item_key: itemKey,
+      p_is_confirmed: isConfirmed,
       p_note: note.length > 0 ? note : null,
     });
     if (error) throwMappedWorkflowRpc(error);

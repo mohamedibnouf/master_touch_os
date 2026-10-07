@@ -11,9 +11,13 @@ import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 import { ProcurementReadinessCard } from "@/components/projects/procurement-readiness-card";
 import { MobilizationReadinessCard } from "@/components/projects/mobilization-readiness-card";
 import { ExecutionProgressCard } from "@/components/projects/execution-progress-card";
+import { CommissioningProgressCard } from "@/components/projects/commissioning-progress-card";
+import { HandoverReadinessCard } from "@/components/projects/handover-readiness-card";
 import { PROCUREMENT_STEP_KEY, type ProjectProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 import { MOBILIZATION_STEP_KEY, type ProjectMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
 import { EXECUTION_STEP_KEY, type ProjectExecutionProgress } from "@/modules/projects/stage07-execution";
+import { COMMISSIONING_STEP_KEY, type ProjectCommissioningProgress } from "@/modules/projects/stage08-commissioning";
+import { HANDOVER_STEP_KEY, type ProjectHandoverReadiness } from "@/modules/projects/stage09-handover";
 
 function formatStamp(value: string | null): string {
   if (!value) return "—";
@@ -33,6 +37,8 @@ export function WorkflowStageDetails({
   canCreatePr = false,
   mobilizationReadiness = null,
   executionProgress = null,
+  commissioningProgress = null,
+  handoverReadiness = null,
 }: {
   node: WorkflowViewNode;
   projectId: string;
@@ -44,6 +50,8 @@ export function WorkflowStageDetails({
   canCreatePr?: boolean;
   mobilizationReadiness?: ProjectMobilizationReadiness | null;
   executionProgress?: ProjectExecutionProgress | null;
+  commissioningProgress?: ProjectCommissioningProgress | null;
+  handoverReadiness?: ProjectHandoverReadiness | null;
 }) {
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
@@ -145,6 +153,22 @@ export function WorkflowStageDetails({
         />
       ) : null}
 
+      {node.stepKey === COMMISSIONING_STEP_KEY && commissioningProgress ? (
+        <CommissioningProgressCard
+          progress={commissioningProgress}
+          projectId={projectId}
+          canMutate={node.canComplete}
+        />
+      ) : null}
+
+      {node.stepKey === HANDOVER_STEP_KEY && handoverReadiness ? (
+        <HandoverReadinessCard
+          readiness={handoverReadiness}
+          projectId={projectId}
+          canMutate={node.canComplete}
+        />
+      ) : null}
+
       {node.canSubmitApproval ? (
         <WorkflowGateSubmitFields
           projectId={projectId}
@@ -166,7 +190,9 @@ export function WorkflowStageDetails({
             disabled={
               (node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness?.ready === false) ||
               (node.stepKey === MOBILIZATION_STEP_KEY && mobilizationReadiness?.ready === false) ||
-              (node.stepKey === EXECUTION_STEP_KEY && executionProgress?.ready === false)
+              (node.stepKey === EXECUTION_STEP_KEY && executionProgress?.ready === false) ||
+              (node.stepKey === COMMISSIONING_STEP_KEY && commissioningProgress?.ready === false) ||
+              (node.stepKey === HANDOVER_STEP_KEY && handoverReadiness?.ready === false)
             }
           >
             إكمال المرحلة
