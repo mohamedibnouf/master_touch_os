@@ -74,7 +74,7 @@ export async function AppShell({
     hrLeave: g("leave.manage") || g("leave.view_all"),
     hrAttendance: g("attendance.manage") || g("attendance.view_all"),
     management: g("reports.management.read"),
-    projects: g("project.read") || g("project.read_all"),
+    projects: true,
     engineering: g("engineering.read"),
     documentControl: g("document_control.read") || g("document.approve"),
     documents: g("document.read"),

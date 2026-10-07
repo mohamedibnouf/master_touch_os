@@ -15,7 +15,6 @@ export default async function ProjectsPage({
 }) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
-  authorizeRead(ctx);
 
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
@@ -144,10 +143,4 @@ export default async function ProjectsPage({
       </div>
     </PageContainer>
   );
-}
-
-function authorizeRead(ctx: NonNullable<Awaited<ReturnType<typeof getAuthContext>>>) {
-  if (!hasPermission(ctx, "project.read")) {
-    redirect("/");
-  }
 }

@@ -81,8 +81,9 @@ describe("workflow notification deep-link (N1–N14)", () => {
 
   it("N9: project page still notFound when getProject misses; href is not authorization", () => {
     const page = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
-    expect(page).toMatch(/if \(!project\) notFound\(\)/);
-    expect(page).toMatch(/hasPermission\(ctx, "project.read"\)/);
+    expect(page).toMatch(/if \(!project\)/);
+    expect(page).toMatch(/notFound\(\)/);
+    expect(page).not.toMatch(/hasPermission\(ctx, "project.read"\)\) redirect/);
     expect(page).toMatch(/workflowStageFocusId/);
   });
 

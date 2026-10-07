@@ -82,8 +82,10 @@ describe("notification mobile navigation v2 (R1–R15)", () => {
 
   it("R9: project stages URL is not rewritten to Home", () => {
     const page = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
-    expect(page).toMatch(/if \(!ctx \|\| !hasPermission\(ctx, "project.read"\)\) redirect\("\/login"\)/);
-    expect(page).toMatch(/if \(!project\) notFound\(\)/);
+    expect(page).toMatch(/if \(!ctx\) redirect\("\/login"\)/);
+    expect(page).not.toMatch(/hasPermission\(ctx, "project.read"\)\) redirect/);
+    expect(page).toMatch(/if \(!project\) \{/);
+    expect(page).toMatch(/notFound\(\)/);
     expect(page).not.toMatch(/redirect\("\/"\)/);
     const mw = readFileSync("src/lib/supabase/middleware.ts", "utf8");
     expect(mw).toMatch(/url.pathname = "\/login"/);

@@ -35,6 +35,8 @@ import { ProjectAiCard } from "@/components/ai/project-ai-card";
 import { ProjectAiAssistant } from "@/components/ai/project-ai-assistant";
 import { canAnalyzeProjectAi } from "@/modules/ai/security/permissions";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
+import { logger } from "@/lib/logger";
+import { hasCatalogProjectRead } from "@/lib/projects/assigned-access";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -46,14 +48,23 @@ export default async function ProjectDetailPage({
   searchParams: Promise<{ tab?: string; stage?: string }>;
 }) {
   const ctx = await getAuthContext();
-  if (!ctx || !hasPermission(ctx, "project.read")) redirect("/login");
+  if (!ctx) redirect("/login");
 
   const { id } = await params;
   const { tab = "overview", stage: stageParam } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const project = await repo.getProject(ctx.organization.id, id);
-  if (!project) notFound();
+  if (!project) {
+    logger.warn("project route denied", {
+      code: "PROJECT_ROUTE_PROJECT_NOT_VISIBLE",
+      userId: ctx.userId,
+      organizationId: ctx.organization.id,
+      projectId: id,
+      catalogRead: hasCatalogProjectRead(ctx.grants, ctx.organization.id, id),
+    });
+    notFound();
+  }
 
   const [stages, members, documents, users, definitions, health] = await Promise.all([
     repo.listProjectStages(project.id),
