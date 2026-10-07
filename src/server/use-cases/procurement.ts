@@ -4,11 +4,18 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { DatabaseError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
-import { authorize } from "@/server/policies/authorize";
+import { authorize, hasPermission } from "@/server/policies/authorize";
+import {
+  evaluateRfqSupplierEligibility,
+  isRfqInvitationEditable,
+  parseSupplierId,
+  RFQ_INVITE_ERROR,
+} from "@/modules/procurement/rfq-invitation";
+import type { AuthContext } from "@/types/models";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
@@ -17,6 +24,14 @@ import { generateCorrelationId } from "@/lib/utils";
 
 function revalidateCommercial(...paths: string[]) {
   for (const path of paths) revalidatePath(path);
+}
+
+function authorizeRfqInvitationMutation(ctx: AuthContext | null): AuthContext {
+  const user = authorize(ctx, "rfq.read");
+  if (!hasPermission(user, "rfq.issue") && !hasPermission(user, "rfq.manage")) {
+    throw new ForbiddenError({ permission: "rfq.issue" });
+  }
+  return user;
 }
 
 export async function createSupplierAction(
@@ -430,7 +445,22 @@ export async function createRfqFromPrAction(
     });
   }
 
-  for (const supplierId of supplierIds) {
+  const uniqueSupplierIds = [...new Set(supplierIds.map((id) => parseSupplierId(id)).filter((id): id is string => Boolean(id)))];
+  for (const supplierId of uniqueSupplierIds) {
+    const { data: supplier } = await supabase
+      .from("suppliers")
+      .select("id, organization_id, status")
+      .eq("id", supplierId)
+      .maybeSingle<{ id: string; organization_id: string; status: string }>();
+    const eligibility = evaluateRfqSupplierEligibility({
+      supplierId,
+      actorOrganizationId: ctx.organization.id,
+      supplierOrganizationId: supplier?.organization_id ?? null,
+      supplierStatus: supplier?.status ?? null,
+    });
+    if (!eligibility.ok) {
+      throw new ValidationError(RFQ_INVITE_ERROR[eligibility.code].ar, RFQ_INVITE_ERROR[eligibility.code].en);
+    }
     await supabase.from("rfq_suppliers").insert({
       organization_id: ctx.organization.id,
       rfq_id: rfq.id,
@@ -499,6 +529,103 @@ export async function issueRfqAction(
   });
 
   revalidateCommercial(`/procurement/rfqs/${rfqId}`, "/procurement/rfqs", "/procurement");
+  });
+}
+
+export async function inviteRfqSupplierAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
+    const ctx = authorizeRfqInvitationMutation(await getAuthContext());
+    const rfqId = parseSupplierId(String(formData.get("rfqId") ?? ""));
+    const supplierId = parseSupplierId(String(formData.get("supplierId") ?? ""));
+    if (!rfqId) throw new ValidationError("معرّف طلب العروض غير صالح.", "Invalid RFQ id.");
+    if (!supplierId) throw new ValidationError(RFQ_INVITE_ERROR.INVALID_ID.ar, RFQ_INVITE_ERROR.INVALID_ID.en);
+
+    const supabase = await createServerSupabaseClient();
+    const { data: rfq } = await supabase
+      .from("rfqs")
+      .select("id, organization_id, status")
+      .eq("id", rfqId)
+      .maybeSingle<{ id: string; organization_id: string; status: string }>();
+    if (!rfq) throw new NotFoundError("طلب عرض السعر", "RFQ");
+    if (rfq.organization_id !== ctx.organization.id) throw new ForbiddenError();
+    if (!isRfqInvitationEditable(rfq.status)) {
+      throw new ValidationError(RFQ_INVITE_ERROR.NOT_EDITABLE.ar, RFQ_INVITE_ERROR.NOT_EDITABLE.en);
+    }
+
+    const { data: supplier } = await supabase
+      .from("suppliers")
+      .select("id, organization_id, status")
+      .eq("id", supplierId)
+      .maybeSingle<{ id: string; organization_id: string; status: string }>();
+    const eligibility = evaluateRfqSupplierEligibility({
+      supplierId,
+      actorOrganizationId: ctx.organization.id,
+      supplierOrganizationId: supplier?.organization_id ?? null,
+      supplierStatus: supplier?.status ?? null,
+    });
+    if (!eligibility.ok) {
+      throw new ValidationError(RFQ_INVITE_ERROR[eligibility.code].ar, RFQ_INVITE_ERROR[eligibility.code].en);
+    }
+
+    const { data: existing } = await supabase
+      .from("rfq_suppliers")
+      .select("id")
+      .eq("rfq_id", rfqId)
+      .eq("supplier_id", supplierId)
+      .maybeSingle<{ id: string }>();
+    if (existing) {
+      throw new ValidationError(RFQ_INVITE_ERROR.DUPLICATE.ar, RFQ_INVITE_ERROR.DUPLICATE.en);
+    }
+
+    const { error } = await supabase.from("rfq_suppliers").insert({
+      organization_id: ctx.organization.id,
+      rfq_id: rfqId,
+      supplier_id: supplierId,
+      sent_by: ctx.userId,
+    });
+    if (error) throw new DatabaseError(error);
+
+    revalidateCommercial(`/procurement/rfqs/${rfqId}`, "/procurement/rfqs");
+  });
+}
+
+export async function removeRfqSupplierAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
+    const ctx = authorizeRfqInvitationMutation(await getAuthContext());
+    const rfqId = parseSupplierId(String(formData.get("rfqId") ?? ""));
+    const invitationId = parseSupplierId(String(formData.get("invitationId") ?? ""));
+    if (!rfqId || !invitationId) throw new ValidationError("بيانات الدعوة غير صالحة.", "Invalid invitation.");
+
+    const supabase = await createServerSupabaseClient();
+    const { data: rfq } = await supabase
+      .from("rfqs")
+      .select("id, organization_id, status")
+      .eq("id", rfqId)
+      .maybeSingle<{ id: string; organization_id: string; status: string }>();
+    if (!rfq) throw new NotFoundError("طلب عرض السعر", "RFQ");
+    if (rfq.organization_id !== ctx.organization.id) throw new ForbiddenError();
+    if (!isRfqInvitationEditable(rfq.status)) {
+      throw new ValidationError(RFQ_INVITE_ERROR.NOT_EDITABLE.ar, RFQ_INVITE_ERROR.NOT_EDITABLE.en);
+    }
+
+    const { data: invite } = await supabase
+      .from("rfq_suppliers")
+      .select("id, rfq_id")
+      .eq("id", invitationId)
+      .eq("rfq_id", rfqId)
+      .maybeSingle<{ id: string; rfq_id: string }>();
+    if (!invite) throw new NotFoundError("دعوة المورد", "Supplier invitation");
+
+    const { error } = await supabase.from("rfq_suppliers").delete().eq("id", invitationId).eq("rfq_id", rfqId);
+    if (error) throw new DatabaseError(error);
+
+    revalidateCommercial(`/procurement/rfqs/${rfqId}`, "/procurement/rfqs");
   });
 }
 

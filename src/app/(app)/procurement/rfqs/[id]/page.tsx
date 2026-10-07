@@ -9,6 +9,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { issueRfqAction, updateRfqSupplierResponseAction } from "@/server/use-cases/procurement";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { RfqSupplierInvitePanel, RfqSupplierRemoveButton } from "@/components/procurement/rfq-supplier-invite-panel";
+import { isRfqInvitationEditable } from "@/modules/procurement/rfq-invitation";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -27,12 +29,28 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const invitations = (rfq.rfq_suppliers as Array<Record<string, unknown>>) ?? [];
 
   const canIssue =
-    ["draft", "ready_to_issue"].includes(rfq.status) &&
+    isRfqInvitationEditable(rfq.status) &&
     hasPermission(ctx, "rfq.issue") &&
     invitations.length > 0;
 
   const isIssued = ["issued", "responses_received", "under_comparison", "awarded"].includes(rfq.status);
   const canManageResponse = hasPermission(ctx, "rfq.manage");
+  const canManageInvites =
+    isRfqInvitationEditable(rfq.status) &&
+    (hasPermission(ctx, "rfq.issue") || hasPermission(ctx, "rfq.manage"));
+  const canListSuppliers = hasPermission(ctx, "supplier.read");
+
+  const invitedIds = new Set(invitations.map((inv) => String(inv.supplier_id)));
+  let inviteCandidates: Array<{ id: string; supplier_code: string; legal_name: string }> = [];
+  if (canManageInvites && canListSuppliers) {
+    const { data: supplierRows } = await supabase
+      .from("suppliers")
+      .select("id, supplier_code, legal_name")
+      .eq("organization_id", ctx.organization.id)
+      .eq("status", "active")
+      .order("legal_name");
+    inviteCandidates = (supplierRows ?? []).filter((row) => !invitedIds.has(row.id));
+  }
 
   // Quotations for this RFQ
   const { data: quotations } = await supabase
@@ -168,6 +186,7 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   <th className="py-2 text-right">المورد</th>
                   <th className="py-2 text-right">حالة الرد</th>
                   {canManageResponse ? <th className="py-2 text-right">تحديث</th> : null}
+                  {canManageInvites ? <th className="py-2 text-right">إزالة</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +222,11 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                           )}
                         </td>
                       ) : null}
+                      {canManageInvites ? (
+                        <td className="py-2">
+                          <RfqSupplierRemoveButton rfqId={rfq.id} invitationId={String(inv.id)} />
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -210,6 +234,11 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
             </table>
           </div>
         )}
+        {canManageInvites && canListSuppliers ? (
+          <RfqSupplierInvitePanel rfqId={rfq.id} candidates={inviteCandidates} />
+        ) : canManageInvites ? (
+          <p className="mt-3 text-sm text-muted">عرض سجل الموردين يتطلب صلاحية قراءة الموردين.</p>
+        ) : null}
       </Card>
 
       {/* Quotations received */}
