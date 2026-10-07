@@ -7,8 +7,13 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
+import { parseScopedProjectId } from "@/modules/procurement/stage05-readiness";
 
-export default async function ProcurementPage() {
+export default async function ProcurementPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project?: string }>;
+}) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (
@@ -20,37 +25,65 @@ export default async function ProcurementPage() {
     redirect("/");
   }
 
+  const params = await searchParams;
+  const scopedProjectId = parseScopedProjectId(params.project);
   const supabase = await createServerSupabaseClient();
+  let projectFilter: string | null = null;
+  if (scopedProjectId) {
+    const { data: visible } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", scopedProjectId)
+      .maybeSingle<{ id: string }>();
+    projectFilter = visible?.id ?? null;
+  }
+  let scopedProjectLabel: string | null = null;
+  if (projectFilter) {
+    const { data: projectRow } = await supabase
+      .from("projects")
+      .select("project_code, name_ar")
+      .eq("id", projectFilter)
+      .maybeSingle<{ project_code: string; name_ar: string }>();
+    if (projectRow) {
+      scopedProjectLabel = `${projectRow.project_code} — ${projectRow.name_ar}`;
+    }
+  }
   const repo = new CommercialRepository(supabase);
   const stats = await repo.procurementDashboardStats(ctx.organization.id);
 
   // Recent PRs needing action
-  const { data: pendingPrs } = await supabase
+  let pendingPrQuery = supabase
     .from("purchase_requests")
     .select("id, pr_number, status, priority, estimated_cost, currency")
     .eq("organization_id", ctx.organization.id)
     .in("status", ["submitted", "under_review"])
     .order("created_at", { ascending: true })
     .limit(10);
+  if (projectFilter) pendingPrQuery = pendingPrQuery.eq("project_id", projectFilter);
+  const { data: pendingPrs } = await pendingPrQuery;
 
   // RFQs with deadlines
   const today = new Date().toISOString().slice(0, 10);
-  const { data: rfqsDue } = await supabase
+  let rfqQuery = supabase
     .from("rfqs")
     .select("id, rfq_number, title, status, response_due_date")
     .eq("organization_id", ctx.organization.id)
     .eq("status", "issued")
     .order("response_due_date", { ascending: true })
     .limit(5);
+  if (projectFilter) rfqQuery = rfqQuery.eq("project_id", projectFilter);
+  const { data: rfqsDue } = await rfqQuery;
 
   // POs awaiting action
-  const { data: actionPOs } = await supabase
+  let poQuery = supabase
     .from("purchase_orders")
     .select("id, po_number, status, total, currency, required_delivery_date, suppliers(legal_name)")
     .eq("organization_id", ctx.organization.id)
     .in("status", ["draft", "pending_approval", "approved"])
     .order("created_at", { ascending: true })
     .limit(10);
+  if (projectFilter) poQuery = poQuery.eq("project_id", projectFilter);
+  const { data: actionPOs } = await poQuery;
 
   const kpiCards = [
     {
@@ -117,9 +150,20 @@ export default async function ProcurementPage() {
 
   return (
     <PageContainer className="space-y-5">
+      {scopedProjectLabel ? (
+        <p className="text-sm text-navy" data-testid="procurement-project-scope">
+          نطاق المشروع: {scopedProjectLabel}
+        </p>
+      ) : null}
       <PageHeader
         title="المشتريات"
-        description="لوحة المتابعة التشغيلية للمشتريات"
+        description={
+          scopedProjectLabel
+            ? `لوحة المتابعة التشغيلية للمشتريات — ${scopedProjectLabel}`
+            : scopedProjectId && !projectFilter
+              ? "لوحة المتابعة التشغيلية للمشتريات — لا يمكن عرض المشروع المطلوب"
+              : "لوحة المتابعة التشغيلية للمشتريات"
+        }
         actions={
           <div className="flex gap-3">
             <Link href="/procurement/suppliers" className="text-sm text-navy underline">الموردون</Link>
@@ -131,7 +175,7 @@ export default async function ProcurementPage() {
       {/* Quick Nav */}
       <div className="mb-6 flex flex-wrap gap-2">
         {hasPermission(ctx, "purchase_request.create") ? (
-          <Link href="/procurement/purchase-requests/new" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+          <Link href={projectFilter ? `/procurement/purchase-requests/new?project=${projectFilter}` : "/procurement/purchase-requests/new"} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
             + طلب شراء
           </Link>
         ) : null}

@@ -10,6 +10,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
+import { newPurchaseRequestHref, parseScopedProjectId } from "@/modules/procurement/stage05-readiness";
 
 export default async function PurchaseRequestsPage({
   searchParams,
@@ -22,13 +23,14 @@ export default async function PurchaseRequestsPage({
 
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
+  const scopedProjectId = parseScopedProjectId(params.project);
   const supabase = await createServerSupabaseClient();
   const repo = new CommercialRepository(supabase);
   const { rows, total, pageSize } = await repo.listPurchaseRequests({
     organizationId: ctx.organization.id,
     page,
     status: params.status,
-    projectId: params.project,
+    projectId: scopedProjectId ?? undefined,
     search: params.q,
   });
 
@@ -39,7 +41,7 @@ export default async function PurchaseRequestsPage({
         description="سجل طلبات الشراء الداخلية"
         actions={
           hasPermission(ctx, "purchase_request.create") ? (
-            <Link href="/procurement/purchase-requests/new" className="text-sm text-navy underline">
+            <Link href={newPurchaseRequestHref(scopedProjectId)} className="text-sm text-navy underline">
               طلب جديد
             </Link>
           ) : null

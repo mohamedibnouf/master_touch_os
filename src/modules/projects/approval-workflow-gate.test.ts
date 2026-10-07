@@ -227,7 +227,7 @@ describe("rpc error mapping", () => {
     expect(mapWorkflowRpcError("WORKFLOW_GATE_REQUIRED").kind).toBe("VALIDATION");
     expect(mapWorkflowRpcError("WORKFLOW_LINK_INVALID").ar).toContain("ارتباط");
     expect(mapWorkflowRpcError("CONFLICT").kind).toBe("CONFLICT");
-    expect(mapWorkflowRpcError("FORBIDDEN").kind).toBe("FORBIDDEN");
+    expect(mapWorkflowRpcError("WORKFLOW_PROCUREMENT_NOT_READY").ar).toContain("أمر شراء");
   });
 });
 

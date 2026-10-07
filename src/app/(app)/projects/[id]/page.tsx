@@ -37,6 +37,7 @@ import { canAnalyzeProjectAi } from "@/modules/ai/security/permissions";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
 import { logger } from "@/lib/logger";
 import { hasCatalogProjectRead } from "@/lib/projects/assigned-access";
+import { PROCUREMENT_STEP_KEY, parseProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -120,6 +121,27 @@ export default async function ProjectDetailPage({
     workflow.currentNodeId,
     stageParam,
   );
+  const canOpenProcurement =
+    hasPermission(ctx, "purchase_request.read") ||
+    hasPermission(ctx, "rfq.read") ||
+    hasPermission(ctx, "purchase_order.read") ||
+    hasPermission(ctx, "procurement.read");
+  const canCreatePr = hasPermission(ctx, "purchase_request.create");
+  let procurementReadiness = null;
+  if (workflow.nodes.some((node) => node.stepKey === PROCUREMENT_STEP_KEY)) {
+    const { data: readinessRaw, error: readinessError } = await supabase.rpc(
+      "get_project_procurement_readiness",
+      { p_project_id: project.id },
+    );
+    if (readinessError) {
+      logger.warn("project procurement readiness failed", {
+        code: "PROJECT_PROCUREMENT_READINESS_FAILED",
+        projectId: project.id,
+      });
+    } else {
+      procurementReadiness = parseProcurementReadiness(readinessRaw);
+    }
+  }
   const userActive = new Map<string, boolean>();
   for (const row of users) {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -488,6 +510,9 @@ export default async function ProjectDetailPage({
                         projectCode={project.project_code}
                         approvers={approverOptions}
                         documents={gateDocumentOptions}
+                        procurementReadiness={procurementReadiness}
+                        canOpenProcurement={canOpenProcurement}
+                        canCreatePr={canCreatePr}
                       />
                     </CaseFlowStep>
                   ))}
@@ -752,7 +777,7 @@ export default async function ProjectDetailPage({
                 p.status,
                 p.estimated_cost != null ? `${p.estimated_cost} ${p.currency}` : "—",
               ])}
-              actionHref="/procurement"
+              actionHref={`/procurement?project=${project.id}`}
               actionLabel="المشتريات"
             />
             <ProjectMiniTable
@@ -764,7 +789,7 @@ export default async function ProjectDetailPage({
                 p.status,
                 `${p.total} ${p.currency}`,
               ])}
-              actionHref="/procurement"
+              actionHref={`/procurement?project=${project.id}`}
               actionLabel="المشتريات"
             />
           </div>

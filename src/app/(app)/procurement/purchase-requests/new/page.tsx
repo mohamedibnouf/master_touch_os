@@ -7,9 +7,15 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
 import { createPurchaseRequestAction } from "@/server/use-cases/procurement";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { parseScopedProjectId } from "@/modules/procurement/stage05-readiness";
 
-export default async function NewPurchaseRequestPage() {
+export default async function NewPurchaseRequestPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project?: string }>;
+}) {
   const ctx = authorize(await getAuthContext(), "purchase_request.create");
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: projects } = await supabase
     .from("projects")
@@ -21,6 +27,9 @@ export default async function NewPurchaseRequestPage() {
   if (!projects?.length) {
     redirect("/procurement/purchase-requests");
   }
+
+  const requestedProject = parseScopedProjectId(params.project) ?? "";
+  const defaultProjectId = projects.some((p) => p.id === requestedProject) ? requestedProject : "";
 
   async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
@@ -38,7 +47,7 @@ export default async function NewPurchaseRequestPage() {
       <Card>
         <ServerActionForm action={action} className="grid gap-4" data-testid="pr-create-form">
           <Field label="المشروع">
-            <Select name="projectId" required defaultValue="" data-testid="pr-project-id">
+            <Select name="projectId" required defaultValue={defaultProjectId} data-testid="pr-project-id">
               <option value="" disabled>اختر مشروعاً</option>
               {(projects ?? []).map((p) => (
                 <option key={p.id} value={p.id}>

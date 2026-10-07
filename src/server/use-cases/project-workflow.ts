@@ -79,6 +79,7 @@ export type WorkflowViewNode = {
   workflowStepId: string | null;
   responsibleUserId: string | null;
   canAssignResponsible: boolean;
+  stepKey: string | null;
 };
 
 export type ProjectWorkflowProjection = {
@@ -392,6 +393,7 @@ export async function loadProjectWorkflowProjection(input: {
         workflowStepId: step.step_id,
         responsibleUserId: step.responsible_user_id,
         canAssignResponsible: Boolean(canManage && canReassignWorkflowStepStatus(step.status)),
+        stepKey: step.step_key,
       };
     });
 
@@ -518,6 +520,7 @@ export async function loadProjectWorkflowProjection(input: {
           workflowStepId: step.id as string,
           responsibleUserId,
           canAssignResponsible: canManage,
+          stepKey: (step.key as string | null) ?? null,
         };
       });
       const currentNodeId = pickCurrentNodeId(nodes);
@@ -624,6 +627,7 @@ export async function loadProjectWorkflowProjection(input: {
       workflowStepId: null,
       responsibleUserId: stage.owner_user_id,
       canAssignResponsible: false,
+      stepKey: null,
     };
   });
 

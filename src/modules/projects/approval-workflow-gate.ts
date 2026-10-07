@@ -113,6 +113,13 @@ export function mapWorkflowRpcError(message: string): {
       en: "Select at least one supporting document.",
     };
   }
+  if (message.includes("WORKFLOW_PROCUREMENT_NOT_READY")) {
+    return {
+      kind: "VALIDATION",
+      ar: "لا يمكن إكمال مرحلة المشتريات بعد. أكمل دورة الشراء المطلوبة وأصدر أمر شراء واحدًا على الأقل قبل إكمال المرحلة.",
+      en: "Procurement cannot be completed until a coherent issued purchase order exists for this project.",
+    };
+  }
   if (message.includes("WORKFLOW_GATE_REQUIRED")) {
     return {
       kind: "VALIDATION",

@@ -8,6 +8,8 @@ import {
 } from "@/server/use-cases/platform";
 import { WorkflowGateSubmitFields, type GateSupportingDocumentOption } from "@/components/projects/workflow-gate-approval-card";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
+import { ProcurementReadinessCard } from "@/components/projects/procurement-readiness-card";
+import { PROCUREMENT_STEP_KEY, type ProjectProcurementReadiness } from "@/modules/procurement/stage05-readiness";
 
 function formatStamp(value: string | null): string {
   if (!value) return "—";
@@ -22,12 +24,18 @@ export function WorkflowStageDetails({
   projectCode,
   approvers,
   documents,
+  procurementReadiness = null,
+  canOpenProcurement = false,
+  canCreatePr = false,
 }: {
   node: WorkflowViewNode;
   projectId: string;
   projectCode: string;
   approvers: Array<{ id: string; name: string }>;
   documents: GateSupportingDocumentOption[];
+  procurementReadiness?: ProjectProcurementReadiness | null;
+  canOpenProcurement?: boolean;
+  canCreatePr?: boolean;
 }) {
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
@@ -103,6 +111,15 @@ export function WorkflowStageDetails({
 
       <ApprovalActionPanel node={node} projectId={projectId} />
 
+      {node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness ? (
+        <ProcurementReadinessCard
+          readiness={procurementReadiness}
+          projectId={projectId}
+          canOpenProcurement={canOpenProcurement}
+          canCreatePr={canCreatePr}
+        />
+      ) : null}
+
       {node.canSubmitApproval ? (
         <WorkflowGateSubmitFields
           projectId={projectId}
@@ -118,7 +135,11 @@ export function WorkflowStageDetails({
           <input type="hidden" name="instanceStepId" value={node.instanceStepId} />
           <input type="hidden" name="outcome" value="complete" />
           <input type="hidden" name="projectId" value={projectId} />
-          <Button type="submit" variant="success">
+          <Button
+            type="submit"
+            variant="success"
+            disabled={node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness?.ready === false}
+          >
             إكمال المرحلة
           </Button>
         </ServerActionForm>
