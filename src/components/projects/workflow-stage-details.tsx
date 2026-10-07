@@ -9,7 +9,9 @@ import {
 import { WorkflowGateSubmitFields, type GateSupportingDocumentOption } from "@/components/projects/workflow-gate-approval-card";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 import { ProcurementReadinessCard } from "@/components/projects/procurement-readiness-card";
+import { MobilizationReadinessCard } from "@/components/projects/mobilization-readiness-card";
 import { PROCUREMENT_STEP_KEY, type ProjectProcurementReadiness } from "@/modules/procurement/stage05-readiness";
+import { MOBILIZATION_STEP_KEY, type ProjectMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
 
 function formatStamp(value: string | null): string {
   if (!value) return "—";
@@ -27,6 +29,7 @@ export function WorkflowStageDetails({
   procurementReadiness = null,
   canOpenProcurement = false,
   canCreatePr = false,
+  mobilizationReadiness = null,
 }: {
   node: WorkflowViewNode;
   projectId: string;
@@ -36,6 +39,7 @@ export function WorkflowStageDetails({
   procurementReadiness?: ProjectProcurementReadiness | null;
   canOpenProcurement?: boolean;
   canCreatePr?: boolean;
+  mobilizationReadiness?: ProjectMobilizationReadiness | null;
 }) {
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
@@ -120,6 +124,15 @@ export function WorkflowStageDetails({
         />
       ) : null}
 
+      {node.stepKey === MOBILIZATION_STEP_KEY && mobilizationReadiness ? (
+        <MobilizationReadinessCard
+          readiness={mobilizationReadiness}
+          projectId={projectId}
+          canMutate={node.canComplete}
+          canOpenProcurement={canOpenProcurement}
+        />
+      ) : null}
+
       {node.canSubmitApproval ? (
         <WorkflowGateSubmitFields
           projectId={projectId}
@@ -138,7 +151,10 @@ export function WorkflowStageDetails({
           <Button
             type="submit"
             variant="success"
-            disabled={node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness?.ready === false}
+            disabled={
+              (node.stepKey === PROCUREMENT_STEP_KEY && procurementReadiness?.ready === false) ||
+              (node.stepKey === MOBILIZATION_STEP_KEY && mobilizationReadiness?.ready === false)
+            }
           >
             إكمال المرحلة
           </Button>

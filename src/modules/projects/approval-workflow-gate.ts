@@ -120,6 +120,13 @@ export function mapWorkflowRpcError(message: string): {
       en: "Procurement cannot be completed until a coherent issued purchase order exists for this project.",
     };
   }
+  if (message.includes("WORKFLOW_MOBILIZATION_NOT_READY")) {
+    return {
+      kind: "VALIDATION",
+      ar: "يجب إكمال عناصر التجهيز المطلوبة قبل إكمال المرحلة.",
+      en: "Required mobilization checks must be completed before this stage can be closed.",
+    };
+  }
   if (message.includes("WORKFLOW_GATE_REQUIRED")) {
     return {
       kind: "VALIDATION",

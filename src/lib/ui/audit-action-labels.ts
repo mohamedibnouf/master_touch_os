@@ -62,6 +62,7 @@ const ACTION_LABELS: Record<string, string> = {
   "project.archived": "تم أرشفة مشروع",
   "workflow.started": "بدأ مسار العمل",
   "workflow.step.completed": "اكتملت خطوة مسار العمل",
+  "workflow.mobilization.readiness_changed": "تم تحديث جاهزية التجهيز",
   "workflow.step.deadline_changed": "تم تحديث موعد المرحلة",
   "workflow.step.deadline_warning": "اقترب موعد انتهاء المرحلة",
   "workflow.step.overdue": "تأخرت مرحلة مسار العمل",

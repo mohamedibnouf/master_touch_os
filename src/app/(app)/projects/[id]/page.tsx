@@ -38,6 +38,7 @@ import { getAiPlatformConfig } from "@/modules/ai/config-env";
 import { logger } from "@/lib/logger";
 import { hasCatalogProjectRead } from "@/lib/projects/assigned-access";
 import { PROCUREMENT_STEP_KEY, parseProcurementReadiness } from "@/modules/procurement/stage05-readiness";
+import { MOBILIZATION_STEP_KEY, parseMobilizationReadiness } from "@/modules/projects/stage06-mobilization";
 
 const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
 
@@ -140,6 +141,21 @@ export default async function ProjectDetailPage({
       });
     } else {
       procurementReadiness = parseProcurementReadiness(readinessRaw);
+    }
+  }
+  let mobilizationReadiness = null;
+  if (workflow.nodes.some((node) => node.stepKey === MOBILIZATION_STEP_KEY)) {
+    const { data: mobilizationRaw, error: mobilizationError } = await supabase.rpc(
+      "get_project_mobilization_readiness",
+      { p_project_id: project.id },
+    );
+    if (mobilizationError) {
+      logger.warn("project mobilization readiness failed", {
+        code: "PROJECT_MOBILIZATION_READINESS_FAILED",
+        projectId: project.id,
+      });
+    } else {
+      mobilizationReadiness = parseMobilizationReadiness(mobilizationRaw);
     }
   }
   const userActive = new Map<string, boolean>();
@@ -513,6 +529,7 @@ export default async function ProjectDetailPage({
                         procurementReadiness={procurementReadiness}
                         canOpenProcurement={canOpenProcurement}
                         canCreatePr={canCreatePr}
+                        mobilizationReadiness={mobilizationReadiness}
                       />
                     </CaseFlowStep>
                   ))}

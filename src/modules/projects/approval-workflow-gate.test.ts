@@ -228,6 +228,7 @@ describe("rpc error mapping", () => {
     expect(mapWorkflowRpcError("WORKFLOW_LINK_INVALID").ar).toContain("ارتباط");
     expect(mapWorkflowRpcError("CONFLICT").kind).toBe("CONFLICT");
     expect(mapWorkflowRpcError("WORKFLOW_PROCUREMENT_NOT_READY").ar).toContain("أمر شراء");
+    expect(mapWorkflowRpcError("WORKFLOW_MOBILIZATION_NOT_READY").ar).toContain("التجهيز");
   });
 });
 

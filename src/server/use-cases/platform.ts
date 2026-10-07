@@ -32,6 +32,8 @@ import {
   validateDeadlineChange,
 } from "@/modules/projects/deadline";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors";
+import { isPostgresUuid } from "@/lib/postgres-uuid";
+import { isMobilizationItemKey, MOBILIZATION_NOTE_MAX } from "@/modules/projects/stage06-mobilization";
 import { mapWorkflowRpcError } from "@/modules/projects/approval-workflow-gate";
 import {
   ignoredBrowserGateFields,
@@ -593,6 +595,36 @@ export async function assignWorkflowStepResponsibleAction(
     }
 
     revalidateProjectWorkflow(parsed.data.projectId);
+  });
+}
+
+export async function setMobilizationReadinessItemAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
+    requireUser(await getAuthContext());
+    const projectId = String(formData.get("projectId") ?? "");
+    const itemKey = String(formData.get("itemKey") ?? "");
+    const confirmedRaw = String(formData.get("isConfirmed") ?? "");
+    const noteRaw = formData.get("note");
+    if (!isPostgresUuid(projectId) || !isMobilizationItemKey(itemKey)) {
+      throw new ValidationError("بيانات التجهيز غير صالحة.", "Invalid mobilization data.");
+    }
+    const isConfirmed = confirmedRaw === "true";
+    const note = typeof noteRaw === "string" ? noteRaw.trim() : "";
+    if (note.length > MOBILIZATION_NOTE_MAX) {
+      throw new ValidationError("الملاحظة أطول من المسموح.", "Note is too long.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("set_project_mobilization_readiness_item", {
+      p_project_id: projectId,
+      p_item_key: itemKey,
+      p_is_confirmed: isConfirmed,
+      p_note: note.length > 0 ? note : null,
+    });
+    if (error) throwMappedWorkflowRpc(error);
+    revalidateProjectWorkflow(projectId);
   });
 }
 
