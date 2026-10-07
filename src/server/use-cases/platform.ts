@@ -62,6 +62,7 @@ import { EventService } from "@/server/services/event.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { workflowStageHref } from "@/lib/notifications/href";
 import { notifyWorkflowReadyAssignees as dispatchWorkflowReadyAssignees } from "@/server/services/notification-delivery-worker";
+import { markOwnedNotificationRead } from "@/server/use-cases/notification-read";
 import { StorageService } from "@/server/services/storage.service";
 import { parseGoogleDriveUrl } from "@/modules/documents/google-drive-url";
 import { isStorageFileRequired } from "@/modules/documents/schemas";
@@ -1266,15 +1267,15 @@ export async function markNotificationReadAction(
   formData: FormData,
 ): Promise<FormActionState> {
   return runFormAction("تعذر إتمام العملية. حاول مرة أخرى.", async () => {
-  const ctx = authorize(await getAuthContext(), "notification.read");
+  authorize(await getAuthContext(), "notification.read");
   const id = String(formData.get("id") ?? "");
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("recipient_profile_id", ctx.userId);
-  if (error) throw new DatabaseError(error);
+  const result = await markOwnedNotificationRead(id);
+  if (!result.ok) {
+    if (result.status === 400) {
+      throw new ValidationError("معرّف التنبيه غير صالح.", "Invalid notification id.");
+    }
+    throw new ValidationError("تعذر تعليم التنبيه كمقروء.", "Could not mark the notification as read.");
+  }
   revalidatePath("/notifications");
   });
 }

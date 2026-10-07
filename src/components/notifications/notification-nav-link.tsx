@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { markNotificationReadAction } from "@/server/use-cases/platform";
-import { safeNotificationHref } from "@/modules/notifications/safety";
+import {
+  markNotificationReadBestEffort,
+  planActionableNotificationTap,
+} from "@/lib/notifications/tap";
 
 export function NotificationNavLink({
   id,
@@ -18,25 +19,22 @@ export function NotificationNavLink({
   className?: string;
   children: ReactNode;
 }) {
-  const safe = safeNotificationHref(href);
-  if (!safe) {
+  const plan = planActionableNotificationTap({ href, unread });
+  if (!plan.href) {
     return <div className={className}>{children}</div>;
   }
 
   return (
-    <Link
-      href={safe}
+    <a
+      href={plan.href}
       className={className}
       data-testid="notification-nav-link"
-      data-notification-href={safe}
+      data-notification-href={plan.href}
       onClick={() => {
-        if (!unread) return;
-        const fd = new FormData();
-        fd.set("id", id);
-        void markNotificationReadAction({ ok: true }, fd);
+        if (plan.markRead) markNotificationReadBestEffort(id);
       }}
     >
       {children}
-    </Link>
+    </a>
   );
 }

@@ -64,7 +64,6 @@ export function HeaderNotifications({
       {open ? (
         <div
           id={panelId}
-          role="dialog"
           aria-label="التنبيهات"
           className="absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-surface)] border border-line bg-white p-2 shadow-[var(--shadow-2)]"
         >

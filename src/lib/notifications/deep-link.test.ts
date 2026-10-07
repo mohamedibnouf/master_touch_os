@@ -38,14 +38,17 @@ describe("workflow notification deep-link (N1–N14)", () => {
     expect(header).not.toMatch(/<details/);
     expect(header).toMatch(/NotificationNavLink/);
     const nav = readFileSync("src/components/notifications/notification-nav-link.tsx", "utf8");
-    expect(nav).toMatch(/href=\{safe\}/);
-    expect(nav).toMatch(/markNotificationReadAction/);
+    expect(nav).toMatch(/href=\{plan\.href\}/);
+    expect(nav).toMatch(/<a/);
+    expect(nav).not.toMatch(/markNotificationReadAction/);
+    expect(nav).toMatch(/markNotificationReadBestEffort/);
+    const owned = readFileSync("src/server/use-cases/notification-read.ts", "utf8");
+    expect(owned).toMatch(/eq\("recipient_profile_id", ctx\.userId\)/);
     const markSrc = readFileSync("src/server/use-cases/platform.ts", "utf8");
     const markFn = markSrc.slice(
       markSrc.indexOf("export async function markNotificationReadAction"),
       markSrc.indexOf("export async function createUserAction"),
     );
-    expect(markFn).toMatch(/eq\("recipient_profile_id", ctx\.userId\)/);
     expect(markFn).not.toMatch(/revalidatePath\("\/"\)/);
     const home = readFileSync("src/components/home/home-ops-panels.tsx", "utf8");
     expect(home).toMatch(/resolveNotificationHref/);
