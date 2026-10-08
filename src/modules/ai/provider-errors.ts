@@ -10,7 +10,12 @@ export type AiProviderFailureCode =
   | "AI_PROVIDER_SERVER_ERROR"
   | "AI_PROVIDER_NETWORK_ERROR"
   | "AI_PROVIDER_INVALID_RESPONSE"
-  | "AI_PROVIDER_SCHEMA_ERROR";
+  | "AI_PROVIDER_SCHEMA_ERROR"
+  | "AI_PROVIDER_ERROR"
+  | "AI_INVALID_JSON"
+  | "AI_SCHEMA_VALIDATION_FAILED"
+  | "AI_RESPONSE_INCOMPLETE"
+  | "AI_RATE_LIMITED";
 
 export const AI_PROVIDER_USER_MESSAGE_AR: Record<AiProviderFailureCode, string> = {
   AI_PROVIDER_BAD_REQUEST: "تعذر إكمال التحليل بسبب إعداد غير صالح لخدمة الذكاء الاصطناعي. حاول مرة أخرى.",
@@ -24,6 +29,12 @@ export const AI_PROVIDER_USER_MESSAGE_AR: Record<AiProviderFailureCode, string> 
   AI_PROVIDER_NETWORK_ERROR: "تعذر الاتصال بخدمة الذكاء الاصطناعي. حاول مرة أخرى.",
   AI_PROVIDER_INVALID_RESPONSE: "تم استلام استجابة غير صالحة من خدمة الذكاء الاصطناعي. حاول مرة أخرى.",
   AI_PROVIDER_SCHEMA_ERROR: "تم استلام استجابة غير صالحة من خدمة الذكاء الاصطناعي. حاول مرة أخرى.",
+  AI_PROVIDER_ERROR: "تعذر إكمال التحليل حالياً. حاول مرة أخرى.",
+  AI_INVALID_JSON: "تم استلام استجابة غير صالحة من خدمة الذكاء الاصطناعي. حاول مرة أخرى.",
+  AI_SCHEMA_VALIDATION_FAILED: "تم استلام استجابة غير صالحة من خدمة الذكاء الاصطناعي. حاول مرة أخرى.",
+  AI_RESPONSE_INCOMPLETE: "لم تكتمل استجابة خدمة الذكاء الاصطناعي. حاول مرة أخرى.",
+  AI_RATE_LIMITED:
+    "تم الوصول إلى حد استخدام خدمة الذكاء الاصطناعي مؤقتاً. يرجى المحاولة لاحقاً أو مراجعة رصيد الخدمة.",
 };
 
 export const AI_PROVIDER_USER_MESSAGE_EN: Record<AiProviderFailureCode, string> = {
@@ -37,6 +48,11 @@ export const AI_PROVIDER_USER_MESSAGE_EN: Record<AiProviderFailureCode, string> 
   AI_PROVIDER_NETWORK_ERROR: "Could not reach the AI service. Please try again.",
   AI_PROVIDER_INVALID_RESPONSE: "The AI service returned an invalid response. Please try again.",
   AI_PROVIDER_SCHEMA_ERROR: "The AI service returned an invalid response. Please try again.",
+  AI_PROVIDER_ERROR: "The AI service is temporarily unavailable. Please try again.",
+  AI_INVALID_JSON: "The AI service returned an invalid response. Please try again.",
+  AI_SCHEMA_VALIDATION_FAILED: "The AI service returned an invalid response. Please try again.",
+  AI_RESPONSE_INCOMPLETE: "The AI service response was incomplete. Please try again.",
+  AI_RATE_LIMITED: "The AI service rate or quota limit was reached. Try later or review billing.",
 };
 
 const SAFE_PROVIDER_TOKEN = /^[A-Za-z0-9._-]{1,64}$/;
@@ -87,7 +103,7 @@ export function classifyThrownProviderFailure(error: unknown): {
 }
 
 function appStatusFor(code: AiProviderFailureCode, httpStatus: number | null): number {
-  if (code === "AI_PROVIDER_RATE_LIMITED") return 429;
+  if (code === "AI_PROVIDER_RATE_LIMITED" || code === "AI_RATE_LIMITED") return 429;
   if (code === "AI_PROVIDER_TIMEOUT") return 504;
   if (code === "AI_PROVIDER_AUTH_FAILED") return 502;
   if (code === "AI_PROVIDER_FORBIDDEN") return 502;
@@ -127,7 +143,12 @@ export function providerFailureAppError(input: {
 }
 
 export function invalidProviderResponseError(
-  kind: "AI_PROVIDER_INVALID_RESPONSE" | "AI_PROVIDER_SCHEMA_ERROR",
+  kind:
+    | "AI_PROVIDER_INVALID_RESPONSE"
+    | "AI_PROVIDER_SCHEMA_ERROR"
+    | "AI_INVALID_JSON"
+    | "AI_SCHEMA_VALIDATION_FAILED"
+    | "AI_RESPONSE_INCOMPLETE",
   extra?: Record<string, unknown>,
 ): ValidationError {
   return new ValidationError(AI_PROVIDER_USER_MESSAGE_AR[kind], AI_PROVIDER_USER_MESSAGE_EN[kind], {

@@ -19,6 +19,11 @@ import {
   validateBusinessCasePayload,
   validateDocumentAnalysisPayload,
 } from "../document-analysis-contract";
+import {
+  MANAGEMENT_INSIGHTS_OPENAI_JSON_SCHEMA,
+  MANAGEMENT_INSIGHTS_SCHEMA_NAME,
+  validateManagementInsightPayload,
+} from "../management-insights-contract";
 import type {
   AiGenerateStructuredInput,
   AiGenerateTextInput,
@@ -70,7 +75,15 @@ function logProviderFailure(input: {
     finishReason: typeof details.finishReason === "string" ? details.finishReason : null,
     responseLength: typeof details.responseLength === "number" ? details.responseLength : null,
     schemaIssues: Array.isArray(details.schemaIssues) ? details.schemaIssues : null,
+    pipeline: input.observe?.pipeline ?? (typeof details.pipeline === "string" ? details.pipeline : null),
+    promptVersion: input.observe?.promptVersion ?? (typeof details.promptVersion === "string" ? details.promptVersion : null),
+    schemaVersion: input.observe?.schemaVersion ?? (typeof details.schemaVersion === "string" ? details.schemaVersion : null),
+    correlationId: input.observe?.correlationId ?? (typeof details.correlationId === "string" ? details.correlationId : null),
   });
+}
+
+function messageHasRefusal(message: { refusal?: unknown } | undefined): boolean {
+  return typeof message?.refusal === "string" && message.refusal.trim().length > 0;
 }
 
 export function createOpenAIProvider(opts: {
@@ -164,11 +177,11 @@ export function createOpenAIProvider(opts: {
         }
 
         let json: {
-          choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+          choices?: Array<{ message?: { content?: unknown; refusal?: unknown }; finish_reason?: unknown }>;
         };
         try {
           json = (await res.json()) as {
-            choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+            choices?: Array<{ message?: { content?: unknown; refusal?: unknown }; finish_reason?: unknown }>;
           };
         } catch {
           const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
@@ -177,12 +190,33 @@ export function createOpenAIProvider(opts: {
             latencyMs: Date.now() - started,
             operation,
             responseLength: 0,
+            pipeline: input.observe?.pipeline ?? null,
+            promptVersion: input.observe?.promptVersion ?? null,
+            schemaVersion: input.observe?.schemaVersion ?? null,
+            correlationId: input.observe?.correlationId ?? null,
           });
           logProviderFailure({ error: failure, observe: input.observe, model: input.model });
           throw failure;
         }
         const finishReason = safeProviderErrorToken(json.choices?.[0]?.finish_reason);
-        const content = extractChatMessageContent(json.choices?.[0]?.message);
+        const message = json.choices?.[0]?.message;
+        if (messageHasRefusal(message) || finishReason === "length" || finishReason === "content_filter") {
+          const failure = invalidProviderResponseError("AI_RESPONSE_INCOMPLETE", {
+            httpStatus: res.status,
+            model: input.model,
+            latencyMs: Date.now() - started,
+            operation,
+            finishReason: messageHasRefusal(message) ? "refusal" : finishReason,
+            responseLength: 0,
+            pipeline: input.observe?.pipeline ?? null,
+            promptVersion: input.observe?.promptVersion ?? null,
+            schemaVersion: input.observe?.schemaVersion ?? null,
+            correlationId: input.observe?.correlationId ?? null,
+          });
+          logProviderFailure({ error: failure, observe: input.observe, model: input.model });
+          throw failure;
+        }
+        const content = extractChatMessageContent(message);
         if (!content) {
           const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
             httpStatus: res.status,
@@ -191,6 +225,10 @@ export function createOpenAIProvider(opts: {
             operation,
             finishReason,
             responseLength: 0,
+            pipeline: input.observe?.pipeline ?? null,
+            promptVersion: input.observe?.promptVersion ?? null,
+            schemaVersion: input.observe?.schemaVersion ?? null,
+            correlationId: input.observe?.correlationId ?? null,
           });
           logProviderFailure({ error: failure, observe: input.observe, model: input.model });
           throw failure;
@@ -253,16 +291,22 @@ export function createOpenAIProvider(opts: {
       return { text: result.content, usage: result.usage, model: result.model, latencyMs: result.latencyMs };
     },
     async generateStructured<T>(input: AiGenerateStructuredInput<T>): Promise<AiStructuredResult<T>> {
-      const namedSchema = jsonSchemaForStructuredName(input.schemaName);
+      const namedSchema =
+        jsonSchemaForStructuredName(input.schemaName) ??
+        (input.schemaName === "management-insights"
+          ? (MANAGEMENT_INSIGHTS_OPENAI_JSON_SCHEMA as unknown as Record<string, unknown>)
+          : null);
       const jsonSchema = input.jsonSchema ?? namedSchema;
       const jsonSchemaName =
         input.schemaName === "document-analysis"
           ? DOCUMENT_ANALYSIS_SCHEMA_NAME
           : input.schemaName === "business-case"
             ? BUSINESS_CASE_SCHEMA_NAME
-            : jsonSchema
-              ? input.schemaName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
-              : null;
+            : input.schemaName === "management-insights"
+              ? MANAGEMENT_INSIGHTS_SCHEMA_NAME
+              : jsonSchema
+                ? input.schemaName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64)
+                : null;
       const result = await complete({
         systemPrompt: input.systemPrompt,
         userPayload: input.userPayload,
@@ -275,11 +319,15 @@ export function createOpenAIProvider(opts: {
       });
       const parsedJson = parseDocumentAnalysisJson(result.content);
       if (!parsedJson.ok) {
-        const failure = invalidProviderResponseError("AI_PROVIDER_INVALID_RESPONSE", {
+        const failure = invalidProviderResponseError("AI_INVALID_JSON", {
           model: result.model,
           finishReason: result.finishReason,
           responseLength: result.content.length,
           operation: input.observe?.operation ?? "structured",
+          pipeline: input.observe?.pipeline ?? null,
+          promptVersion: input.observe?.promptVersion ?? null,
+          schemaVersion: input.observe?.schemaVersion ?? null,
+          correlationId: input.observe?.correlationId ?? null,
         });
         logProviderFailure({ error: failure, observe: input.observe, model: result.model });
         throw failure;
@@ -308,6 +356,25 @@ export function createOpenAIProvider(opts: {
             responseLength: result.content.length,
             operation: input.observe?.operation ?? "document_analysis",
             schemaIssues: checked.issues,
+          });
+          logProviderFailure({ error: failure, observe: input.observe, model: result.model });
+          throw failure;
+        }
+        return { value: checked.value as T, usage: result.usage, model: result.model, latencyMs: result.latencyMs };
+      }
+      if (input.schemaName === "management-insights") {
+        const checked = validateManagementInsightPayload(parsedJson.value);
+        if (!checked.ok) {
+          const failure = invalidProviderResponseError("AI_SCHEMA_VALIDATION_FAILED", {
+            model: result.model,
+            finishReason: result.finishReason,
+            responseLength: result.content.length,
+            operation: input.observe?.operation ?? "management_insights",
+            schemaIssues: checked.issues,
+            pipeline: input.observe?.pipeline ?? "management_insights",
+            promptVersion: input.observe?.promptVersion ?? null,
+            schemaVersion: input.observe?.schemaVersion ?? null,
+            correlationId: input.observe?.correlationId ?? null,
           });
           logProviderFailure({ error: failure, observe: input.observe, model: result.model });
           throw failure;

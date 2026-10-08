@@ -1,4 +1,5 @@
 import { documentAnalysisResponseInstructions } from "./document-analysis-contract";
+import { managementInsightResponseInstructions } from "./management-insights-contract";
 
 export const AI_PROMPT_VERSIONS = {
   baseSafety: "ai-safety:v1",
@@ -8,7 +9,7 @@ export const AI_PROMPT_VERSIONS = {
   documentAnalysis: "document-analysis:v1",
   businessCase: "business-case:v1",
   executiveReport: "executive-report:v1",
-  managementInsights: "management-insights:v1",
+  managementInsights: "management-insights:v2",
 } as const;
 
 export function buildBaseSafetyPrompt(): string {
@@ -99,7 +100,8 @@ export function buildManagementInsightsPrompt(): string {
     buildBaseSafetyPrompt(),
     `Task version: ${AI_PROMPT_VERSIONS.managementInsights}.`,
     "Explain the supplied deterministic org-level counts and project names.",
-    "Do not invent additional projects. Only mention projects listed in facts.",
+    "Do not invent additional projects. Only mention projects listed in facts.insight_items.",
+    managementInsightResponseInstructions(),
   ].join("\n");
 }
 

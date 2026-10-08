@@ -5,6 +5,10 @@ export type AiProviderObserve = {
   organizationId?: string;
   documentId?: string;
   versionId?: string;
+  pipeline?: string;
+  promptVersion?: string;
+  schemaVersion?: string;
+  correlationId?: string;
 };
 
 export type AiGenerateTextInput = {

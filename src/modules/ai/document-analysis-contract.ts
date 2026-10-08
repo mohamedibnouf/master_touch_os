@@ -135,7 +135,7 @@ export function stripMarkdownJsonFence(raw: string): string {
   return (fenced?.[1] ?? trimmed).trim();
 }
 
-function receivedKind(value: unknown): string {
+export function receivedKind(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
   return typeof value;

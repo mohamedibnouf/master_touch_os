@@ -470,6 +470,17 @@ export async function refreshManagementInsightsAction(input?: {
     });
     return { ok: true, data: explained };
   } catch (e) {
+    const details = isAppError(e) && e.details && typeof e.details === "object" ? e.details : {};
+    logger.warn("ai.pipeline.failed", {
+      pipeline: "management_insights",
+      model: typeof details.model === "string" ? details.model : null,
+      promptVersion: typeof details.promptVersion === "string" ? details.promptVersion : null,
+      schemaVersion: typeof details.schemaVersion === "string" ? details.schemaVersion : null,
+      errorCode: typeof details.aiCode === "string" ? details.aiCode : null,
+      schemaIssues: Array.isArray(details.schemaIssues) ? details.schemaIssues : null,
+      correlationId: typeof details.correlationId === "string" ? details.correlationId : null,
+      latencyMs: typeof details.latencyMs === "number" ? details.latencyMs : null,
+    });
     return fail(e);
   }
 }

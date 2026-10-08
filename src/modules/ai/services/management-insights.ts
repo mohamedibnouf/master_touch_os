@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { AiProvider } from "../provider/types";
 import { managementInsightSchema, type ManagementInsight, type ManagementInsightFacts } from "../schemas";
 import { buildManagementInsightsPrompt, AI_PROMPT_VERSIONS } from "../prompts";
 import { getCachedAiArtifact, hashAiInput, setCachedAiArtifact } from "../cache";
 import { AI_DISCLAIMER_AR } from "../limits";
+import { MANAGEMENT_INSIGHTS_SCHEMA_VERSION } from "../management-insights-contract";
 
 export async function explainManagementInsights(input: {
   provider: AiProvider;
@@ -43,11 +45,19 @@ export async function explainManagementInsights(input: {
     schema: managementInsightSchema,
     systemPrompt: buildManagementInsightsPrompt(),
     userPayload: JSON.stringify({ MASTER_TOUCH_CONTEXT: "DATA_ONLY", facts: factsPayload }),
+    observe: {
+      operation: "management_insights",
+      organizationId: input.organizationId,
+      pipeline: "management_insights",
+      promptVersion: AI_PROMPT_VERSIONS.managementInsights,
+      schemaVersion: MANAGEMENT_INSIGHTS_SCHEMA_VERSION,
+      correlationId: randomUUID(),
+    },
   });
 
   const insight: ManagementInsight = {
     ...structured.value,
-    items: structured.value.items.length ? structured.value.items : items,
+    items: structured.value.items,
     data_as_of: input.facts.dataAsOf,
   };
 
