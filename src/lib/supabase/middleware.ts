@@ -2,12 +2,19 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
 import { isNotificationsCronPath, requiresInteractiveLogin } from "@/lib/http/session-gate";
+import { startPerf } from "@/lib/perf/server-timing";
 
+/**
+ * Session refresh + login gate only.
+ * Inactive profile/employee checks live in getAuthContext + app layout so every
+ * navigation is not two extra Supabase round trips (IAD↔Singapore RTT).
+ */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   if (isNotificationsCronPath(request.nextUrl.pathname)) {
     return NextResponse.next({ request });
   }
 
+  const done = startPerf("middleware_update_session");
   let response = NextResponse.next({ request });
   const env = getPublicEnv();
 
@@ -39,6 +46,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
+    done();
     return NextResponse.redirect(url);
   }
 
@@ -46,38 +54,10 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
+    done();
     return NextResponse.redirect(url);
   }
 
-  if (user && !isPublic) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_active")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profile && profile.is_active === false) {
-      await supabase.auth.signOut();
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("disabled", "1");
-      return NextResponse.redirect(url);
-    }
-
-    const { data: employee } = await supabase
-      .from("employees")
-      .select("is_active")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-
-    if (employee && employee.is_active === false) {
-      await supabase.auth.signOut();
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("disabled", "1");
-      return NextResponse.redirect(url);
-    }
-  }
-
+  done();
   return response;
 }

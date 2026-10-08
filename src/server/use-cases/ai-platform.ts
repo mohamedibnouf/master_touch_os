@@ -3,12 +3,12 @@
 import "server-only";
 
 import { getAuthContext } from "@/server/context";
+import { requireUser } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
 import {
   ForbiddenError,
   NotFoundError,
-  UnauthorizedError,
   ValidationError,
   isAppError,
 } from "@/lib/errors";
@@ -58,10 +58,7 @@ function fail(error: unknown): AiActionResult<never> {
 }
 
 async function requireAiActor() {
-  const ctx = await getAuthContext();
-  if (!ctx) throw new UnauthorizedError();
-  if (!ctx.profile.is_active || ctx.membershipStatus !== "active") throw new ForbiddenError();
-  return ctx;
+  return requireUser(await getAuthContext());
 }
 
 export async function getAiPlatformStatusAction(): Promise<{

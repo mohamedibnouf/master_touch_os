@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { signOutAction } from "@/modules/auth/actions";
@@ -73,7 +73,9 @@ export function AppShellFrame({
       >
         تخطي إلى المحتوى
       </a>
-      <NavigationPendingBar />
+      <Suspense fallback={null}>
+        <NavigationPendingBar />
+      </Suspense>
       {drawerOpen ? (
         <button
           type="button"

@@ -115,7 +115,7 @@ describe("Home self-service without employees row", () => {
 
   it("does not make employee rows mandatory in getAuthContext", () => {
     const context = readFileSync(join(process.cwd(), "src/server/context.ts"), "utf8");
-    expect(context).toContain("employeeResult.data ?? null");
+    expect(context).toContain("resolveAuthFromBundle");
     expect(context).not.toMatch(/if \(!employee\)/);
   });
 });

@@ -140,6 +140,14 @@ function isOfficialCode(value: string): value is OfficialApprovalCode {
   return value === "A" || value === "B" || value === "C" || value === "D" || value === "E";
 }
 
+export type WorkflowInstanceRow = {
+  id: string;
+  status: string;
+  definition_id: string;
+  started_at: string;
+  completed_at: string | null;
+};
+
 export async function loadProjectWorkflowProjection(input: {
   supabase: SupabaseClient;
   ctx: AuthContext;
@@ -149,27 +157,28 @@ export async function loadProjectWorkflowProjection(input: {
   roleNames: Map<string, string>;
   departmentNames?: Map<string, string>;
   jobTitles?: Map<string, string>;
+  /** When provided, skips the workflow_instances round trip. */
+  instance?: WorkflowInstanceRow | null;
 }): Promise<ProjectWorkflowProjection> {
   const nowIso = new Date().toISOString();
   const { supabase, ctx, projectId, stages, profileNames, roleNames } = input;
   const departmentNames = input.departmentNames ?? new Map<string, string>();
   const jobTitles = input.jobTitles ?? new Map<string, string>();
 
-  const { data: instance } = await supabase
-    .from("workflow_instances")
-    .select("id, status, definition_id, started_at, completed_at")
-    .eq("organization_id", ctx.organization.id)
-    .eq("entity_type", "project")
-    .eq("entity_id", projectId)
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<{
-      id: string;
-      status: string;
-      definition_id: string;
-      started_at: string;
-      completed_at: string | null;
-    }>();
+  const instance =
+    input.instance !== undefined
+      ? input.instance
+      : (
+          await supabase
+            .from("workflow_instances")
+            .select("id, status, definition_id, started_at, completed_at")
+            .eq("organization_id", ctx.organization.id)
+            .eq("entity_type", "project")
+            .eq("entity_id", projectId)
+            .order("started_at", { ascending: false })
+            .limit(1)
+            .maybeSingle<WorkflowInstanceRow>()
+        ).data;
 
   if (instance) {
     const [{ data: stepRows }, { data: definition }] = await Promise.all([

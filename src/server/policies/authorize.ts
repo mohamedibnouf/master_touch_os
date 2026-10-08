@@ -4,12 +4,13 @@ import { ForbiddenError, UnauthorizedError } from "@/lib/errors";
 import { type PermissionKey } from "@/lib/permissions/catalog";
 import { can, type PermissionContext } from "@/lib/permissions/evaluate";
 import type { AuthContext } from "@/types/models";
+import { isDisabledInteractiveAccount } from "@/lib/auth/interactive-account";
 
 export function requireUser(ctx: AuthContext | null): AuthContext {
   if (!ctx) {
     throw new UnauthorizedError();
   }
-  if (!ctx.profile.is_active || ctx.membershipStatus !== "active") {
+  if (isDisabledInteractiveAccount(ctx) || ctx.membershipStatus !== "active") {
     throw new ForbiddenError({ reason: "inactive" });
   }
   return ctx;
@@ -39,7 +40,7 @@ export function hasPermission(
   permission: PermissionKey,
   context?: Partial<PermissionContext>,
 ): boolean {
-  if (!ctx || !ctx.profile.is_active || ctx.membershipStatus !== "active") {
+  if (!ctx || isDisabledInteractiveAccount(ctx) || ctx.membershipStatus !== "active") {
     return false;
   }
   return can(ctx.grants, permission, {

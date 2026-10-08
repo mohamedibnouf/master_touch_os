@@ -39,6 +39,7 @@ describe("project detail tab loaders", () => {
     expect(page).toMatch(/currentPackageStepKeys/);
     expect(page).toMatch(/<Link/);
     expect(page).toContain("prefetch={false}");
+    expect(page).toMatch(/instanceRes/);
     expect(page).not.toMatch(/<a[\s\S]{0,80}href=\{`\/projects\/\$\{project\.id\}\?tab=\$\{item\.id\}`\}/);
   });
 });

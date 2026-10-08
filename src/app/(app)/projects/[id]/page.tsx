@@ -68,7 +68,18 @@ export default async function ProjectDetailPage({
   const { tab = "overview", stage: stageParam } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
-  const project = await repo.getProject(ctx.organization.id, id);
+  const [project, instanceRes] = await Promise.all([
+    repo.getProject(ctx.organization.id, id),
+    supabase
+      .from("workflow_instances")
+      .select("id, status, definition_id, started_at, completed_at")
+      .eq("organization_id", ctx.organization.id)
+      .eq("entity_type", "project")
+      .eq("entity_id", id)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
   if (!project) {
     logger.warn("project route denied", {
       code: "PROJECT_ROUTE_PROJECT_NOT_VISIBLE",
@@ -137,6 +148,7 @@ export default async function ProjectDetailPage({
     roleNames,
     departmentNames,
     jobTitles,
+    instance: instanceRes.data ?? null,
   });
   const focusedStageId = workflowStageFocusId(
     workflow.nodes.map((node) => node.id),
