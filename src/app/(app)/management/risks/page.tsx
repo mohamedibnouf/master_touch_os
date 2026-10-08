@@ -14,6 +14,8 @@ import {
   filterFindings,
 } from "@/modules/management/risk/engine";
 import type { ManagementRiskCategory, ManagementRiskSeverity } from "@/modules/management/types";
+import { loadGuardianFindingsForViewer } from "@/server/use-cases/guardian";
+import { GuardianFindingsPanel } from "@/components/management/guardian-findings";
 
 const SEVERITIES: ManagementRiskSeverity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 const CATEGORIES: ManagementRiskCategory[] = [
@@ -56,6 +58,12 @@ export default async function ManagementRisksPage({
     ctx.organization.id,
     sections,
   );
+  let guardian: Awaited<ReturnType<typeof loadGuardianFindingsForViewer>> | null = null;
+  try {
+    guardian = await loadGuardianFindingsForViewer();
+  } catch {
+    guardian = null;
+  }
 
   const filtered = filterFindings(risks, {
     severity: severityFilter,
@@ -144,6 +152,13 @@ export default async function ManagementRisksPage({
           ))}
         </div>
       </Card>
+
+      {guardian?.schemaReady ? (
+        <Card data-testid="guardian-register">
+          <h2 className="mb-3 font-semibold text-navy">سجل الحارس (نتائج دائمة)</h2>
+          <GuardianFindingsPanel findings={guardian.findings} lastScan={guardian.lastScan} alerts={guardian.alerts} />
+        </Card>
+      ) : null}
 
       <Card>
         <h2 className="mb-3 font-semibold text-navy">

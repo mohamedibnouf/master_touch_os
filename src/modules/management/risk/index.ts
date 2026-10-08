@@ -6,6 +6,7 @@ export {
   dedupeFindings,
   emptyRiskInput,
   evaluateRisks,
+  evaluateRisksUncapped,
   filterFindings,
   sortFindings,
   summarizeFindingsAsAttention,

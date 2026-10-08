@@ -62,7 +62,8 @@ export function sortFindings(findings: RiskFinding[]): RiskFinding[] {
   });
 }
 
-export function evaluateRisks(
+/** Full rule evaluation. Guardian scans must use this — never the UI cap. */
+export function evaluateRisksUncapped(
   input: RiskInputSnapshot,
   rules: RiskRule[] = MANAGEMENT_RISK_RULES,
 ): RiskFinding[] {
@@ -70,9 +71,14 @@ export function evaluateRisks(
   for (const rule of rules) {
     raw.push(...rule.evaluate(input));
   }
-  const deduped = dedupeFindings(raw);
-  const sorted = sortFindings(deduped);
-  return sorted.slice(0, MANAGEMENT_RISK_THRESHOLDS.maxFindings);
+  return sortFindings(dedupeFindings(raw));
+}
+
+export function evaluateRisks(
+  input: RiskInputSnapshot,
+  rules: RiskRule[] = MANAGEMENT_RISK_RULES,
+): RiskFinding[] {
+  return evaluateRisksUncapped(input, rules).slice(0, MANAGEMENT_RISK_THRESHOLDS.maxFindings);
 }
 
 /**

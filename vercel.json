@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/notifications/run",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/internal/guardian/run",
+      "schedule": "0 * * * *"
     }
   ]
 }
