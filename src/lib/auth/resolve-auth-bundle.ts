@@ -25,11 +25,17 @@ function asOrg(value: Organization | Organization[] | null | undefined): Organiz
 /** Pure mapping of the auth embed. Request-scoped only — callers must not cache across users. */
 export function resolveAuthFromBundle(input: {
   profile: Profile;
-  memberships: AuthMembershipEmbed[] | null | undefined;
+  memberships: AuthMembershipEmbed[] | AuthMembershipEmbed | null | undefined;
   employees: Employee[] | Employee | null | undefined;
   roleRows: AuthUserRoleRow[] | null | undefined;
 }): ResolvedAuthIdentity | null {
-  const memberships = [...(input.memberships ?? [])]
+  const rawMemberships = input.memberships;
+  const membershipList = Array.isArray(rawMemberships)
+    ? rawMemberships
+    : rawMemberships
+      ? [rawMemberships]
+      : [];
+  const memberships = [...membershipList]
     .filter((row) => row.status === "active")
     .sort((a, b) => String(a.joined_at ?? "").localeCompare(String(b.joined_at ?? "")));
   const membership = memberships[0];
