@@ -1,10 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
-import { isNotificationsCronPath, requiresInteractiveLogin } from "@/lib/http/session-gate";
+import { isInternalCronPath, requiresInteractiveLogin } from "@/lib/http/session-gate";
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  if (isNotificationsCronPath(request.nextUrl.pathname)) {
+  if (isInternalCronPath(request.nextUrl.pathname)) {
     return NextResponse.next({ request });
   }
 

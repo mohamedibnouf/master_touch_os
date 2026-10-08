@@ -3,7 +3,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isNotificationsCronAuthorized, notificationsCronSecret } from "./cron-auth";
 import {
+  GUARDIAN_CRON_PATH,
   NOTIFICATIONS_CRON_PATH,
+  isGuardianCronPath,
+  isInternalCronPath,
   isNotificationsCronPath,
   requiresInteractiveLogin,
 } from "@/lib/http/session-gate";
@@ -18,10 +21,15 @@ function restoreCronEnv(prevA: string | undefined, prevB: string | undefined) {
 }
 
 describe("cron path session bypass", () => {
-  it("exempts only the exact notifications cron path from interactive login", () => {
+  it("exempts only the exact notifications and guardian cron paths from interactive login", () => {
     expect(isNotificationsCronPath(NOTIFICATIONS_CRON_PATH)).toBe(true);
     expect(isNotificationsCronPath(`${NOTIFICATIONS_CRON_PATH}/`)).toBe(true);
+    expect(isGuardianCronPath(GUARDIAN_CRON_PATH)).toBe(true);
+    expect(isGuardianCronPath(`${GUARDIAN_CRON_PATH}/`)).toBe(true);
+    expect(isInternalCronPath(NOTIFICATIONS_CRON_PATH)).toBe(true);
+    expect(isInternalCronPath(GUARDIAN_CRON_PATH)).toBe(true);
     expect(requiresInteractiveLogin(NOTIFICATIONS_CRON_PATH)).toBe(false);
+    expect(requiresInteractiveLogin(GUARDIAN_CRON_PATH)).toBe(false);
     expect(requiresInteractiveLogin("/login")).toBe(false);
     expect(requiresInteractiveLogin("/auth/callback")).toBe(false);
 
@@ -33,6 +41,9 @@ describe("cron path session bypass", () => {
     expect(requiresInteractiveLogin("/api/internal/other")).toBe(true);
     expect(requiresInteractiveLogin("/api/internal/notifications")).toBe(true);
     expect(requiresInteractiveLogin("/api/internal/notifications/run/extra")).toBe(true);
+    expect(requiresInteractiveLogin("/api/internal/guardian")).toBe(true);
+    expect(requiresInteractiveLogin("/api/internal/guardian/run/extra")).toBe(true);
+    expect(isInternalCronPath("/api/internal/other")).toBe(false);
   });
 });
 
@@ -140,7 +151,7 @@ describe("cron secret hygiene", () => {
 
   it("does not open other internal API prefixes", () => {
     const mw = readFileSync(join(process.cwd(), "src/lib/supabase/middleware.ts"), "utf8");
-    expect(mw).toContain("isNotificationsCronPath");
+    expect(mw).toContain("isInternalCronPath");
     expect(mw).not.toContain('startsWith("/api/internal")');
     expect(mw).not.toContain('startsWith("/api/")');
   });
