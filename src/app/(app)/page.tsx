@@ -11,7 +11,22 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ManagementAiInsights } from "@/components/ai/management-ai-insights";
 import { canViewManagementAi } from "@/modules/ai/security/permissions";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
-import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import { loadExecutiveIntelligenceFacts } from "@/server/use-cases/executive-intelligence-facts";
+import type { AuthContext } from "@/types/models";
+import type { DashboardViz } from "@/server/use-cases/dashboard-viz";
+
+async function ExecutiveIntelligenceBlock({
+  ctx,
+  viz,
+}: {
+  ctx: AuthContext;
+  viz: DashboardViz | null;
+}) {
+  const facts = await loadExecutiveIntelligenceFacts(ctx, viz);
+  if (!facts) return null;
+  const cfg = getAiPlatformConfig();
+  return <ManagementAiInsights enabled={cfg.enabled} facts={facts} />;
+}
 
 export default async function DashboardPage() {
   const ctx = await getAuthContext();
@@ -29,22 +44,6 @@ export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
   const viz = await loadDashboardViz(ctx, supabase);
   const showAi = canViewManagementAi(ctx);
-  const aiStatus = showAi ? getAiPlatformConfig() : null;
-  const insightFacts =
-    showAi && viz
-      ? {
-          followUpProjects: viz.progressRows.length,
-          overdueStages: viz.kpis.overdueStages ?? 0,
-          pendingApprovals: viz.kpis.pendingApprovals ?? 0,
-          projectNotes: viz.progressRows.slice(0, 5).map((row) => ({
-            id: row.id,
-            nameAr: row.label,
-            reasonAr: row.hint ?? "مشروع نشط مصرّح بعرضه",
-            href: row.href,
-          })),
-          dataAsOf: riyadhTodayYmd(),
-        }
-      : null;
 
   return (
     <PageContainer data-testid="employee-home" className="space-y-4 md:space-y-5">
@@ -60,8 +59,10 @@ export default async function DashboardPage() {
 
       {viz ? <HomeDashboardViz viz={viz} /> : null}
 
-      {insightFacts ? (
-        <ManagementAiInsights enabled={Boolean(aiStatus?.enabled)} initialFacts={insightFacts} />
+      {showAi ? (
+        <Suspense fallback={<KpiRowSkeleton count={4} />}>
+          <ExecutiveIntelligenceBlock ctx={ctx} viz={viz} />
+        </Suspense>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch xl:gap-5">

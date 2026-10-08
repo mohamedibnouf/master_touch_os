@@ -10,7 +10,7 @@ import {
 } from "@/modules/ai/management-insights-contract";
 import { buildManagementInsightsPrompt, AI_PROMPT_VERSIONS } from "@/modules/ai/prompts";
 import { createOpenAIProvider } from "@/modules/ai/provider/openai";
-import { createMockAiProvider } from "@/modules/ai/provider/mock";
+import { createMockAiProvider, createUnavailableMockProvider } from "@/modules/ai/provider/mock";
 import type { AiProvider } from "@/modules/ai/provider/types";
 import { explainManagementInsights } from "@/modules/ai/services/management-insights";
 import { analyzeDocumentText } from "@/modules/ai/services/document-analysis";
@@ -20,6 +20,7 @@ import { clearAiCacheForTests } from "@/modules/ai/cache";
 
 const VALID = {
   headline_ar: "ثلاث إشارات تشغيلية تحتاج متابعة.",
+  executive_summary_ar: "الملخص مبني على المقاييس الحتمية دون اختراع أرقام.",
   items: [
     {
       title_ar: "مشروع تجريبي",
@@ -27,6 +28,9 @@ const VALID = {
       href: "/projects/cbf8f9e7-ca63-4231-8694-8a95372cbd20",
     },
   ],
+  observations: [],
+  recommendations: [],
+  limitations_ar: "التحليل استشاري.",
   generated_at: "2026-10-08T16:00:00.000Z",
   data_as_of: "2026-10-08",
 };
@@ -90,7 +94,11 @@ describe("management insights contract", () => {
   it("maps echoed insight_items to items without inventing headlines", () => {
     const normalized = normalizeManagementInsightShape({
       headline_ar: VALID.headline_ar,
+      executive_summary_ar: VALID.executive_summary_ar,
       insight_items: VALID.items,
+      observations: [],
+      recommendations: [],
+      limitations_ar: VALID.limitations_ar,
       generated_at: VALID.generated_at,
       data_as_of: VALID.data_as_of,
     });
@@ -98,6 +106,23 @@ describe("management insights contract", () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.items[0]?.title_ar).toBe("مشروع تجريبي");
     expect(validateManagementInsightPayload({ insight_items: VALID.items }).ok).toBe(false);
+  });
+
+  it("does not treat a v2-shaped payload as a successful v3 analysis", () => {
+    const result = validateManagementInsightPayload({
+      headline_ar: VALID.headline_ar,
+      items: VALID.items,
+      generated_at: VALID.generated_at,
+      data_as_of: VALID.data_as_of,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues.some((i) => i.path === "executive_summary_ar")).toBe(true);
+  });
+
+  it("does not coerce a malformed observations value into an empty success", () => {
+    const result = validateManagementInsightPayload({ ...VALID, observations: "not-an-array" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues.some((i) => i.path === "observations")).toBe(true);
   });
 
   it("does not treat a missing items key as an empty successful analysis", () => {
@@ -124,6 +149,12 @@ describe("management insights contract", () => {
     expect(item.additionalProperties).toBe(false);
     expect([...item.required].sort()).toEqual(Object.keys(item.properties).sort());
     expect(item.properties.href).toEqual({ anyOf: [{ type: "string" }, { type: "null" }] });
+    const rec = root.properties.recommendations.items;
+    expect(rec.additionalProperties).toBe(false);
+    expect([...rec.required].sort()).toEqual(Object.keys(rec.properties).sort());
+    const obs = root.properties.observations.items;
+    expect(obs.additionalProperties).toBe(false);
+    expect([...obs.required].sort()).toEqual(Object.keys(obs.properties).sort());
   });
 
   it("does not invent a fallback headline or recommendations", () => {
@@ -144,7 +175,11 @@ describe("management insights contract", () => {
     expect(prompt).toContain(AI_PROMPT_VERSIONS.managementInsights);
     expect(MANAGEMENT_INSIGHTS_OPENAI_JSON_SCHEMA.required).toEqual([
       "headline_ar",
+      "executive_summary_ar",
       "items",
+      "observations",
+      "recommendations",
+      "limitations_ar",
       "generated_at",
       "data_as_of",
     ]);
@@ -269,7 +304,11 @@ describe("management insights OpenAI adapter", () => {
       chat({
         content: JSON.stringify({
           headline_ar: VALID.headline_ar,
+          executive_summary_ar: VALID.executive_summary_ar,
           insight_items: VALID.items,
+          observations: [],
+          recommendations: [],
+          limitations_ar: VALID.limitations_ar,
           generated_at: VALID.generated_at,
           data_as_of: VALID.data_as_of,
         }),
@@ -300,6 +339,20 @@ describe("management insights service and sibling pipelines", () => {
     expect(explained.insight.data_as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(explained.insight.generated_at.length).toBeGreaterThan(0);
     expect(explained.insight.generated_at.length).toBeLessThanOrEqual(40);
+    expect(explained.insight.executive_summary_ar.length).toBeGreaterThan(0);
+    expect(explained.insight.observations).toEqual([]);
+  });
+
+  it("surfaces provider failure without fabricating insights", async () => {
+    clearAiCacheForTests();
+    await expect(
+      explainManagementInsights({
+        provider: createUnavailableMockProvider(),
+        organizationId: "11111111-1111-1111-1111-111111111111",
+        facts: FACTS,
+        forceRefresh: true,
+      }),
+    ).rejects.toMatchObject({ status: 504 });
   });
 
   it("does not replace an empty model items array with deterministic project notes", async () => {
@@ -314,7 +367,11 @@ describe("management insights service and sibling pipelines", () => {
         return {
           value: {
             headline_ar: "لا توجد بنود تحليل إضافية.",
+            executive_summary_ar: "لا توجد بنود تحليل إضافية.",
             items: [],
+            observations: [],
+            recommendations: [],
+            limitations_ar: "",
             generated_at: "2026-10-08T16:00:00.000Z",
             data_as_of: "wrong-date",
           } as T,

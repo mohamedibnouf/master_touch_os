@@ -30,6 +30,7 @@ import { answerProjectAssistant } from "@/modules/ai/services/assistant";
 import { buildExecutiveReportAi } from "@/modules/ai/services/executive-report";
 import { analyzeDocumentText } from "@/modules/ai/services/document-analysis";
 import { explainManagementInsights } from "@/modules/ai/services/management-insights";
+import { loadExecutiveIntelligenceFacts } from "@/server/use-cases/executive-intelligence-facts";
 import { persistAiRun, hashAiInput } from "@/modules/ai/cache";
 import { estimateChars } from "@/modules/ai/security/sanitize";
 import { extractAuthorizedDocumentText } from "@/server/use-cases/document-ai-source";
@@ -41,6 +42,7 @@ import type { ExecutiveReport } from "@/modules/ai/schemas";
 import type { AssistantAnswer } from "@/modules/ai/schemas";
 import type { BusinessCaseAnalysis, DocumentAnalysis } from "@/modules/ai/schemas";
 import type { ManagementInsight, ManagementInsightFacts } from "@/modules/ai/schemas";
+import type { ExecutiveIntelligenceFacts } from "@/modules/ai/executive-intelligence/types";
 import type { DocumentSourceClass } from "@/modules/ai/classify-source";
 
 export type AiActionResult<T> =
@@ -402,7 +404,9 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
 
 export async function refreshManagementInsightsAction(input?: {
   refresh?: boolean;
-}): Promise<AiActionResult<{ insight: ManagementInsight; facts: ManagementInsightFacts; cached: boolean; disclaimerAr: string }>> {
+}): Promise<
+  AiActionResult<{ insight: ManagementInsight; facts: ExecutiveIntelligenceFacts; cached: boolean; disclaimerAr: string }>
+> {
   try {
     const ctx = await requireAiActor();
     if (!canViewManagementAi(ctx)) throw new ForbiddenError();
@@ -414,57 +418,12 @@ export async function refreshManagementInsightsAction(input?: {
     }
 
     assertAiRateLimit(ctx.profile.id, "analysis");
-    const supabase = await createServerSupabaseClient();
-    const orgId = ctx.organization.id;
-    const nowIso = new Date().toISOString();
-    const canProjects = hasPermission(ctx, "project.read");
-
-    const [projectsRes, overdueRes, pendingRes] = await Promise.all([
-      canProjects
-        ? supabase.from("projects").select("id, name_ar, status, planned_end_date").eq("organization_id", orgId).limit(80)
-        : Promise.resolve({ data: [] as Array<{ id: string; name_ar: string; status: string; planned_end_date: string | null }> }),
-      canProjects
-        ? supabase
-            .from("workflow_instance_steps")
-            .select("id, instance_id")
-            .eq("organization_id", orgId)
-            .in("status", ["ready", "in_progress"])
-            .lt("due_at", nowIso)
-            .limit(40)
-        : Promise.resolve({ data: [] as Array<{ id: string }> }),
-      hasPermission(ctx, "approval.review") || canViewManagementAi(ctx)
-        ? supabase
-            .from("approval_requests")
-            .select("id, title, entity_id")
-            .eq("organization_id", orgId)
-            .in("status", ["pending", "in_progress"])
-            .limit(40)
-        : Promise.resolve({ data: [] as Array<{ id: string; title: string; entity_id: string | null }> }),
-    ]);
-
-    const overdueCount = overdueRes.data?.length ?? 0;
-    const pendingCount = pendingRes.data?.length ?? 0;
-    const projectNotes = (projectsRes.data ?? []).slice(0, 5).map((p) => ({
-      id: p.id,
-      nameAr: p.name_ar,
-      reasonAr:
-        p.planned_end_date && p.planned_end_date < riyadhTodayYmd()
-          ? "تجاوز تاريخ الانتهاء المخطط"
-          : "ضمن المشاريع المصرّح بعرضها",
-      href: `/projects/${p.id}`,
-    }));
-
-    const facts: ManagementInsightFacts = {
-      followUpProjects: projectNotes.length,
-      overdueStages: overdueCount,
-      pendingApprovals: pendingCount,
-      projectNotes,
-      dataAsOf: riyadhTodayYmd(),
-    };
+    const facts = await loadExecutiveIntelligenceFacts(ctx);
+    if (!facts) throw new ForbiddenError();
 
     const explained = await explainManagementInsights({
       provider,
-      organizationId: orgId,
+      organizationId: ctx.organization.id,
       facts,
       forceRefresh: Boolean(input?.refresh),
     });

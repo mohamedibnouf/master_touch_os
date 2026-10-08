@@ -115,9 +115,32 @@ export const managementInsightItemSchema = z.object({
   href: z.string().max(300).nullable(),
 });
 
+export const managementObservationSchema = z.object({
+  issue_key: z.string().min(1).max(80),
+  title_ar: z.string().min(1).max(300),
+  explanation_ar: z.string().min(1).max(800),
+  evidence_ref: z.string().max(80).nullable(),
+});
+
+export const managementRecommendationSchema = z.object({
+  priority: z.enum(["critical", "high", "medium", "low"]),
+  problem_ar: z.string().min(1).max(400),
+  evidence_ar: z.string().min(1).max(600),
+  impact_ar: z.string().min(1).max(400),
+  action_ar: z.string().min(1).max(600),
+  owner_role_ar: z.string().max(80).nullable(),
+  timeframe_ar: z.string().max(80).nullable(),
+  record_ref: z.string().max(80).nullable(),
+  href: z.string().max(300).nullable(),
+});
+
 export const managementInsightSchema = z.object({
   headline_ar: z.string().min(1).max(400),
+  executive_summary_ar: z.string().min(1).max(2000),
   items: z.array(managementInsightItemSchema).max(8),
+  observations: z.array(managementObservationSchema).max(8),
+  recommendations: z.array(managementRecommendationSchema).max(8),
+  limitations_ar: z.string().max(800),
   generated_at: z.string().min(1).max(40),
   data_as_of: z.string().min(1).max(40),
 });

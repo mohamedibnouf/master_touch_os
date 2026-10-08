@@ -4,27 +4,61 @@ import { managementInsightSchema, type ManagementInsight, type ManagementInsight
 import { buildManagementInsightsPrompt, AI_PROMPT_VERSIONS } from "../prompts";
 import { getCachedAiArtifact, hashAiInput, setCachedAiArtifact } from "../cache";
 import { AI_DISCLAIMER_AR } from "../limits";
-import { MANAGEMENT_INSIGHTS_SCHEMA_VERSION } from "../management-insights-contract";
+import {
+  MANAGEMENT_INSIGHTS_SCHEMA_VERSION,
+  validateManagementInsightPayload,
+} from "../management-insights-contract";
+import { invalidProviderResponseError } from "../provider-errors";
+import { coerceExecutiveFacts } from "../executive-intelligence/facts-builder";
+import { groundManagementInsight } from "../executive-intelligence/grounding";
+import type { ExecutiveIntelligenceFacts } from "../executive-intelligence/types";
 
 export async function explainManagementInsights(input: {
   provider: AiProvider;
   organizationId: string;
-  facts: ManagementInsightFacts;
+  facts: ManagementInsightFacts | ExecutiveIntelligenceFacts;
   forceRefresh?: boolean;
-}): Promise<{ insight: ManagementInsight; cached: boolean; facts: ManagementInsightFacts; disclaimerAr: string }> {
-  const items = input.facts.projectNotes.slice(0, 5).map((p) => ({
+}): Promise<{
+  insight: ManagementInsight;
+  cached: boolean;
+  facts: ExecutiveIntelligenceFacts;
+  disclaimerAr: string;
+}> {
+  const facts = coerceExecutiveFacts(input.facts);
+  const items = facts.projectNotes.slice(0, 5).map((p) => ({
     title_ar: p.nameAr,
     explanation_ar: p.reasonAr,
     href: p.href,
   }));
 
   const factsPayload = {
-    follow_up_projects: input.facts.followUpProjects,
-    overdue_stages: input.facts.overdueStages,
-    pending_approvals: input.facts.pendingApprovals,
+    follow_up_projects: facts.followUpProjects,
+    overdue_stages: facts.overdueStages,
+    pending_approvals: facts.pendingApprovals,
     insight_items: items,
     generated_at: new Date().toISOString(),
-    data_as_of: input.facts.dataAsOf,
+    data_as_of: facts.dataAsOf,
+    metrics: facts.metrics.map((m) => ({
+      key: m.key,
+      label_ar: m.labelAr,
+      value: m.value,
+      unit: m.unit,
+      availability: m.availability,
+      denominator: m.denominator,
+    })),
+    delayed_projects: facts.delayedProjects.map((p) => ({
+      id: p.id,
+      name_ar: p.nameAr,
+      overdue_days: p.overdueDays,
+    })),
+    progress_sample: facts.progressSample.map((p) => ({
+      id: p.id,
+      name_ar: p.nameAr,
+      percent: p.percent,
+    })),
+    pending_approval_titles: facts.pendingApprovalRows.map((p) => p.titleAr),
+    allowed_roles_ar: facts.allowedRolesAr,
+    limitations_ar: facts.limitationsAr,
   };
 
   const inputHash = hashAiInput({ v: AI_PROMPT_VERSIONS.managementInsights, factsPayload, model: input.provider.model });
@@ -36,7 +70,7 @@ export async function explainManagementInsights(input: {
       inputHash,
     });
     if (cached) {
-      return { insight: cached.payload, cached: true, facts: input.facts, disclaimerAr: AI_DISCLAIMER_AR };
+      return { insight: cached.payload, cached: true, facts, disclaimerAr: AI_DISCLAIMER_AR };
     }
   }
 
@@ -55,11 +89,24 @@ export async function explainManagementInsights(input: {
     },
   });
 
-  const insight: ManagementInsight = {
-    ...structured.value,
-    items: structured.value.items,
-    data_as_of: input.facts.dataAsOf,
-  };
+  const checked = validateManagementInsightPayload(structured.value);
+  if (!checked.ok) {
+    throw invalidProviderResponseError("AI_SCHEMA_VALIDATION_FAILED", {
+      operation: "management_insights",
+      pipeline: "management_insights",
+      promptVersion: AI_PROMPT_VERSIONS.managementInsights,
+      schemaVersion: MANAGEMENT_INSIGHTS_SCHEMA_VERSION,
+      schemaIssues: checked.issues,
+    });
+  }
+
+  const insight = groundManagementInsight(
+    {
+      ...checked.value,
+      data_as_of: facts.dataAsOf,
+    },
+    facts,
+  );
 
   setCachedAiArtifact({
     organizationId: input.organizationId,
@@ -69,5 +116,5 @@ export async function explainManagementInsights(input: {
     payload: insight,
   });
 
-  return { insight, cached: false, facts: input.facts, disclaimerAr: AI_DISCLAIMER_AR };
+  return { insight, cached: false, facts, disclaimerAr: AI_DISCLAIMER_AR };
 }

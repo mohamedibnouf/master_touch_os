@@ -7,5 +7,9 @@ describe("dashboard home", () => {
     expect(src).toContain("loadDashboardViz");
     expect(src).not.toContain("DashboardVizBlock");
     expect(src).toContain("HomeTodayCards");
+    expect(src).toContain("ExecutiveIntelligenceBlock");
+    expect(src).toContain("loadExecutiveIntelligenceFacts");
+    expect(src).not.toContain("refreshManagementInsightsAction");
+    expect(src).not.toContain("getManagementInsightFactsAction");
   });
 });

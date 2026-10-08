@@ -112,9 +112,14 @@ function mockForSchema(schemaName: string, facts: Record<string, unknown>): unkn
   }
 
   if (schemaName === "management-insights") {
+    const items = Array.isArray(facts.insight_items) ? facts.insight_items : [];
     return {
       headline_ar: "رؤى إدارية مبنية على إشارات تشغيلية محسوبة.",
-      items: Array.isArray(facts.insight_items) ? facts.insight_items : [],
+      executive_summary_ar: "الملخص مبني على المقاييس الحتمية المزوّدة دون اختراع أرقام.",
+      items,
+      observations: [],
+      recommendations: [],
+      limitations_ar: "التحليل استشاري ويعتمد على العينة المصرّح بها.",
       generated_at: now,
       data_as_of: typeof facts.data_as_of === "string" ? facts.data_as_of : now,
     };

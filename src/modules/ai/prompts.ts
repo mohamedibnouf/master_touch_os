@@ -9,7 +9,7 @@ export const AI_PROMPT_VERSIONS = {
   documentAnalysis: "document-analysis:v1",
   businessCase: "business-case:v1",
   executiveReport: "executive-report:v1",
-  managementInsights: "management-insights:v2",
+  managementInsights: "management-insights:v3",
 } as const;
 
 export function buildBaseSafetyPrompt(): string {
@@ -99,8 +99,11 @@ export function buildManagementInsightsPrompt(): string {
   return [
     buildBaseSafetyPrompt(),
     `Task version: ${AI_PROMPT_VERSIONS.managementInsights}.`,
-    "Explain the supplied deterministic org-level counts and project names.",
-    "Do not invent additional projects. Only mention projects listed in facts.insight_items.",
+    "Write an Arabic executive intelligence brief for the General Manager using ONLY MASTER_TOUCH_CONTEXT facts.",
+    "Do not invent counts, percentages, budgets, dates, employees, or projects.",
+    "evidence_ref and record_ref must be a supplied metric key or project id.",
+    "Recommendations are advisory. Do not claim any workflow, payroll, or approval action was executed.",
+    "Deduplicate observations by issue_key. Prefer delayed projects and overdue stages over generic advice.",
     managementInsightResponseInstructions(),
   ].join("\n");
 }
