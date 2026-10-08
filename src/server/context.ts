@@ -13,21 +13,17 @@ import {
   AUTH_ORGANIZATION_COLUMNS,
   AUTH_PROFILE_COLUMNS,
 } from "@/lib/query-projections";
-import { startPerf } from "@/lib/perf/server-timing";
 
 async function loadAuthContext(): Promise<AuthContext | null> {
-  const done = startPerf("auth_context");
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    done();
     return null;
   }
 
-  const doneIdentity = startPerf("auth_context_identity");
   const [profileResult, membershipResult] = await Promise.all([
     supabase.from("profiles").select(AUTH_PROFILE_COLUMNS).eq("id", user.id).maybeSingle<Profile>(),
     supabase
@@ -43,18 +39,9 @@ async function loadAuthContext(): Promise<AuthContext | null> {
         organizations: Organization | Organization[] | null;
       }>(),
   ]);
-  doneIdentity();
-
-  if (profileResult.error) {
-    logger.error("auth profile query failed", { code: profileResult.error.code ?? null });
-  }
-  if (membershipResult.error) {
-    logger.error("auth membership query failed", { code: membershipResult.error.code ?? null });
-  }
 
   const profile = profileResult.data;
   if (!profile) {
-    done();
     return null;
   }
 
@@ -64,11 +51,9 @@ async function loadAuthContext(): Promise<AuthContext | null> {
     : membership?.organizations;
 
   if (!membership || !organization) {
-    done();
     return null;
   }
 
-  const doneGrants = startPerf("auth_context_grants");
   const [employeeResult, roleResult] = await Promise.all([
     supabase
       .from("employees")
@@ -83,7 +68,6 @@ async function loadAuthContext(): Promise<AuthContext | null> {
       .eq("profile_id", user.id)
       .eq("organization_id", organization.id),
   ]);
-  doneGrants();
 
   if (roleResult.error) {
     logger.error("auth user_roles query failed", { code: roleResult.error.code ?? null });
@@ -108,7 +92,6 @@ async function loadAuthContext(): Promise<AuthContext | null> {
     organizationId: organization.id,
   }) as PermissionKey[];
 
-  done();
   return {
     userId: user.id,
     profile,

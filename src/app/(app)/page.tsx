@@ -12,9 +12,20 @@ import { ManagementAiInsights } from "@/components/ai/management-ai-insights";
 import { canViewManagementAi } from "@/modules/ai/security/permissions";
 import { getAiPlatformConfig } from "@/modules/ai/config-env";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
-import type { AuthContext } from "@/types/models";
 
-async function DashboardVizBlock({ ctx }: { ctx: AuthContext }) {
+export default async function DashboardPage() {
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+
+  const greetingName = ctx.profile.full_name_ar || ctx.profile.full_name_en || "مرحباً";
+  const displayDate = new Date().toLocaleDateString("ar-SA", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Riyadh",
+  });
+
   const supabase = await createServerSupabaseClient();
   const viz = await loadDashboardViz(ctx, supabase);
   const showAi = canViewManagementAi(ctx);
@@ -36,29 +47,6 @@ async function DashboardVizBlock({ ctx }: { ctx: AuthContext }) {
       : null;
 
   return (
-    <>
-      {viz ? <HomeDashboardViz viz={viz} /> : null}
-      {insightFacts ? (
-        <ManagementAiInsights enabled={Boolean(aiStatus?.enabled)} initialFacts={insightFacts} />
-      ) : null}
-    </>
-  );
-}
-
-export default async function DashboardPage() {
-  const ctx = await getAuthContext();
-  if (!ctx) redirect("/login");
-
-  const greetingName = ctx.profile.full_name_ar || ctx.profile.full_name_en || "مرحباً";
-  const displayDate = new Date().toLocaleDateString("ar-SA", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Riyadh",
-  });
-
-  return (
     <PageContainer data-testid="employee-home" className="space-y-4 md:space-y-5">
       <header className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
@@ -70,9 +58,11 @@ export default async function DashboardPage() {
         <p className="shrink-0 text-sm text-muted">{displayDate}</p>
       </header>
 
-      <Suspense fallback={<KpiRowSkeleton count={4} />}>
-        <DashboardVizBlock ctx={ctx} />
-      </Suspense>
+      {viz ? <HomeDashboardViz viz={viz} /> : null}
+
+      {insightFacts ? (
+        <ManagementAiInsights enabled={Boolean(aiStatus?.enabled)} initialFacts={insightFacts} />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch xl:gap-5">
         <div className="min-w-0 xl:col-span-8">

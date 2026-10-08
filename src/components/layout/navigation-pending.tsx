@@ -1,27 +1,16 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function navigationTargetKey(pathname: string, search: string): string {
-  return `${pathname}${search}`;
-}
-
-export function shouldShowNavigationPending(currentKey: string, pendingKey: string | null): boolean {
-  return pendingKey !== null && pendingKey !== currentKey;
-}
-
 export function NavigationPendingBar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
-  const currentKey = navigationTargetKey(pathname, search);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const active = shouldShowNavigationPending(currentKey, pendingKey);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const active = pendingPath !== null && pendingPath !== pathname;
 
   useEffect(() => {
-    const onPopState = () => setPendingKey(null);
+    const onPopState = () => setPendingPath(null);
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -44,13 +33,12 @@ export function NavigationPendingBar() {
         return;
       }
       if (url.origin !== window.location.origin) return;
-      const nextKey = navigationTargetKey(url.pathname, url.search);
-      if (nextKey === currentKey) return;
-      setPendingKey(nextKey);
+      if (url.pathname === pathname && url.search === window.location.search) return;
+      setPendingPath(url.pathname);
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [currentKey]);
+  }, [pathname]);
 
   return (
     <div

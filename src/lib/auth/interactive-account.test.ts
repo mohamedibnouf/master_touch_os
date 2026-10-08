@@ -70,13 +70,13 @@ describe("interactive account gate", () => {
     expect(isDisabledInteractiveAccount(ctx({ profileActive: true, employeeActive: false }))).toBe(true);
   });
 
-  it("layout signs out disabled accounts; middleware no longer queries profiles/employees", () => {
+  it("middleware signs out inactive profile/employee where cookies can be set", () => {
     const layout = readFileSync("src/app/(app)/layout.tsx", "utf8");
-    expect(layout).toContain("isDisabledInteractiveAccount");
-    expect(layout).toContain("signOut");
+    expect(layout).not.toContain("signOut");
     const mw = readFileSync("src/lib/supabase/middleware.ts", "utf8");
-    expect(mw).toContain("getUser");
-    expect(mw).not.toMatch(/from\("profiles"\)/);
-    expect(mw).not.toMatch(/from\("employees"\)/);
+    expect(mw).toContain('from("profiles")');
+    expect(mw).toContain('from("employees")');
+    expect(mw).toContain("signOut");
+    expect(mw).toContain('searchParams.set("disabled", "1")');
   });
 });

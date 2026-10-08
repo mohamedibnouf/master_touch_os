@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { navigationTargetKey, shouldShowNavigationPending } from "./navigation-pending";
+import { readFileSync } from "node:fs";
 
-describe("navigation pending includes search", () => {
-  it("treats tab query changes as pending navigation", () => {
-    const current = navigationTargetKey("/projects/abc", "?tab=overview");
-    const next = navigationTargetKey("/projects/abc", "?tab=stages");
-    expect(shouldShowNavigationPending(current, next)).toBe(true);
-    expect(shouldShowNavigationPending(current, current)).toBe(false);
+describe("navigation pending bar", () => {
+  it("does not use useSearchParams (avoids client Suspense stall on the app shell)", () => {
+    const src = readFileSync("src/components/layout/navigation-pending.tsx", "utf8");
+    expect(src).toContain("usePathname");
+    expect(src).not.toContain("useSearchParams");
+    const frame = readFileSync("src/components/layout/app-shell-frame.tsx", "utf8");
+    expect(frame).toContain("<NavigationPendingBar />");
+    expect(frame).not.toMatch(/Suspense[\s\S]{0,80}NavigationPendingBar/);
   });
 });
