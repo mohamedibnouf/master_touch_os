@@ -1,3 +1,4 @@
+import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -65,8 +66,8 @@ export default async function ExecutiveReportPage() {
                   {report.activity.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
                       <span>
-                        <span className="font-medium text-ink">{a.action}</span>
-                        <span className="text-muted"> · {a.entityType}</span>
+                        <span className="font-medium text-ink">{auditActionLabel(a.action, locale)}</span>
+                        <span className="text-muted"> · {auditEntityLabel(a.entityType, locale)}</span>
                       </span>
                       <span className="text-xs tabular-nums text-muted">
                         {new Date(a.createdAt).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}

@@ -216,7 +216,6 @@ export default async function ClientInvoiceDetailPage({ params }: { params: Prom
                     type="number"
                     step="0.01"
                     min="0.01"
-                    max={String(outstanding)}
                     defaultValue={String(outstanding)}
                     required
                     data-testid="client-payment-amount"

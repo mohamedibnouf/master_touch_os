@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidateViews } from "@/server/revalidate-views";
 import { z } from "zod";
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
@@ -43,45 +43,45 @@ function requiredEntityPermission(entityType: SupportedEntityType): string | nul
 async function revalidateEntityPaths(entityType: SupportedEntityType, entityId: string) {
   const supabase = await createServerSupabaseClient();
 
-  revalidatePath("/approvals");
-  revalidatePath("/");
+  revalidateViews("/approvals");
+  revalidateViews("/");
 
   switch (entityType) {
     case "purchase_request":
-      revalidatePath("/procurement");
-      revalidatePath("/procurement/purchase-requests");
-      revalidatePath(`/procurement/purchase-requests/${entityId}`);
+      revalidateViews("/procurement");
+      revalidateViews("/procurement/purchase-requests");
+      revalidateViews(`/procurement/purchase-requests/${entityId}`);
       return;
     case "quotation_comparison":
     case "quotation_recommendation": {
       const { data } = await supabase.from("quotation_comparisons").select("rfq_id").eq("id", entityId).maybeSingle();
       if (data?.rfq_id) {
-        revalidatePath("/procurement");
-        revalidatePath("/procurement/rfqs");
-        revalidatePath(`/procurement/rfqs/${data.rfq_id}`);
-        revalidatePath(`/procurement/rfqs/${data.rfq_id}/comparison`);
+        revalidateViews("/procurement");
+        revalidateViews("/procurement/rfqs");
+        revalidateViews(`/procurement/rfqs/${data.rfq_id}`);
+        revalidateViews(`/procurement/rfqs/${data.rfq_id}/comparison`);
       }
       return;
     }
     case "purchase_order":
-      revalidatePath("/procurement");
-      revalidatePath("/procurement/purchase-orders");
-      revalidatePath(`/procurement/purchase-orders/${entityId}`);
+      revalidateViews("/procurement");
+      revalidateViews("/procurement/purchase-orders");
+      revalidateViews(`/procurement/purchase-orders/${entityId}`);
       return;
     case "supplier_invoice":
-      revalidatePath("/finance");
-      revalidatePath("/finance/supplier-invoices");
-      revalidatePath(`/finance/supplier-invoices/${entityId}`);
+      revalidateViews("/finance");
+      revalidateViews("/finance/supplier-invoices");
+      revalidateViews(`/finance/supplier-invoices/${entityId}`);
       return;
     case "client_valuation":
-      revalidatePath("/finance");
-      revalidatePath("/finance/client-valuations");
-      revalidatePath(`/finance/client-valuations/${entityId}`);
+      revalidateViews("/finance");
+      revalidateViews("/finance/client-valuations");
+      revalidateViews(`/finance/client-valuations/${entityId}`);
       return;
     case "variation":
-      revalidatePath("/finance");
-      revalidatePath("/finance/variations");
-      revalidatePath(`/finance/variations/${entityId}`);
+      revalidateViews("/finance");
+      revalidateViews("/finance/variations");
+      revalidateViews(`/finance/variations/${entityId}`);
       return;
   }
 }

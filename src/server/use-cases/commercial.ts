@@ -3,7 +3,7 @@ import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidateViews } from "@/server/revalidate-views";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -19,7 +19,13 @@ import { authorize } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { StorageService } from "@/server/services/storage.service";
-import { grossWithVat, roundMoney, vatAmount } from "@/server/domain/commercial";
+import {
+  grossWithVat,
+  invoiceFitsCertified,
+  roundMoney,
+  valuationInvoiceCapacity,
+  vatAmount,
+} from "@/server/domain/commercial";
 
 async function ensureApprovalAndDecide(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -52,6 +58,7 @@ async function ensureApprovalAndDecide(
         entity_type: input.entityType,
         entity_id: input.entityId,
         title: input.title,
+        title_en: input.titleEn?.trim() ? input.titleEn.trim().slice(0, 240) : null,
         status: "in_progress",
         mode: "sequential",
         requested_by: ctx.userId,
@@ -171,7 +178,7 @@ export async function attachEntityDocumentAction(
     newValues: { document_id: doc.id, role },
   });
 
-  if (revalidate) revalidatePath(revalidate);
+  if (revalidate) revalidateViews(revalidate);
   });
 }
 
@@ -250,8 +257,8 @@ export async function createProjectContractAction(
     entityId: data.id,
   });
 
-  revalidatePath(`/projects/${parsed.data.projectId}`);
-  revalidatePath(`/projects/${parsed.data.projectId}/commercial/contract`);
+  revalidateViews(`/projects/${parsed.data.projectId}`);
+  revalidateViews(`/projects/${parsed.data.projectId}/commercial/contract`);
   });
 }
 
@@ -266,7 +273,7 @@ export async function activateProjectContractAction(
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.rpc("activate_project_contract", { p_contract_id: contractId });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/projects/${projectId}/commercial/contract`);
+  revalidateViews(`/projects/${projectId}/commercial/contract`);
   });
 }
 
@@ -316,7 +323,7 @@ export async function createContractMilestoneAction(
     status: "planned",
   });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/projects/${parsed.data.projectId}/commercial/milestones`);
+  revalidateViews(`/projects/${parsed.data.projectId}/commercial/milestones`);
   });
 }
 
@@ -335,7 +342,7 @@ export async function markMilestoneEligibleAction(
     p_comments: comments,
   });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/projects/${projectId}/commercial/milestones`);
+  revalidateViews(`/projects/${projectId}/commercial/milestones`);
   });
 }
 
@@ -411,8 +418,8 @@ export async function createClientValuationAction(
   const { error: calcErr } = await supabase.rpc("recalculate_client_valuation", { p_valuation_id: val.id });
   if (calcErr) throw new DatabaseError(calcErr);
 
-  revalidatePath("/finance/client-valuations");
-  revalidatePath(`/finance/client-valuations/${val.id}`);
+  revalidateViews("/finance/client-valuations");
+  revalidateViews(`/finance/client-valuations/${val.id}`);
   });
 }
 
@@ -458,6 +465,7 @@ export async function submitClientValuationForReviewAction(
       entity_type: "client_valuation",
       entity_id: valuationId,
       title: `مراجعة مستخلص ${val.valuation_number}`,
+      title_en: `Review valuation ${val.valuation_number}`,
       status: "in_progress",
       mode: "sequential",
       requested_by: ctx.userId,
@@ -493,8 +501,8 @@ export async function submitClientValuationForReviewAction(
     priority: "high",
   });
 
-  revalidatePath(`/finance/client-valuations/${valuationId}`);
-  revalidatePath("/approvals");
+  revalidateViews(`/finance/client-valuations/${valuationId}`, "/finance/client-valuations", "/approvals");
+  revalidateViews("/approvals");
   });
 }
 
@@ -524,7 +532,7 @@ export async function approveClientValuationInternalAction(
     approverId: ctx.userId,
   });
 
-  revalidatePath(`/finance/client-valuations/${valuationId}`);
+  revalidateViews(`/finance/client-valuations/${valuationId}`, "/finance/client-valuations", "/approvals");
   });
 }
 
@@ -542,7 +550,7 @@ export async function markValuationUnderClientReviewAction(
     .eq("id", valuationId)
     .eq("status", "submitted");
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/finance/client-valuations/${valuationId}`);
+  revalidateViews(`/finance/client-valuations/${valuationId}`, "/finance/client-valuations", "/approvals");
   });
 }
 
@@ -578,7 +586,7 @@ export async function recordClientValuationCertificationAction(
     p_comments: parsed.data.comments ?? null,
   });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/finance/client-valuations/${parsed.data.valuationId}`);
+  revalidateViews(`/finance/client-valuations/${parsed.data.valuationId}`, "/finance/client-valuations");
   });
 }
 
@@ -624,10 +632,22 @@ export async function createClientInvoiceAction(
     if (!val || !["certified", "partially_certified"].includes(val.status)) {
       throw new ValidationError("المستخلص غير معتمد من العميل.", "Valuation not client-certified.");
     }
+    // certified_amount is VAT-inclusive; cap the invoice total (incl. VAT) by the
+    // certified amount minus what is already invoiced against this valuation.
     const certified = Number(val.certified_amount ?? 0);
+    const { data: priorInvoices } = await supabase
+      .from("client_invoices")
+      .select("total")
+      .eq("valuation_id", parsed.data.valuationId)
+      .in("status", ["issued", "partially_paid", "paid", "overdue"]);
+    const alreadyInvoiced = (priorInvoices ?? []).reduce((sum, row) => sum + Number(row.total ?? 0), 0);
     const total = grossWithVat(parsed.data.taxableAmount, parsed.data.vatRate);
-    if (total > certified + 0.001) {
-      throw new ValidationError("مبلغ الفاتورة يتجاوز المبلغ المعتمد.", "Invoice exceeds certified amount.");
+    if (!invoiceFitsCertified(total, certified, alreadyInvoiced)) {
+      const remaining = valuationInvoiceCapacity(certified, alreadyInvoiced);
+      throw new ValidationError(
+        `إجمالي الفاتورة شاملاً الضريبة (${total.toLocaleString("ar-SA")}) يتجاوز المبلغ المعتمد المتبقي للمستخلص (${remaining.toLocaleString("ar-SA")}). أدخل المبلغ قبل الضريبة.`,
+        `The invoice total including VAT (${total.toLocaleString("en-US")}) exceeds the valuation's remaining certified amount (${remaining.toLocaleString("en-US")}). Enter the amount before VAT.`,
+      );
     }
   }
 
@@ -655,8 +675,8 @@ export async function createClientInvoiceAction(
     .single();
   if (error || !inv) throw new DatabaseError(error);
 
-  revalidatePath("/finance/client-invoices");
-  revalidatePath(`/finance/client-invoices/${inv.id}`);
+  revalidateViews("/finance/client-invoices");
+  revalidateViews(`/finance/client-invoices/${inv.id}`);
   redirect(`/finance/client-invoices/${inv.id}`);
   });
 }
@@ -674,8 +694,8 @@ export async function issueClientInvoiceAction(
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.rpc("issue_client_invoice", { p_invoice_id: invoiceId });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/finance/client-invoices/${invoiceId}`);
-  revalidatePath("/finance/client-invoices");
+  revalidateViews(`/finance/client-invoices/${invoiceId}`);
+  revalidateViews("/finance/client-invoices");
   redirect(`/finance/client-invoices/${invoiceId}`);
   });
 }
@@ -745,8 +765,8 @@ export async function createVariationAction(
     .single();
   if (error || !vo) throw new DatabaseError(error);
 
-  revalidatePath("/finance/variations");
-  revalidatePath(`/finance/variations/${vo.id}`);
+  revalidateViews("/finance/variations");
+  revalidateViews(`/finance/variations/${vo.id}`);
   });
 }
 
@@ -793,6 +813,7 @@ export async function submitVariationAction(
       entity_type: "variation",
       entity_id: variationId,
       title: `اعتماد أمر تغيير ${vo.vo_number}`,
+      title_en: `Approve variation ${vo.vo_number}`,
       status: "in_progress",
       mode: "sequential",
       requested_by: ctx.userId,
@@ -815,7 +836,7 @@ export async function submitVariationAction(
   });
   if (stepErr) throw new DatabaseError(stepErr);
 
-  revalidatePath(`/finance/variations/${variationId}`);
+  revalidateViews(`/finance/variations/${variationId}`, "/finance/variations", "/approvals");
   });
 }
 
@@ -838,8 +859,8 @@ export async function approveVariationWithAmountAction(
     p_approved_amount: approvedAmount,
   });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/finance/variations/${variationId}`);
-  revalidatePath("/finance/variations");
-  revalidatePath("/approvals");
+  revalidateViews(`/finance/variations/${variationId}`, "/finance/variations", "/approvals");
+  revalidateViews("/finance/variations");
+  revalidateViews("/approvals");
   });
 }

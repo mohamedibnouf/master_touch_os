@@ -1,3 +1,4 @@
+import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import { EmptyState, PageHeader, Section } from "@/components/ui/primitives";
@@ -47,9 +48,9 @@ export default async function ManagementActivityPage() {
             {snapshot.activity.map((a) => (
               <li key={a.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-ink">{a.action}</p>
+                  <p className="font-medium text-ink">{auditActionLabel(a.action, locale)}</p>
                   <p className="text-muted">
-                    {a.entityType}
+                    {auditEntityLabel(a.entityType, locale)}
                     {a.entityId ? (
                       <span className="font-mono text-xs" dir="ltr">
                         {` · ${a.entityId.slice(0, 8)}…`}

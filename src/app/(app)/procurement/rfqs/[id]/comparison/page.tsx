@@ -432,7 +432,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
           <h2 className="mb-3 text-sm font-semibold text-ink">{tc.submittedTitle}</h2>
           <p className="text-sm text-ink">{comparison.recommendation_reason}</p>
           <p className="mt-2 text-xs tabular-nums text-muted">
-            {comparison.recommended_at ? new Date(comparison.recommended_at).toLocaleString(intlLocale(locale)) : ""}
+            {comparison.recommended_at ? new Date(comparison.recommended_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" }) : ""}
           </p>
         </Card>
       ) : null}

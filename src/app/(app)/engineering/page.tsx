@@ -67,7 +67,7 @@ export default async function EngineeringPage({
   const { project: projectFilter, module: moduleFilter = "rfi" } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const now = new Date().toISOString();
-  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" });
+  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "Asia/Riyadh" });
 
   const [projects, disciplines] = await Promise.all([
     supabase

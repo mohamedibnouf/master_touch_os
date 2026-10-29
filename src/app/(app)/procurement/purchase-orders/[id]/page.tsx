@@ -1,3 +1,4 @@
+import { auditActionLabel } from "@/lib/ui/audit-action-labels";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -329,8 +330,8 @@ export default async function PurchaseOrderDetailPage({
           <ul className="space-y-2 text-sm">
             {audit.map((a) => (
               <li key={a.id} className="flex justify-between gap-4 border-b border-line pb-2">
-                <span dir="ltr" className="font-mono text-xs text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
+                <span className="text-ink">{auditActionLabel(a.action, locale)}</span>
+                <span className="text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}</span>
               </li>
             ))}
           </ul>

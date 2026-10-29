@@ -56,7 +56,7 @@ export default async function DocumentControlPage({
   const { type, overdue, q } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const now = new Date().toISOString();
-  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" });
+  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "Asia/Riyadh" });
 
   let query = supabase
     .from("documents")

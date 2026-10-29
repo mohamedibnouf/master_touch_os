@@ -1,3 +1,4 @@
+import { auditActionLabel } from "@/lib/ui/audit-action-labels";
 import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
@@ -48,7 +49,19 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
   const tm = td.matching;
   const common = t.financePayables.common;
 
-  const audit = await repo.getAuditForEntity("supplier_invoice", id);
+  const purchaseOrderId = (invoice.purchase_order_id as string | null) ?? null;
+  const [audit, grnRes] = await Promise.all([
+    repo.getAuditForEntity("supplier_invoice", id),
+    purchaseOrderId
+      ? supabase
+          .from("goods_receipts")
+          .select("id, receipt_number, status")
+          .eq("purchase_order_id", purchaseOrderId)
+          .neq("status", "draft")
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] as Array<{ id: string; receipt_number: string; status: string }> }),
+  ]);
+  const grnNumbers = (grnRes.data ?? []).map((g) => g.receipt_number).filter(Boolean);
 
   const supplier = Array.isArray(invoice.suppliers) ? invoice.suppliers[0] : invoice.suppliers;
   const project = Array.isArray(invoice.projects) ? invoice.projects[0] : invoice.projects;
@@ -90,7 +103,12 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
       state: poLeg,
       detail: (po as Record<string, string> | null)?.po_number ?? undefined,
     },
-    { key: "grn", label: tm.legs.grn, state: grnLeg },
+    {
+      key: "grn",
+      label: tm.legs.grn,
+      state: grnLeg,
+      detail: grnNumbers.length > 0 ? grnNumbers.join(locale === "ar" ? "، " : ", ") : undefined,
+    },
     { key: "invoice", label: tm.legs.invoice, state: invoiceLeg, detail: invoice.invoice_number },
   ];
   const isClean = matchFlags.length === 0 && !hasDiscrepancy;
@@ -336,7 +354,6 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
                   type="number"
                   step="0.01"
                   min="0.01"
-                  max={String(outstanding)}
                   defaultValue={String(outstanding)}
                   required
                   className="tabular-nums"
@@ -387,8 +404,8 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
           <ul className="space-y-2 text-sm">
             {audit.map((a) => (
               <li key={a.id} className="flex justify-between gap-4 border-b border-line pb-2">
-                <span className="text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
+                <span className="text-ink">{auditActionLabel(a.action, locale)}</span>
+                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}</span>
               </li>
             ))}
           </ul>

@@ -175,7 +175,7 @@ export default async function PurchaseOrderPrintPage({
         <footer className="mt-8 border-t border-line pt-6 text-xs text-muted">
           <p>{tp.footer}</p>
           <p className="mt-1">
-            {tp.issuedAt}: {po.issued_at ? new Date(po.issued_at).toLocaleString(intlLocale(locale)) : "—"}
+            {tp.issuedAt}: {po.issued_at ? new Date(po.issued_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" }) : "—"}
           </p>
         </footer>
       </article>

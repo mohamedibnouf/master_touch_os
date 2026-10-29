@@ -681,6 +681,7 @@ export default async function ProjectDetailPage({
                       key={node.id}
                       node={node}
                       current={node.id === focusedStageId}
+                      active={node.id === workflow.currentNodeId}
                       isLast={index === workflow.nodes.length - 1}
                       projectId={project.id}
                       candidates={responsibleCandidates}

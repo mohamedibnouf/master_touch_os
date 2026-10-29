@@ -114,6 +114,8 @@ export const procurementSourcingEn: Dictionary["procurementSourcing"] = {
       rfqTitlePlaceholder: "RFQ — {number}",
       responseDueDate: "Response due date",
       createRfq: "Create RFQ →",
+      linkedRfqsTitle: "Linked requests for quotation",
+      openRfq: "Open RFQ",
       approvalTitle: "Approval status",
       approvalStatus: "Request status:",
       attachmentsTitle: "Request attachments",

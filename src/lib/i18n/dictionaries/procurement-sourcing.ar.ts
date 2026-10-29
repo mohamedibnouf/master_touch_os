@@ -113,6 +113,8 @@ export const procurementSourcingAr = {
       rfqTitlePlaceholder: "RFQ — {number}",
       responseDueDate: "موعد الرد",
       createRfq: "إنشاء RFQ →",
+      linkedRfqsTitle: "طلبات عروض الأسعار المرتبطة",
+      openRfq: "فتح طلب عرض السعر",
       approvalTitle: "حالة الاعتماد",
       approvalStatus: "حالة الطلب:",
       attachmentsTitle: "مرفقات الطلب",

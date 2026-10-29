@@ -39,6 +39,8 @@ const STEP_STATUS_AR: Record<string, string> = {
   completed: "مكتمل",
   skipped: "متجاوز",
   rejected: "مرفوض",
+  approved: "معتمد",
+  cancelled: "ملغاة",
 };
 
 const PROJECT_STATUS_EN: Record<string, string> = {
@@ -81,6 +83,8 @@ const STEP_STATUS_EN: Record<string, string> = {
   completed: "Completed",
   skipped: "Skipped",
   rejected: "Rejected",
+  approved: "Approved",
+  cancelled: "Cancelled",
 };
 
 type LabelLocale = "ar" | "en";

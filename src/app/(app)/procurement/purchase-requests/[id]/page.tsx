@@ -1,3 +1,4 @@
+import { auditActionLabel } from "@/lib/ui/audit-action-labels";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -41,7 +42,7 @@ export default async function PurchaseRequestDetailPage({
   const td = t.procurementSourcing.requests.detail;
   const common = t.procurementSourcing.common;
 
-  const [approval, audit, users] = await Promise.all([
+  const [approval, audit, users, linkedRfqsRes] = await Promise.all([
     repo.getApprovalForEntity("purchase_request", id),
     repo.getAuditForEntity("purchase_request", id),
     supabase
@@ -51,7 +52,16 @@ export default async function PurchaseRequestDetailPage({
       .eq("status", "active")
       .order("joined_at", { ascending: false })
       .limit(200),
+    hasPermission(ctx, "rfq.read")
+      ? supabase
+          .from("rfqs")
+          .select("id, rfq_number, title, status")
+          .eq("purchase_request_id", id)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as Array<{ id: string; rfq_number: string; title: string | null; status: string }> }),
   ]);
+  const linkedRfqs = linkedRfqsRes.data ?? [];
 
   const project = (Array.isArray(pr.projects) ? pr.projects[0] : pr.projects) as
     | { project_code: string; name_ar: string | null; name_en?: string | null }
@@ -215,6 +225,25 @@ export default async function PurchaseRequestDetailPage({
         </Card>
       ) : null}
 
+      {linkedRfqs.length > 0 ? (
+        <Card data-testid="pr-linked-rfqs">
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.linkedRfqsTitle}</h2>
+          <ul className="divide-y divide-line text-sm">
+            {linkedRfqs.map((rfq) => (
+              <li key={rfq.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <span className="flex items-center gap-2">
+                  <span dir="ltr" className="font-mono text-xs text-ink">{rfq.rfq_number}</span>
+                  <CommercialStatusBadge status={rfq.status} locale={locale} />
+                </span>
+                <Link href={`/procurement/rfqs/${rfq.id}`} className="font-medium text-primary hover:underline">
+                  {td.openRfq}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {pr.approval_request_id && approval ? (
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-ink">{td.approvalTitle}</h2>
@@ -249,8 +278,8 @@ export default async function PurchaseRequestDetailPage({
           <ul className="divide-y divide-line text-sm">
             {audit.map((a) => (
               <li key={a.id} className="flex justify-between gap-3 py-2">
-                <span className="text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
+                <span className="text-ink">{auditActionLabel(a.action, locale)}</span>
+                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}</span>
               </li>
             ))}
           </ul>

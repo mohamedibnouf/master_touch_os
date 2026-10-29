@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidateViews } from "@/server/revalidate-views";
 import { z } from "zod";
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -13,6 +13,7 @@ import { authorize } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { grossWithVat, vatAmount } from "@/server/domain/commercial";
+import { paymentErrorCopy } from "@/lib/commercial/payment-errors";
 import {
   COMMERCIAL_INTEGRITY_ERROR as INTEGRITY_ERROR,
   checkSupplierInvoiceAgainstPo,
@@ -20,6 +21,13 @@ import {
   isSupplierInvoicePayable,
   isVariationApprovable,
 } from "@/modules/procurement/integrity";
+
+/** Payment RPC failures carry stable codes (050/051); show their localized message instead of a generic error. */
+function paymentRpcError(error: { message?: string | null; details?: string | null }): Error {
+  const copy = paymentErrorCopy(error);
+  if (!copy) return new DatabaseError(error);
+  return copy.kind === "conflict" ? new ConflictError(copy.ar, copy.en) : new ValidationError(copy.ar, copy.en);
+}
 
 export async function createSupplierInvoiceAction(
   _prev: FormActionState,
@@ -100,8 +108,8 @@ export async function createSupplierInvoiceAction(
     logger.error("supplier invoice match evaluation failed", { invoiceId: inv.id, code: matchErr.code });
   }
 
-  revalidatePath("/finance/supplier-invoices");
-  revalidatePath(`/finance/supplier-invoices/${inv.id}`);
+  revalidateViews("/finance/supplier-invoices");
+  revalidateViews(`/finance/supplier-invoices/${inv.id}`);
   });
 }
 
@@ -121,7 +129,7 @@ export async function approveSupplierInvoiceForPaymentAction(
   if (invoiceError) throw new DatabaseError(invoiceError);
   if (!invoice) throw new NotFoundError("فاتورة المورد", "Supplier invoice");
   if (invoice.status === "approved_for_payment" || invoice.status === "paid" || invoice.status === "partially_paid") {
-    revalidatePath(`/finance/supplier-invoices/${invoiceId}`);
+    revalidateViews(`/finance/supplier-invoices/${invoiceId}`);
     return;
   }
   if (!isSupplierInvoiceApprovable(invoice.status)) {
@@ -149,6 +157,7 @@ export async function approveSupplierInvoiceForPaymentAction(
         entity_type: "supplier_invoice",
         entity_id: invoiceId,
         title: `اعتماد فاتورة مورد ${invoice.invoice_number}`,
+        title_en: `Approve supplier invoice ${invoice.invoice_number}`,
         status: "in_progress",
         mode: "sequential",
         requested_by: ctx.userId,
@@ -194,9 +203,9 @@ export async function approveSupplierInvoiceForPaymentAction(
   });
   if (error) throw new DatabaseError(error);
 
-  revalidatePath(`/finance/supplier-invoices/${invoiceId}`);
-  revalidatePath("/finance/supplier-invoices");
-  revalidatePath("/approvals");
+  revalidateViews(`/finance/supplier-invoices/${invoiceId}`);
+  revalidateViews("/finance/supplier-invoices");
+  revalidateViews("/approvals");
   });
 }
 
@@ -248,7 +257,7 @@ export async function recordSupplierPaymentAction(
     p_bank_reference: parsed.data.bankReference ?? null,
     p_notes: parsed.data.notes ?? null,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throw paymentRpcError(error);
 
   await new AuditService(supabase).log({
     organizationId: ctx.organization.id,
@@ -258,11 +267,11 @@ export async function recordSupplierPaymentAction(
     newValues: { amount: parsed.data.amount },
   });
 
-  revalidatePath(`/finance/supplier-invoices/${parsed.data.invoiceId}`);
-  revalidatePath("/finance/supplier-invoices");
-  revalidatePath("/finance");
-  revalidatePath(`/projects/${invoice.project_id}`);
-  if (invoice.purchase_order_id) revalidatePath(`/procurement/purchase-orders/${invoice.purchase_order_id}`);
+  revalidateViews(`/finance/supplier-invoices/${parsed.data.invoiceId}`);
+  revalidateViews("/finance/supplier-invoices");
+  revalidateViews("/finance");
+  revalidateViews(`/projects/${invoice.project_id}`);
+  if (invoice.purchase_order_id) revalidateViews(`/procurement/purchase-orders/${invoice.purchase_order_id}`);
   });
 }
 
@@ -285,9 +294,9 @@ export async function approveVariationAction(
     p_approved_amount: approvedAmount,
   });
   if (error) throw new DatabaseError(error);
-  revalidatePath(`/finance/variations/${variationId}`);
-  revalidatePath("/finance/variations");
-  revalidatePath("/approvals");
+  revalidateViews(`/finance/variations/${variationId}`);
+  revalidateViews("/finance/variations");
+  revalidateViews("/approvals");
   });
 }
 
@@ -322,9 +331,9 @@ export async function recordClientPaymentAction(
     p_reference: parsed.data.reference,
     p_payment_method: parsed.data.paymentMethod,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throw paymentRpcError(error);
 
-  revalidatePath(`/finance/client-invoices/${parsed.data.invoiceId}`);
-  revalidatePath("/finance/receivables");
+  revalidateViews(`/finance/client-invoices/${parsed.data.invoiceId}`, "/finance/client-invoices");
+  revalidateViews("/finance/receivables");
   });
 }

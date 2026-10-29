@@ -1288,7 +1288,7 @@ export default async function EmployeeDetailPage({
                         <td className="p-2">{d.document_number ?? "—"}</td>
                         <td className="p-2 tabular-nums">{d.expiry_date ?? "—"}</td>
                         <td className="p-2 tabular-nums text-muted">
-                          {new Date(d.created_at).toLocaleDateString(intlLocale(locale))}
+                          {new Date(d.created_at).toLocaleDateString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}
                         </td>
                       </tr>
                     ))}
@@ -1471,7 +1471,7 @@ export default async function EmployeeDetailPage({
                 <li key={a.id} className="flex justify-between gap-3 border-b border-line pb-1">
                   <span className="min-w-0 font-medium text-ink">{auditActionLabel(a.action, locale)}</span>
                   <span className="shrink-0 tabular-nums text-muted">
-                    {new Date(a.created_at).toLocaleString(intlLocale(locale))}
+                    {new Date(a.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}
                   </span>
                 </li>
               ))}

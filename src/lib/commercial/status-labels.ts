@@ -52,6 +52,10 @@ export const COMMERCIAL_STATUS_AR: Record<string, string> = {
   certified: "معتمد من العميل",
   planned: "مخطط",
   claimed: "مُطالب",
+  compliant: "مطابق",
+  partial: "جزئي",
+  non_compliant: "غير مطابق",
+  not_assessed: "لم يُقيَّم",
 };
 
 export const COMMERCIAL_STATUS_EN: Record<string, string> = {
@@ -108,6 +112,10 @@ export const COMMERCIAL_STATUS_EN: Record<string, string> = {
   certified: "Certified by client",
   planned: "Planned",
   claimed: "Claimed",
+  compliant: "Compliant",
+  partial: "Partial",
+  non_compliant: "Non-compliant",
+  not_assessed: "Not assessed",
 };
 
 export function commercialStatusLabel(status: string, locale: "ar" | "en" = "ar"): string {

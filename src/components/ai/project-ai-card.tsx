@@ -58,7 +58,7 @@ export function ProjectAiCard({
           </p>
           <p className="mt-2 text-sm leading-6 text-muted">{view.intelligence.summary_ar}</p>
           <p className="mt-1 text-xs text-muted">
-            {format(t.ai.generatedAt, { date: new Date(view.generatedAt).toLocaleString(intlLocale(locale)) })}
+            {format(t.ai.generatedAt, { date: new Date(view.generatedAt).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" }) })}
             {view.cached ? ` · ${t.ai.cachedCopy}` : ""}
           </p>
           <button

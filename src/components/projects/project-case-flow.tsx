@@ -93,19 +93,31 @@ export function ProjectCaseFlow({ children }: { children: ReactNode }) {
 export function CaseFlowStep({
   node,
   current,
+  active = current,
   isLast,
   projectId,
   candidates,
   children,
 }: {
   node: WorkflowViewNode;
+  /** The stage focused on the page (?stage= or the workflow's current stage). */
   current: boolean;
+  /** The workflow's current (actionable) stage. */
+  active?: boolean;
   isLast: boolean;
   projectId?: string;
   candidates?: ResponsibleCandidate[];
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(current);
+  // The page re-renders in place after a stage is completed, so this component keeps
+  // its state. When the workflow's current stage moves, collapse the finished stage and
+  // expand the new current one (so its "Complete stage" action is visible).
+  const [seen, setSeen] = useState({ current, active });
+  if (seen.current !== current || seen.active !== active) {
+    setSeen({ current, active });
+    setOpen(seen.active !== active ? active : current);
+  }
   const { t, locale } = useI18n();
   const copy = t.projectWorkflow.caseFlow;
   const name = pickLocalized(locale, node.nameAr, node.nameEn);

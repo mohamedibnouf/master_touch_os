@@ -4,6 +4,13 @@ import type { AuthContext } from "@/types/models";
 import { hasPermission } from "@/server/policies/authorize";
 import { deriveDeadlineState } from "@/modules/projects/deadline";
 import type { DonutSegment } from "@/components/charts/semantic-charts";
+import { pickLocalized, type Locale } from "@/lib/i18n/config";
+import { approvalStatusLabel, projectStatusLabel } from "@/lib/ui/operational-labels";
+
+const STAGE_ATTENTION_LABELS = {
+  ar: { onTrack: "في المسار", dueSoon: "اقترب موعدها", overdue: "متأخرة", waitingApproval: "بانتظار الموافقة" },
+  en: { onTrack: "On track", dueSoon: "Due soon", overdue: "Overdue", waitingApproval: "Awaiting approval" },
+} as const;
 
 type ActiveBar = { id: string; label: string; href: string; percent: number; hint: string };
 
@@ -25,6 +32,7 @@ export type DashboardViz = {
 export async function loadDashboardViz(
   ctx: AuthContext,
   supabase: import("@supabase/supabase-js").SupabaseClient,
+  locale: Locale = "ar",
 ): Promise<DashboardViz | null> {
   const canOrg =
     hasPermission(ctx, "reports.management.read") || hasPermission(ctx, "employee.read");
@@ -47,8 +55,8 @@ export async function loadDashboardViz(
   const [projectsRes, overdueStepsRes, employeesRes, pendingApprovalsRes, instancesRes, activeStepsRes, approvalsRes] =
     await Promise.all([
       canProjects
-        ? supabase.from("projects").select("id, status, name_ar").eq("organization_id", orgId).limit(400)
-        : Promise.resolve({ data: [] as Array<{ id: string; status: string; name_ar: string }> }),
+        ? supabase.from("projects").select("id, status, name_ar, name_en").eq("organization_id", orgId).limit(400)
+        : Promise.resolve({ data: [] as Array<{ id: string; status: string; name_ar: string; name_en: string | null }> }),
       canProjects
         ? supabase
             .from("workflow_instance_steps")
@@ -112,15 +120,8 @@ export async function loadDashboardViz(
     if (status === "draft") return "neutral";
     return "info";
   };
-  const statusLabel: Record<string, string> = {
-    active: "نشط",
-    completed: "مكتمل",
-    on_hold: "متوقف",
-    cancelled: "ملغى",
-    draft: "مسودة",
-  };
   const projectStatus: DonutSegment[] = [...statusCounts.entries()].map(([status, value]) => ({
-    label: statusLabel[status] ?? status,
+    label: projectStatusLabel(status, locale),
     value,
     tone: statusTone(status),
   }));
@@ -140,7 +141,7 @@ export async function loadDashboardViz(
       if (row.status === "completed" || row.status === "skipped") cur.completed += 1;
       byInstance.set(row.instance_id, cur);
     }
-    const nameById = new Map(projects.map((p) => [p.id, p.name_ar]));
+    const nameById = new Map(projects.map((p) => [p.id, pickLocalized(locale, p.name_ar, p.name_en)]));
     progressRows = instances
       .map((inst) => {
         const counts = byInstance.get(inst.id);
@@ -149,10 +150,17 @@ export async function loadDashboardViz(
         const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
         return {
           id: inst.entity_id,
-          label: nameById.get(inst.entity_id) ?? "مشروع",
+          label: nameById.get(inst.entity_id) ?? (locale === "en" ? "Project" : "مشروع"),
           href: `/projects/${inst.entity_id}`,
           percent,
-          hint: total > 0 ? `${completed} من ${total}` : "بدون مراحل",
+          hint:
+            total > 0
+              ? locale === "en"
+                ? `${completed} of ${total}`
+                : `${completed} من ${total}`
+              : locale === "en"
+                ? "No stages"
+                : "بدون مراحل",
         };
       })
       .slice(0, 8);
@@ -187,14 +195,6 @@ export async function loadDashboardViz(
   for (const row of approvalsRes.data ?? []) {
     approvalCounts.set(row.status, (approvalCounts.get(row.status) ?? 0) + 1);
   }
-  const approvalLabel: Record<string, string> = {
-    pending: "معلّق",
-    in_progress: "قيد التنفيذ",
-    approved: "معتمد",
-    rejected: "مرفوض",
-    cancelled: "ملغى",
-    completed: "مكتمل",
-  };
   const approvalTone = (status: string): DonutSegment["tone"] => {
     if (status === "approved" || status === "completed") return "success";
     if (status === "pending" || status === "in_progress") return "warning";
@@ -202,7 +202,7 @@ export async function loadDashboardViz(
     return "neutral";
   };
   const approvalStatus: DonutSegment[] = [...approvalCounts.entries()].map(([status, value]) => ({
-    label: approvalLabel[status] ?? status,
+    label: approvalStatusLabel(status, locale),
     value,
     tone: approvalTone(status),
   }));
@@ -219,10 +219,10 @@ export async function loadDashboardViz(
     projectStatusTotal: projects.length,
     progressRows,
     stageAttention: [
-      { label: "في المسار", value: onTrack, tone: "success" },
-      { label: "اقترب موعدها", value: dueSoon, tone: "warning" },
-      { label: "متأخرة", value: overdue, tone: "danger" },
-      { label: "بانتظار الموافقة", value: waitingApproval, tone: "info" },
+      { label: STAGE_ATTENTION_LABELS[locale].onTrack, value: onTrack, tone: "success" },
+      { label: STAGE_ATTENTION_LABELS[locale].dueSoon, value: dueSoon, tone: "warning" },
+      { label: STAGE_ATTENTION_LABELS[locale].overdue, value: overdue, tone: "danger" },
+      { label: STAGE_ATTENTION_LABELS[locale].waitingApproval, value: waitingApproval, tone: "info" },
     ],
     approvalStatus,
     approvalTotal: (approvalsRes.data ?? []).length,

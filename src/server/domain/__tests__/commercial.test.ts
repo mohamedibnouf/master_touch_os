@@ -12,6 +12,10 @@ import {
   receivableAgeBucket,
   RECEIVABLE_AGE_LABELS,
   revisedContractValue,
+  invoiceFitsCertified,
+  valuationInvoiceCapacity,
+  valuationTaxableBase,
+  valuationVatRate,
   vatAmount,
 } from "../commercial";
 
@@ -96,5 +100,34 @@ describe("commercial domain", () => {
     expect(receivableAgeBucket("2025-12-20", today)).toBe("61_90");
     expect(receivableAgeBucket("2025-10-01", today)).toBe("90_plus");
     expect(RECEIVABLE_AGE_LABELS["90_plus"]).toContain("90");
+  });
+});
+
+describe("client invoice from valuation", () => {
+  const val = { certified_amount: 92000, total_claim: 92000, current_claim_amount: 80000, vat_amount: 12000 };
+
+  it("pre-fills the pre-VAT amount, not the VAT-inclusive certified amount", () => {
+    expect(valuationVatRate(val)).toBe(15);
+    expect(valuationTaxableBase(val)).toBe(80000);
+    expect(grossWithVat(valuationTaxableBase(val), valuationVatRate(val))).toBe(92000);
+  });
+
+  it("scales partial certification to its net-of-VAT share", () => {
+    expect(valuationTaxableBase({ ...val, certified_amount: 46000 })).toBe(40000);
+    expect(valuationTaxableBase({ ...val, certified_amount: 0 })).toBe(0);
+  });
+
+  it("falls back to net claim or 15% when columns are missing", () => {
+    expect(valuationTaxableBase({ certified_amount: null, current_claim_amount: "80000", total_claim: 92000 })).toBe(80000);
+    expect(valuationTaxableBase({ certified_amount: 1150 })).toBe(1000);
+    expect(valuationVatRate({})).toBe(15);
+  });
+
+  it("rejects an invoice whose total exceeds the remaining certified amount", () => {
+    expect(invoiceFitsCertified(92000, 92000)).toBe(true);
+    expect(invoiceFitsCertified(105800, 92000)).toBe(false);
+    expect(invoiceFitsCertified(50000, 92000, 46000)).toBe(false);
+    expect(invoiceFitsCertified(46000, 92000, 46000)).toBe(true);
+    expect(valuationInvoiceCapacity(92000, 100000)).toBe(0);
   });
 });

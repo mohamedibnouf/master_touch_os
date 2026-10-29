@@ -8,7 +8,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClientInvoiceAction } from "@/server/use-cases/commercial";
-import { grossWithVat } from "@/server/domain/commercial";
+import { grossWithVat, valuationTaxableBase, valuationVatRate, type ValuationBillingAmounts } from "@/server/domain/commercial";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { intlLocale } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
@@ -35,7 +35,7 @@ export default async function NewClientInvoicePage({
     const { data } = await supabase
       .from("client_valuations")
       .select(
-        "id, valuation_number, project_id, contract_id, certified_amount, total_claim, status, project_contracts(client_name, contract_number), projects(project_code, name_ar)",
+        "id, valuation_number, project_id, contract_id, certified_amount, total_claim, current_claim_amount, vat_amount, status, project_contracts(client_name, contract_number), projects(project_code, name_ar)",
       )
       .eq("id", valuationId)
       .maybeSingle();
@@ -44,7 +44,7 @@ export default async function NewClientInvoicePage({
 
   const { data: valuations } = await supabase
     .from("client_valuations")
-    .select("id, valuation_number, certified_amount, total_claim, project_id, contract_id, status")
+    .select("id, valuation_number, certified_amount, total_claim, current_claim_amount, vat_amount, project_id, contract_id, status")
     .eq("organization_id", ctx.organization.id)
     .in("status", ["certified", "partially_certified"])
     .order("created_at", { ascending: false })
@@ -61,13 +61,16 @@ export default async function NewClientInvoicePage({
     .eq("organization_id", ctx.organization.id)
     .eq("status", "active");
 
-  const taxableDefault = selected
+  // certified_amount / total_claim include VAT — pre-fill the taxable (pre-VAT) base.
+  const certifiedGross = selected
     ? Number(
         (selected as Record<string, unknown>).certified_amount ??
           (selected as Record<string, unknown>).total_claim ??
           0,
       )
     : 0;
+  const vatRateDefault = selected ? valuationVatRate(selected as ValuationBillingAmounts) : 15;
+  const taxableDefault = selected ? valuationTaxableBase(selected as ValuationBillingAmounts) : 0;
 
   async function action(
     _prev: import("@/server/forms/form-state").FormActionState,
@@ -154,7 +157,7 @@ export default async function NewClientInvoicePage({
               <div className="rounded-md border border-line bg-surface-muted px-4 py-3 text-sm">
                 <p className="text-muted">{tf.certifiedForBilling}</p>
                 <p className="mt-1 font-semibold tabular-nums text-ink">
-                  <MoneyDisplay amount={taxableDefault} currency="SAR" locale={locale} />
+                  <MoneyDisplay amount={certifiedGross} currency="SAR" locale={locale} />
                 </p>
               </div>
             </>
@@ -188,7 +191,7 @@ export default async function NewClientInvoicePage({
               />
             </Field>
             <Field label={tf.vatRate}>
-              <Input name="vatRate" type="number" step="0.001" min="0" defaultValue="15" />
+              <Input name="vatRate" type="number" step="0.001" min="0" defaultValue={String(vatRateDefault)} />
             </Field>
             <Field label={tf.currency}>
               <Select name="currency" defaultValue="SAR">
@@ -201,7 +204,7 @@ export default async function NewClientInvoicePage({
           <p className="text-sm text-muted">
             {tf.expectedTotal}{" "}
             <span className="tabular-nums text-ink">
-              <MoneyDisplay amount={grossWithVat(taxableDefault, 15)} currency="SAR" locale={locale} />
+              <MoneyDisplay amount={grossWithVat(taxableDefault, vatRateDefault)} currency="SAR" locale={locale} />
             </span>
           </p>
 

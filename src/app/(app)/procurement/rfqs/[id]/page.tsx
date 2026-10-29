@@ -1,3 +1,4 @@
+import { auditActionLabel } from "@/lib/ui/audit-action-labels";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -321,8 +322,8 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
           <ul className="divide-y divide-line text-sm">
             {audit.map((a) => (
               <li key={a.id} className="flex justify-between gap-3 py-2">
-                <span className="text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
+                <span className="text-ink">{auditActionLabel(a.action, locale)}</span>
+                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}</span>
               </li>
             ))}
           </ul>

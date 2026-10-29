@@ -122,3 +122,75 @@ export function evaluateInvoiceMatchFlags(input: {
   }
   return flags;
 }
+
+/** VAT-relevant columns of a client valuation (see migrations 049/050). */
+export type ValuationBillingAmounts = {
+  /** Client-certified amount — VAT-inclusive (capped by `total_claim`). */
+  certified_amount?: number | string | null;
+  /** Submitted claim including VAT. */
+  total_claim?: number | string | null;
+  /** Submitted claim net of VAT (pre-VAT). */
+  current_claim_amount?: number | string | null;
+  vat_amount?: number | string | null;
+};
+
+function toNum(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * VAT rate (percent) implied by a valuation's submitted claim. Falls back to
+ * `fallbackRate` (15%) when the claim has no VAT breakdown.
+ */
+export function valuationVatRate(val: ValuationBillingAmounts, fallbackRate = 15): number {
+  const net = toNum(val.current_claim_amount);
+  const vat = toNum(val.vat_amount);
+  if (net !== null && net > 0 && vat !== null && vat >= 0) {
+    return roundMoney((vat / net) * 100, 3);
+  }
+  const total = toNum(val.total_claim);
+  if (net !== null && net > 0 && total !== null && total >= net) {
+    return roundMoney(((total - net) / net) * 100, 3);
+  }
+  return fallbackRate;
+}
+
+/**
+ * Pre-VAT (taxable) amount the client invoice for a valuation should start from.
+ * `certified_amount` and `total_claim` both include VAT, so the taxable base is the
+ * certified amount net of VAT (or the net current claim when nothing is certified yet).
+ */
+export function valuationTaxableBase(val: ValuationBillingAmounts, fallbackRate = 15): number {
+  const certified = toNum(val.certified_amount);
+  const total = toNum(val.total_claim);
+  const net = toNum(val.current_claim_amount);
+  const rate = valuationVatRate(val, fallbackRate);
+
+  if (certified === null) {
+    if (net !== null) return roundMoney(Math.max(0, net));
+    if (total !== null) return roundMoney(Math.max(0, total / (1 + rate / 100)));
+    return 0;
+  }
+  if (certified <= 0) return 0;
+  if (net !== null && total !== null && total > 0) {
+    if (certified >= total - 0.001) return roundMoney(net);
+    return roundMoney((certified * net) / total);
+  }
+  return roundMoney(certified / (1 + rate / 100));
+}
+
+/** Remaining VAT-inclusive capacity on a valuation after invoices already issued against it. */
+export function valuationInvoiceCapacity(certifiedAmount: number, alreadyInvoicedTotal: number): number {
+  return roundMoney(Math.max(0, certifiedAmount - alreadyInvoicedTotal));
+}
+
+/** True when an invoice total (incl. VAT) fits the valuation's remaining certified capacity. */
+export function invoiceFitsCertified(
+  invoiceTotal: number,
+  certifiedAmount: number,
+  alreadyInvoicedTotal = 0,
+): boolean {
+  return invoiceTotal <= valuationInvoiceCapacity(certifiedAmount, alreadyInvoicedTotal) + 0.001;
+}

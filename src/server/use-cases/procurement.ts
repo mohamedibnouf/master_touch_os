@@ -3,7 +3,8 @@ import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { revalidateViews } from "@/server/revalidate-views";
 import { z } from "zod";
 import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
@@ -31,7 +32,7 @@ import { grossWithVat, lineTotal, roundMoney, vatAmount } from "@/server/domain/
 import { generateCorrelationId } from "@/lib/utils";
 
 function revalidateCommercial(...paths: string[]) {
-  for (const path of paths) revalidatePath(path);
+  revalidateViews(...paths);
 }
 
 function authorizeRfqInvitationMutation(ctx: AuthContext | null): AuthContext {
@@ -201,6 +202,7 @@ async function createCommercialApproval(
       entity_type: input.entityType,
       entity_id: input.entityId,
       title: input.title,
+      title_en: input.titleEn?.trim() ? input.titleEn.trim().slice(0, 240) : null,
       status: "in_progress",
       mode: "sequential",
       requested_by: ctx.userId,
@@ -356,7 +358,7 @@ export async function applyCommercialApprovalDecisionAction(
         rejected_at: approved ? null : new Date().toISOString(),
       })
       .eq("id", request.entity_id);
-    revalidateCommercial(`/procurement/purchase-requests/${request.entity_id}`);
+    revalidateCommercial(`/procurement/purchase-requests/${request.entity_id}`, "/procurement/purchase-requests", "/procurement");
   }
   if (request?.entity_type === "quotation_comparison") {
     await supabase
@@ -387,7 +389,7 @@ export async function applyCommercialApprovalDecisionAction(
       .from("purchase_orders")
       .update({ status: approved ? "approved" : "cancelled" })
       .eq("id", request.entity_id);
-    revalidateCommercial(`/procurement/purchase-orders/${request.entity_id}`);
+    revalidateCommercial(`/procurement/purchase-orders/${request.entity_id}`, "/procurement/purchase-orders", "/procurement");
   }
 
   revalidateCommercial("/approvals", "/");
@@ -487,7 +489,13 @@ export async function createRfqFromPrAction(
     .update({ status: "converted_to_rfq" })
     .eq("id", pr.id);
   if (prErr) throw new DatabaseError(prErr);
-  revalidateCommercial(`/procurement/rfqs/${rfq.id}`, "/procurement/rfqs", `/procurement/purchase-requests/${prId}`);
+  revalidateCommercial(
+    `/procurement/rfqs/${rfq.id}`,
+    "/procurement/rfqs",
+    `/procurement/purchase-requests/${prId}`,
+    "/procurement/purchase-requests",
+  );
+  redirect(`/procurement/rfqs/${rfq.id}`);
   });
 }
 
@@ -847,7 +855,7 @@ export async function recommendAwardAction(
   const supabase = await createServerSupabaseClient();
   const { data: quote } = await supabase
     .from("supplier_quotations")
-    .select("id, total, project_id, rfq_id")
+    .select("id, total, project_id, rfq_id, quotation_number, currency")
     .eq("id", quotationId)
     .maybeSingle();
   if (!quote || quote.rfq_id !== rfqId) throw new NotFoundError("عرض السعر", "Quotation");
@@ -877,7 +885,13 @@ export async function recommendAwardAction(
 
   const approvalId = await createCommercialApproval(supabase, ctx, {
     title: `اعتماد ترسية عرض ${Number(quote.total).toLocaleString("ar-SA")} — قاعدة ${rule.min_amount}`,
-    titleEn: `Approve quotation award ${Number(quote.total).toLocaleString("en-GB")} — rule ${rule.min_amount}`,
+    titleEn: [
+      "Approve quotation award",
+      quote.quotation_number,
+      `— ${Number(quote.total).toLocaleString("en-US", { minimumFractionDigits: 2 })} ${quote.currency ?? "SAR"}`,
+    ]
+      .filter(Boolean)
+      .join(" "),
     entityType: "quotation_comparison",
     entityId: comparison.id,
     approverProfileId,
@@ -897,7 +911,7 @@ export async function recommendAwardAction(
     newValues: { quotation_id: quotationId, threshold_rule_id: rule.id, reason },
   });
 
-  revalidateCommercial(`/procurement/rfqs/${rfqId}/comparison`, "/approvals");
+  revalidateCommercial(`/procurement/rfqs/${rfqId}/comparison`, `/procurement/rfqs/${rfqId}`, "/procurement/rfqs", "/approvals");
   });
 }
 
@@ -1026,7 +1040,7 @@ export async function submitPurchaseOrderForApprovalAction(
     .update({ status: "pending_approval", approval_request_id: approvalId })
     .eq("id", poId);
   if (error) throw new DatabaseError(error);
-  revalidateCommercial(`/procurement/purchase-orders/${poId}`, "/approvals");
+  revalidateCommercial(`/procurement/purchase-orders/${poId}`, "/procurement/purchase-orders", "/procurement", "/approvals", "/");
   });
 }
 

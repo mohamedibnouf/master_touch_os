@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   });
 
   const supabase = await createServerSupabaseClient();
-  const viz = await loadDashboardViz(ctx, supabase);
+  const viz = await loadDashboardViz(ctx, supabase, locale);
   const showAi = canViewManagementAi(ctx);
 
   return (
