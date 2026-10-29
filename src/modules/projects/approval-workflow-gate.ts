@@ -1,5 +1,6 @@
 import { decisionFromCode, type OfficialApprovalCode } from "@/server/domain/approval";
 import type { WorkflowOutcome } from "@/server/domain/workflow";
+import type { Locale } from "@/lib/i18n/config";
 
 export type WorkflowApprovalLink = {
   requestOrganizationId: string;
@@ -175,15 +176,15 @@ export function mapWorkflowRpcError(message: string): {
   return { kind: "DATABASE", ar: "حدث خطأ أثناء حفظ البيانات. حاول مرة أخرى.", en: "A data error occurred." };
 }
 
-export function activityNarrative(action: string, newValues: unknown): string | null {
+export function activityNarrative(action: string, newValues: unknown, locale: Locale = "ar"): string | null {
   if (action !== "workflow.step.completed" && action !== "project.stage.started") return null;
   if (!newValues || typeof newValues !== "object") return null;
   const payload = newValues as Record<string, unknown>;
   if (payload.automatic === true && action === "workflow.step.completed") {
-    return "تم الانتقال تلقائياً بعد اكتمال الموافقة";
+    return locale === "en" ? "Advanced automatically once the approval was completed" : "تم الانتقال تلقائياً بعد اكتمال الموافقة";
   }
   if (payload.automatic === true && action === "project.stage.started") {
-    return "انتقل المشروع تلقائياً إلى المرحلة التالية";
+    return locale === "en" ? "The project moved to the next stage automatically" : "انتقل المشروع تلقائياً إلى المرحلة التالية";
   }
   return null;
 }

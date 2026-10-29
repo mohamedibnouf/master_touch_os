@@ -4,6 +4,9 @@ import { DocumentOpenControl, DocumentSourceBadge } from "@/components/documents
 import { createCurrentWorkflowGateApprovalAction } from "@/server/use-cases/platform";
 import { ApprovalActionPanel } from "@/components/projects/approval-action-panel";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
+import { approvalStatusLabel } from "@/lib/ui/operational-labels";
+import { format, intlLocale, pickLocalized, type Locale } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export type GateSupportingDocumentOption = {
   documentId: string;
@@ -26,14 +29,14 @@ export type FrozenGateDocument = {
   externalUrl: string | null;
 };
 
-function formatStamp(value: string | null | undefined): string {
+function formatStamp(value: string | null | undefined, locale: Locale): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
-  return new Date(parsed).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
+  return new Date(parsed).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
 }
 
-export function WorkflowGateSubmitFields({
+export async function WorkflowGateSubmitFields({
   projectId,
   projectCode,
   stageNameAr,
@@ -46,11 +49,13 @@ export function WorkflowGateSubmitFields({
   approvers: Array<{ id: string; name: string }>;
   documents: GateSupportingDocumentOption[];
 }) {
+  const { t } = await getI18n();
+  const copy = t.projectWorkflow.gate;
   return (
     <ServerActionForm action={createCurrentWorkflowGateApprovalAction} className="space-y-3" testId="workflow-gate-submit-form">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="title" value={`اعتماد مرحلة ${stageNameAr} — ${projectCode}`} />
-      <Field label="المعتمد">
+      <Field label={copy.approver}>
         <Select name="approverProfileId" required>
           {approvers.map((user) => (
             <option key={user.id} value={user.id}>
@@ -60,31 +65,31 @@ export function WorkflowGateSubmitFields({
         </Select>
       </Field>
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-medium text-navy">المستندات الداعمة</legend>
+        <legend className="mb-1 text-sm font-medium text-ink">{copy.supportingDocuments}</legend>
         {documents.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد مستندات حالية مرتبطة بهذا المشروع.</p>
+          <p className="text-sm text-muted">{copy.noProjectDocuments}</p>
         ) : (
           documents.map((doc) => (
-            <label key={doc.documentVersionId} className="flex items-start gap-2 rounded-[var(--radius-control)] border border-line bg-paper px-3 py-2 text-sm">
+            <label key={doc.documentVersionId} className="flex items-start gap-2 rounded-[var(--radius-control)] border border-line bg-surface-muted px-3 py-2 text-sm">
               <input type="checkbox" name="documentVersionId" value={doc.documentVersionId} className="mt-1" />
               <span>
                 <span className="block font-medium text-ink">{doc.title}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                  مراجعة {doc.revision}
+                  {format(copy.revision, { revision: doc.revision })}
                   <DocumentSourceBadge source={doc.fileSource} />
-                  {doc.isCurrent ? "حالية" : "تاريخية"}
+                  {doc.isCurrent ? copy.current : copy.historical}
                 </span>
               </span>
             </label>
           ))
         )}
       </fieldset>
-      <Button type="submit">إرسال المرحلة للاعتماد</Button>
+      <Button type="submit">{copy.submit}</Button>
     </ServerActionForm>
   );
 }
 
-export function WorkflowGateApprovalCard({
+export async function WorkflowGateApprovalCard({
   node,
   projectId,
   projectCode,
@@ -105,39 +110,41 @@ export function WorkflowGateApprovalCard({
   canCreate: boolean;
   canOpenStorage: boolean;
 }) {
+  const { t, locale } = await getI18n();
+  const copy = t.projectWorkflow.gate;
   const waiting = Boolean(node.openApproval);
   return (
-    <section data-testid="workflow-gate-approval-card" className="rounded-[var(--radius-card)] border-2 border-navy bg-white p-5 shadow-[var(--shadow-1)]">
-      <p className="text-xs font-semibold tracking-wide text-navy">اعتماد سير العمل</p>
-      <h2 className="mt-1 text-lg font-semibold text-navy">اعتماد المرحلة الحالية</h2>
+    <section data-testid="workflow-gate-approval-card" className="rounded-[var(--radius-card)] border-2 border-primary bg-surface p-5 shadow-[var(--shadow-1)]">
+      <p className="text-xs font-semibold tracking-wide text-primary">{copy.eyebrow}</p>
+      <h2 className="mt-1 text-lg font-semibold text-ink">{copy.title}</h2>
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-muted">المرحلة</dt>
+          <dt className="text-muted">{copy.stage}</dt>
           <dd>
-            {String(node.sequence).padStart(2, "0")} — {node.nameAr}
+            {String(node.sequence).padStart(2, "0")} — {pickLocalized(locale, node.nameAr, node.nameEn)}
           </dd>
         </div>
         <div>
-          <dt className="text-muted">الحالة</dt>
-          <dd>{waiting ? "بانتظار قرار المعتمد" : "بانتظار الإرسال للاعتماد"}</dd>
+          <dt className="text-muted">{copy.status}</dt>
+          <dd>{waiting ? copy.awaitingDecision : copy.awaitingSubmission}</dd>
         </div>
         <div>
-          <dt className="text-muted">المسؤول</dt>
-          <dd>{node.responsibleLabel ?? "غير محدد"}</dd>
+          <dt className="text-muted">{t.projectWorkflow.common.owner}</dt>
+          <dd>{node.responsibleLabel ?? t.projectWorkflow.common.notSet}</dd>
         </div>
         {waiting ? (
           <>
             <div>
-              <dt className="text-muted">المعتمد</dt>
+              <dt className="text-muted">{copy.approver}</dt>
               <dd>{node.openApproval?.approverLabel ?? node.approverLabel ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted">تاريخ الإرسال</dt>
-              <dd>{formatStamp(submittedAt)}</dd>
+              <dt className="text-muted">{copy.submittedAt}</dt>
+              <dd>{formatStamp(submittedAt, locale)}</dd>
             </div>
             <div>
-              <dt className="text-muted">حالة الطلب</dt>
-              <dd>{node.openApproval?.status ?? "—"}</dd>
+              <dt className="text-muted">{copy.requestStatus}</dt>
+              <dd>{node.openApproval?.status ? approvalStatusLabel(node.openApproval.status, locale) : "—"}</dd>
             </div>
           </>
         ) : null}
@@ -145,15 +152,15 @@ export function WorkflowGateApprovalCard({
 
       {waiting ? (
         <div className="mt-4 space-y-3" data-testid="workflow-gate-submitted">
-          <p className="text-sm font-medium text-navy">المستندات المقدّمة (مراجعة مجمّدة)</p>
+          <p className="text-sm font-medium text-ink">{copy.submittedDocuments}</p>
           {frozenDocuments.length === 0 ? (
-            <p className="text-sm text-muted">لا توجد مستندات مربوطة بهذا الطلب.</p>
+            <p className="text-sm text-muted">{copy.noLinkedDocuments}</p>
           ) : (
             <ul className="space-y-2">
               {frozenDocuments.map((doc) => (
                 <li key={doc.documentVersionId} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm">
                   <span>
-                    {doc.title} · مراجعة {doc.revision}{" "}
+                    {doc.title} · {format(copy.revision, { revision: doc.revision })}{" "}
                     <DocumentSourceBadge source={doc.fileSource} />
                   </span>
                   <DocumentOpenControl
@@ -183,7 +190,7 @@ export function WorkflowGateApprovalCard({
           />
         </div>
       ) : (
-        <p className="mt-4 text-sm text-muted">لا يمكن إرسال هذه المرحلة للاعتماد من حسابك الحالي.</p>
+        <p className="mt-4 text-sm text-muted">{copy.cannotSubmit}</p>
       )}
     </section>
   );

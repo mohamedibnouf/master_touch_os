@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
-export function ProjectProgress({
+export async function ProjectProgress({
   percent,
   completed,
   total,
@@ -11,14 +13,16 @@ export function ProjectProgress({
   total: number;
   tone?: "info" | "success" | "warning" | "danger";
 }) {
+  const { t } = await getI18n();
+  const copy = t.projectWorkflow.progress;
   const safe = Math.min(100, Math.max(0, percent));
   return (
     <div data-testid="project-progress">
-      <div className="mb-1 flex items-baseline justify-between gap-3">
-        <p className="text-sm font-medium text-ink">التقدم</p>
-        <p className="text-sm text-muted">
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium text-ink">{copy.label}</p>
+        <p className="text-sm tabular-nums text-muted">
           <span className="font-semibold text-ink">{safe}%</span>
-          {total > 0 ? ` · ${completed} من ${total} مراحل مكتملة` : null}
+          {total > 0 ? ` · ${format(copy.stagesCompleted, { completed, total })}` : null}
         </p>
       </div>
       <div
@@ -27,7 +31,7 @@ export function ProjectProgress({
         aria-valuenow={safe}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="تقدم المشروع"
+        aria-label={copy.ariaLabel}
       >
         <div
           className={cn(

@@ -24,11 +24,14 @@ const sql073 = readFileSync("supabase/migrations/073_project_workflow_approval_g
 const sql077 = readFileSync("supabase/migrations/077_step_local_workflow_execution.sql", "utf8");
 const sql078 = readFileSync("supabase/migrations/078_operational_document_version.sql", "utf8");
 const sql075 = readFileSync("supabase/migrations/075_ai_intelligence_platform.sql", "utf8");
-const pageSrc = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+const pageSrc =
+  readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8") +
+  readFileSync("src/lib/i18n/dictionaries/project-detail.ar.ts", "utf8");
 const platformSrc = readFileSync("src/server/use-cases/platform.ts", "utf8");
-const panelSrc = readFileSync("src/components/projects/approval-action-panel.tsx", "utf8");
+const workflowCopy = readFileSync("src/lib/i18n/dictionaries/project-workflow.ar.ts", "utf8");
+const panelSrc = readFileSync("src/components/projects/approval-action-panel.tsx", "utf8") + workflowCopy;
 const detailsSrc = readFileSync("src/components/projects/workflow-stage-details.tsx", "utf8");
-const cardSrc = readFileSync("src/components/projects/workflow-gate-approval-card.tsx", "utf8");
+const cardSrc = readFileSync("src/components/projects/workflow-gate-approval-card.tsx", "utf8") + workflowCopy;
 const notifySrc = readFileSync("src/server/services/notification.service.ts", "utf8");
 const workerSrc = readFileSync("src/server/services/notification-delivery-worker.ts", "utf8");
 const driveSrc = readFileSync("src/modules/documents/drive-ai-auth.ts", "utf8");

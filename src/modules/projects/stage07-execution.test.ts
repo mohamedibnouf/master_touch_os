@@ -19,7 +19,8 @@ import {
 const sql082 = readFileSync("supabase/migrations/082_project_execution_control.sql", "utf8");
 const sql081 = readFileSync("supabase/migrations/081_project_mobilization_readiness.sql", "utf8");
 const details = readFileSync("src/components/projects/workflow-stage-details.tsx", "utf8");
-const card = readFileSync("src/components/projects/execution-progress-card.tsx", "utf8");
+// UI copy lives in the projectWorkflow dictionary.
+const card = readFileSync("src/components/projects/execution-progress-card.tsx", "utf8") + readFileSync("src/lib/i18n/dictionaries/project-workflow.ar.ts", "utf8");
 const gate = readFileSync("src/modules/projects/approval-workflow-gate.ts", "utf8");
 const employee = readFileSync("src/lib/permissions/catalog.ts", "utf8");
 const platform = readFileSync("src/server/use-cases/platform.ts", "utf8");

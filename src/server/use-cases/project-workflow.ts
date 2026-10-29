@@ -34,6 +34,7 @@ import {
 } from "@/modules/projects/workflow-responsibility";
 import { resolveWorkflowStepExecutionLookup } from "@/modules/projects/workflow-step-execution";
 import { logger } from "@/lib/logger";
+import { pickLocalized, type Locale } from "@/lib/i18n/config";
 
 function asOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -157,11 +158,15 @@ export async function loadProjectWorkflowProjection(input: {
   roleNames: Map<string, string>;
   departmentNames?: Map<string, string>;
   jobTitles?: Map<string, string>;
+  /** UI language for derived labels (default "ar"). */
+  locale?: Locale;
   /** When provided, skips the workflow_instances round trip. */
   instance?: WorkflowInstanceRow | null;
 }): Promise<ProjectWorkflowProjection> {
   const nowIso = new Date().toISOString();
   const { supabase, ctx, projectId, stages, profileNames, roleNames } = input;
+  const locale: Locale = input.locale ?? "ar";
+  const en = locale === "en";
   const departmentNames = input.departmentNames ?? new Map<string, string>();
   const jobTitles = input.jobTitles ?? new Map<string, string>();
 
@@ -189,7 +194,11 @@ export async function loadProjectWorkflowProjection(input: {
         )
         .eq("instance_id", instance.id)
         .order("sequence"),
-      supabase.from("workflow_definitions").select("name_ar").eq("id", instance.definition_id).maybeSingle<{ name_ar: string }>(),
+      supabase
+        .from("workflow_definitions")
+        .select("name_ar, name_en")
+        .eq("id", instance.definition_id)
+        .maybeSingle<{ name_ar: string; name_en: string | null }>(),
     ]);
 
     const steps = (stepRows ?? []) as InstanceStepRow[];
@@ -294,7 +303,7 @@ export async function loadProjectWorkflowProjection(input: {
         openApproval,
         latestOfficialCode,
       });
-      const overdueLabel = step.due_at ? formatOverdueDurationAr(step.due_at, nowIso) : null;
+      const overdueLabel = step.due_at ? formatOverdueDurationAr(step.due_at, nowIso, locale) : null;
       const roleId = step.assigned_role_id ?? def?.assigned_role_id ?? null;
       const departmentId = step.assigned_department_id ?? def?.assigned_department_id ?? null;
       const assignment = resolveStageAssignment({
@@ -306,6 +315,7 @@ export async function loadProjectWorkflowProjection(input: {
         roleNames,
         departmentNames,
         jobTitles,
+        locale,
       });
       const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
       const assignmentKind = assignment.kind;
@@ -336,16 +346,20 @@ export async function loadProjectWorkflowProjection(input: {
         warningHours,
         nowIso,
       });
-      const remainingLabel = step.due_at ? formatRemainingAr(step.due_at, nowIso) : null;
-      const overdueSinceLabel = step.due_at ? formatOverdueSinceAr(step.due_at, nowIso) : null;
+      const remainingLabel = step.due_at ? formatRemainingAr(step.due_at, nowIso, locale) : null;
+      const overdueSinceLabel = step.due_at ? formatOverdueSinceAr(step.due_at, nowIso, locale) : null;
 
       const prev = steps[index - 1];
       let activationHint: string | null = null;
       if (isActive && prev && (prev.status === "completed" || prev.status === "skipped")) {
         const prevDef = asOne(prev.workflow_steps);
         activationHint = prevDef?.requires_approval
-          ? "تم الانتقال تلقائياً بعد اكتمال الموافقة"
-          : "تم الانتقال تلقائياً بعد اكتمال المرحلة السابقة";
+          ? en
+            ? "Advanced automatically once the approval was completed"
+            : "تم الانتقال تلقائياً بعد اكتمال الموافقة"
+          : en
+            ? "Advanced automatically once the previous stage was completed"
+            : "تم الانتقال تلقائياً بعد اكتمال المرحلة السابقة";
       }
 
       return {
@@ -357,8 +371,8 @@ export async function loadProjectWorkflowProjection(input: {
         visual,
         visualLabel:
           visual === "waiting_approval" || (visual === "overdue" && openApproval)
-            ? `${waitingApprovalPhrase(approverLabel)}${overdueLabel ? ` · ${overdueLabel}` : ""}`
-            : workflowVisualLabel(visual),
+            ? `${waitingApprovalPhrase(approverLabel, locale)}${overdueLabel ? ` · ${overdueLabel}` : ""}`
+            : workflowVisualLabel(visual, locale),
         engineStatus: step.status,
         gate: requiresApproval ? "APPROVAL" : "MANUAL_COMPLETION",
         requiresApproval,
@@ -378,6 +392,7 @@ export async function loadProjectWorkflowProjection(input: {
           openApproval,
           latestOfficialCode,
           overdueLabel,
+          locale,
           missingAssignee:
             requiresApproval &&
             !openApproval &&
@@ -413,13 +428,14 @@ export async function loadProjectWorkflowProjection(input: {
       mode: "workflow",
       instanceStatus: instance.status,
       current,
+      locale,
     });
 
     return {
       mode: "workflow",
       instanceId: instance.id,
       instanceStatus: instance.status,
-      definitionName: definition?.name_ar ?? null,
+      definitionName: definition ? pickLocalized(locale, definition.name_ar, definition.name_en) || null : null,
       nodes,
       progress,
       currentNodeId,
@@ -430,7 +446,7 @@ export async function loadProjectWorkflowProjection(input: {
 
   const { data: publishedDefs } = await supabase
     .from("workflow_definitions")
-    .select("id, name_ar, code")
+    .select("id, name_ar, name_en, code")
     .eq("status", "published")
     .eq("entity_type", "project")
     .or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`);
@@ -480,6 +496,7 @@ export async function loadProjectWorkflowProjection(input: {
           roleNames,
           departmentNames,
           jobTitles,
+        locale,
         });
         const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
         const visual = mapEngineStatusToVisual({
@@ -497,7 +514,7 @@ export async function loadProjectWorkflowProjection(input: {
           nameAr: step.name_ar as string,
           nameEn: step.name_en as string,
           visual,
-          visualLabel: workflowVisualLabel(visual),
+          visualLabel: workflowVisualLabel(visual, locale),
           engineStatus: "pending",
           gate: step.requires_approval ? "APPROVAL" : "MANUAL_COMPLETION",
           requiresApproval: Boolean(step.requires_approval),
@@ -511,7 +528,7 @@ export async function loadProjectWorkflowProjection(input: {
           dueAt: null,
           completedAt: null,
           completedByLabel: null,
-          blockReason: "بانتظار بدء مسار العمل",
+          blockReason: en ? "Waiting for the workflow to start" : "بانتظار بدء مسار العمل",
           overdueLabel: null,
           activationHint: null,
           instanceStepId: null,
@@ -534,12 +551,12 @@ export async function loadProjectWorkflowProjection(input: {
       });
       const currentNodeId = pickCurrentNodeId(nodes);
       const progress = deriveStageProgress(nodes);
-      const attention = buildProjectAttention({ mode: "preview", instanceStatus: null, current: null });
+      const attention = buildProjectAttention({ mode: "preview", instanceStatus: null, current: null, locale });
       return {
         mode: "preview",
         instanceId: null,
         instanceStatus: null,
-        definitionName: previewDef.name_ar,
+        definitionName: pickLocalized(locale, previewDef.name_ar, previewDef.name_en),
         nodes,
         progress,
         currentNodeId,
@@ -550,7 +567,7 @@ export async function loadProjectWorkflowProjection(input: {
   }
 
   if (stages.length === 0) {
-    const attention = buildProjectAttention({ mode: "empty", instanceStatus: null, current: null });
+    const attention = buildProjectAttention({ mode: "empty", instanceStatus: null, current: null, locale });
     return {
       mode: "empty",
       instanceId: null,
@@ -574,7 +591,7 @@ export async function loadProjectWorkflowProjection(input: {
       openApproval: null,
       latestOfficialCode: null,
     });
-    const overdueLabel = stage.due_at ? formatOverdueDurationAr(stage.due_at, nowIso) : null;
+    const overdueLabel = stage.due_at ? formatOverdueDurationAr(stage.due_at, nowIso, locale) : null;
     const assignment = resolveStageAssignment({
       assignedUserId: stage.owner_user_id,
       assignedRoleId: null,
@@ -583,6 +600,7 @@ export async function loadProjectWorkflowProjection(input: {
       roleNames,
       departmentNames,
       jobTitles,
+      locale,
     });
     const responsibleLabel = assignment.kind === "user" ? assignment.label : null;
     return {
@@ -592,7 +610,7 @@ export async function loadProjectWorkflowProjection(input: {
       nameAr: stage.name_ar,
       nameEn: stage.name_en,
       visual,
-      visualLabel: workflowVisualLabel(visual),
+      visualLabel: workflowVisualLabel(visual, locale),
       engineStatus: stage.status,
       gate: "MANUAL_COMPLETION",
       requiresApproval: Boolean(stage.requires_approval),
@@ -612,10 +630,16 @@ export async function loadProjectWorkflowProjection(input: {
         openApproval: null,
         latestOfficialCode: null,
         overdueLabel,
+        locale,
         missingAssignee: false,
       }),
       overdueLabel,
-      activationHint: visual === "current" ? "بعد الإكمال تُفعَّل المرحلة التالية تلقائياً" : null,
+      activationHint:
+        visual === "current"
+          ? en
+            ? "Completing this stage activates the next one automatically"
+            : "بعد الإكمال تُفعَّل المرحلة التالية تلقائياً"
+          : null,
       instanceStepId: null,
       projectStageId: stage.id,
       openApproval: null,
@@ -631,8 +655,8 @@ export async function loadProjectWorkflowProjection(input: {
         warningHours: null,
         nowIso,
       }),
-      remainingLabel: stage.due_at || stage.planned_end ? formatRemainingAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
-      overdueSinceLabel: stage.due_at || stage.planned_end ? formatOverdueSinceAr((stage.due_at ?? stage.planned_end) as string, nowIso) : null,
+      remainingLabel: stage.due_at || stage.planned_end ? formatRemainingAr((stage.due_at ?? stage.planned_end) as string, nowIso, locale) : null,
+      overdueSinceLabel: stage.due_at || stage.planned_end ? formatOverdueSinceAr((stage.due_at ?? stage.planned_end) as string, nowIso, locale) : null,
       workflowStepId: null,
       responsibleUserId: stage.owner_user_id,
       canAssignResponsible: false,
@@ -644,7 +668,9 @@ export async function loadProjectWorkflowProjection(input: {
   for (const node of nodes) {
     node.canComplete = Boolean(canUpdate && node.id === currentNodeId && node.visual !== "completed");
     if (node.visual === "current" && nodes.find((n) => n.sequence === node.sequence - 1)?.visual === "completed") {
-      node.activationHint = "تم الانتقال تلقائياً بعد اكتمال المرحلة السابقة";
+      node.activationHint = en
+        ? "Advanced automatically once the previous stage was completed"
+        : "تم الانتقال تلقائياً بعد اكتمال المرحلة السابقة";
     }
   }
 
@@ -654,6 +680,7 @@ export async function loadProjectWorkflowProjection(input: {
     mode: "legacy",
     instanceStatus: null,
     current,
+    locale,
   });
 
   return {

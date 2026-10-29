@@ -8,6 +8,8 @@ import { formatRiyadhDateTimeAr } from "@/modules/projects/deadline";
 import { cn } from "@/lib/utils";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 import { StageResponsibleAssign, type ResponsibleCandidate } from "@/components/projects/stage-responsible-assign";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 
 const ICON: Record<WorkflowViewNode["visual"], typeof Check> = {
   completed: Check,
@@ -38,7 +40,9 @@ function connectorClass(node: WorkflowViewNode) {
 }
 
 function ResponsibleBlock({ node }: { node: WorkflowViewNode }) {
-  const label = node.responsibleLabel ?? "غير محدد";
+  const { t } = useI18n();
+  const common = t.projectWorkflow.common;
+  const label = node.responsibleLabel ?? common.notSet;
   return (
     <div className="flex min-w-0 items-center gap-2 sm:justify-end">
       <span
@@ -52,14 +56,14 @@ function ResponsibleBlock({ node }: { node: WorkflowViewNode }) {
         )}
       </span>
       <div className="min-w-0 sm:text-end">
-        <p className="text-[11px] text-muted">المسؤول</p>
+        <p className="text-[11px] text-muted">{common.owner}</p>
         <p className="truncate text-sm font-medium text-ink" dir="auto">
           {label}
         </p>
         {node.assignmentSubtitle ? <p className="truncate text-xs text-muted">{node.assignmentSubtitle}</p> : null}
         {node.requiredRoleLabel ? (
           <>
-            <p className="mt-1 text-[11px] text-muted">الدور المطلوب</p>
+            <p className="mt-1 text-[11px] text-muted">{common.requiredRole}</p>
             <p className="truncate text-xs text-ink" dir="auto">
               {node.requiredRoleLabel}
             </p>
@@ -67,7 +71,7 @@ function ResponsibleBlock({ node }: { node: WorkflowViewNode }) {
         ) : null}
         {node.requiredDepartmentLabel && !node.requiredRoleLabel ? (
           <>
-            <p className="mt-1 text-[11px] text-muted">القسم المطلوب</p>
+            <p className="mt-1 text-[11px] text-muted">{common.requiredDepartment}</p>
             <p className="truncate text-xs text-ink" dir="auto">
               {node.requiredDepartmentLabel}
             </p>
@@ -102,6 +106,9 @@ export function CaseFlowStep({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(current);
+  const { t, locale } = useI18n();
+  const copy = t.projectWorkflow.caseFlow;
+  const name = pickLocalized(locale, node.nameAr, node.nameEn);
   const tone = nodeTone(node);
   const Icon = ICON[node.visual];
   const seq = String(node.sequence).padStart(2, "0");
@@ -113,7 +120,7 @@ export function CaseFlowStep({
           type="button"
           aria-expanded={open}
           aria-current={current ? "step" : undefined}
-          aria-label={`${seq} ${node.nameAr} — ${node.visualLabel}`}
+          aria-label={`${seq} ${name} — ${node.visualLabel}`}
           onClick={() => setOpen((v) => !v)}
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
@@ -135,27 +142,27 @@ export function CaseFlowStep({
           current && node.deadlineState === "DUE_SOON" && "border-warning-border bg-warning-soft",
           node.visual === "overdue" && "border-danger-border bg-danger-soft",
           !current && node.visual === "completed" && "border-line bg-surface-muted/50",
-          !current && node.visual === "upcoming" && "border-line bg-white",
-          !current && node.visual !== "completed" && node.visual !== "upcoming" && node.visual !== "overdue" && "border-line bg-white",
+          !current && node.visual === "upcoming" && "border-line bg-surface",
+          !current && node.visual !== "completed" && node.visual !== "upcoming" && node.visual !== "overdue" && "border-line bg-surface",
         )}
       >
         <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <button type="button" className="min-w-0 text-start" onClick={() => setOpen((v) => !v)}>
             <p className="text-[11px] tabular-nums text-muted">{seq}</p>
             <p className="truncate text-sm font-semibold text-ink" dir="auto">
-              {node.nameAr}
+              {name}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               <Badge tone={tone === "info" ? "info" : tone === "neutral" ? "neutral" : tone}>
-                {current && node.visual !== "overdue" ? "المرحلة الحالية" : node.visualLabel}
+                {current && node.visual !== "overdue" ? copy.currentStage : node.visualLabel}
               </Badge>
-              {node.requiresApproval ? <Badge tone="info">يتطلب اعتماد</Badge> : null}
-              {node.deadlineState === "DUE_SOON" ? <Badge tone="warning">اقترب موعد الانتهاء</Badge> : null}
+              {node.requiresApproval ? <Badge tone="info">{copy.requiresApproval}</Badge> : null}
+              {node.deadlineState === "DUE_SOON" ? <Badge tone="warning">{copy.dueSoon}</Badge> : null}
               {node.latestOfficialCode === "A" || node.latestOfficialCode === "B" ? (
-                <Badge tone="success">تم الاعتماد</Badge>
+                <Badge tone="success">{copy.approved}</Badge>
               ) : null}
-              {node.latestOfficialCode === "C" ? <Badge tone="warning">يتطلب تعديل</Badge> : null}
-              {node.latestOfficialCode === "D" ? <Badge tone="danger">مرفوض</Badge> : null}
+              {node.latestOfficialCode === "C" ? <Badge tone="warning">{copy.changesRequired}</Badge> : null}
+              {node.latestOfficialCode === "D" ? <Badge tone="danger">{copy.rejected}</Badge> : null}
             </div>
           </button>
           <div className="min-w-0 sm:max-w-[15rem]">
@@ -164,16 +171,16 @@ export function CaseFlowStep({
               <StageResponsibleAssign node={node} projectId={projectId} candidates={candidates} />
             ) : null}
             {node.dueAt ? (
-              <p className="mt-1 text-xs text-muted sm:text-end">موعد الإغلاق {formatRiyadhDateTimeAr(node.dueAt)}</p>
+              <p className="mt-1 text-xs text-muted sm:text-end">{format(copy.dueAt, { date: formatRiyadhDateTimeAr(node.dueAt, locale) })}</p>
             ) : null}
             {node.remainingLabel && node.deadlineState === "ON_TRACK" ? (
-              <p className="text-xs text-muted sm:text-end">متبقي {node.remainingLabel}</p>
+              <p className="text-xs text-muted sm:text-end">{format(copy.remaining, { time: node.remainingLabel })}</p>
             ) : null}
             {node.deadlineState === "DUE_SOON" && node.remainingLabel ? (
-              <p className="text-xs text-warning sm:text-end">متبقي {node.remainingLabel}</p>
+              <p className="text-xs text-warning sm:text-end">{format(copy.remaining, { time: node.remainingLabel })}</p>
             ) : null}
             {node.overdueSinceLabel ? (
-              <p className="text-xs text-danger sm:text-end">متأخرة منذ {node.overdueSinceLabel}</p>
+              <p className="text-xs text-danger sm:text-end">{format(copy.overdueSince, { time: node.overdueSinceLabel })}</p>
             ) : null}
           </div>
         </div>
@@ -181,7 +188,7 @@ export function CaseFlowStep({
           <div className="mt-3 border-t border-line pt-3">
             {node.visual === "completed" && node.completedAt ? (
               <p className="mb-2 text-xs text-muted">
-                اكتملت {formatRiyadhDateTimeAr(node.completedAt)}
+                {format(copy.completedAt, { date: formatRiyadhDateTimeAr(node.completedAt, locale) })}
                 {node.completedByLabel ? ` · ${node.completedByLabel}` : ""}
               </p>
             ) : null}

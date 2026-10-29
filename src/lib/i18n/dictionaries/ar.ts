@@ -1,8 +1,15 @@
+import { projectDetailAr } from "./project-detail.ar";
+import { projectWorkflowAr } from "./project-workflow.ar";
+import { projectCommercialAr } from "./project-commercial.ar";
+
 /**
  * Arabic is the source dictionary: its shape defines the Dictionary type, and en.ts
- * must provide every key. Add new namespaces per module as screens are translated.
+ * must provide every key. Large modules get their own <namespace>.{ar,en}.ts files.
  */
 export const ar = {
+  projectDetail: projectDetailAr,
+  projectWorkflow: projectWorkflowAr,
+  projectCommercial: projectCommercialAr,
   meta: {
     title: "ماستر تاتش | نظام التشغيل الداخلي",
     description: "نظام تشغيل الأعمال لماستر تاتش",
@@ -90,6 +97,38 @@ export const ar = {
     heroTitle: "منصة واحدة لإدارة المشاريع والفرق والعمليات",
     heroBody: "المشاريع والمشتريات والموارد البشرية والمالية في مكان واحد، بصلاحيات دقيقة لكل دور.",
     heroPoints: ["متابعة المشاريع والمراحل لحظياً", "موافقات ومستندات بمسار واضح", "حضور ورواتب وإجازات بدقة"],
+  },
+  projects: {
+    title: "المشاريع",
+    description: "سجل مشاريع الشركة مع التصفية والترقيم",
+    create: "إنشاء مشروع",
+    searchPlaceholder: "بحث بالاسم أو الرمز",
+    allStatuses: "كل الحالات",
+    allRisks: "كل مستويات المخاطر",
+    filter: "تصفية",
+    empty: "لا توجد مشاريع مطابقة.",
+    colCode: "الرمز",
+    colProject: "المشروع",
+    colStatus: "الحالة",
+    colRisk: "المخاطر",
+    colProgress: "التقدم",
+    summary: "{total} مشروع · صفحة {page} من {pages}",
+    previous: "السابق",
+    next: "التالي",
+    newTitle: "إنشاء مشروع",
+    newDescription: "يتم توليد رمز المشروع تلقائياً وبشكل آمن من قاعدة البيانات",
+    nameAr: "اسم المشروع بالعربية",
+    nameEn: "اسم المشروع بالإنجليزية",
+    descriptionField: "الوصف",
+    manager: "مدير المشروع",
+    unassigned: "بدون تعيين",
+    priority: "الأولوية",
+    priorities: { low: "منخفضة", medium: "متوسطة", high: "مرتفعة", critical: "حرجة" },
+    startDate: "تاريخ البداية",
+    plannedEndDate: "تاريخ الانتهاء المخطط",
+    location: "الموقع",
+    save: "حفظ المشروع",
+    cancel: "إلغاء",
   },
   home: {
     greeting: "مرحباً، {name}",

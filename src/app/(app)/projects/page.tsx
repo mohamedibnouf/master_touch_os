@@ -1,12 +1,18 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronLeft, ChevronRight, FolderKanban, Plus, Search } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { projectRiskLabel, projectRiskTone, projectStatusLabel, projectStatusTone } from "@/lib/ui/operational-labels";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+
+const STATUSES = ["draft", "active", "on_hold", "completed", "cancelled"] as const;
+const RISKS = ["low", "medium", "high", "critical"] as const;
 
 export default async function ProjectsPage({
   searchParams,
@@ -16,6 +22,7 @@ export default async function ProjectsPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
+  const { t, locale } = await getI18n();
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
   const supabase = await createServerSupabaseClient();
@@ -31,112 +38,154 @@ export default async function ProjectsPage({
   });
   const canCreate = hasPermission(ctx, "project.create");
   const pages = Math.max(1, Math.ceil(total / 20));
+  const tp = t.projects;
+
+  // Paging keeps the active filters.
+  const pageHref = (target: number) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.status) qs.set("status", params.status);
+    if (params.risk) qs.set("risk", params.risk);
+    if (params.manager) qs.set("manager", params.manager);
+    qs.set("page", String(target));
+    return `/projects?${qs.toString()}`;
+  };
 
   return (
     <PageContainer data-testid="projects-page" className="space-y-5">
       <PageHeader
-        title="المشاريع"
-        description="سجل مشاريع الشركة مع التصفية والترقيم"
+        title={tp.title}
+        description={tp.description}
         actions={
           canCreate ? (
             <Link href="/projects/new">
-              <Button>إنشاء مشروع</Button>
+              <Button>
+                <Plus className="size-4" aria-hidden />
+                {tp.create}
+              </Button>
             </Link>
           ) : null
         }
       />
 
-      <Card className="mb-5">
-        <form className="grid gap-3 md:grid-cols-4">
-          <Input name="q" defaultValue={params.q} placeholder="بحث بالاسم أو الرمز" />
+      <Card className="p-3 md:p-3">
+        <form className="grid gap-2.5 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+            <Input name="q" defaultValue={params.q} placeholder={tp.searchPlaceholder} className="ps-9" />
+          </div>
           <Select name="status" defaultValue={params.status ?? ""}>
-            <option value="">كل الحالات</option>
-            <option value="draft">مسودة</option>
-            <option value="active">نشط</option>
-            <option value="on_hold">متوقف</option>
-            <option value="completed">مكتمل</option>
-            <option value="cancelled">ملغى</option>
+            <option value="">{tp.allStatuses}</option>
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {projectStatusLabel(status, locale)}
+              </option>
+            ))}
           </Select>
           <Select name="risk" defaultValue={params.risk ?? ""}>
-            <option value="">كل مستويات المخاطر</option>
-            <option value="low">منخفض</option>
-            <option value="medium">متوسط</option>
-            <option value="high">مرتفع</option>
-            <option value="critical">حرج</option>
+            <option value="">{tp.allRisks}</option>
+            {RISKS.map((risk) => (
+              <option key={risk} value={risk}>
+                {projectRiskLabel(risk, locale)}
+              </option>
+            ))}
           </Select>
           <Button type="submit" variant="secondary">
-            تصفية
+            {tp.filter}
           </Button>
         </form>
       </Card>
 
       {rows.length === 0 ? (
-        <EmptyState title="لا توجد مشاريع مطابقة." />
+        <EmptyState title={tp.empty} />
       ) : (
-        <Card className="p-0">
+        <Card className="overflow-hidden p-0 md:p-0">
           <TableScroll>
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-paper text-start text-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">الرمز</th>
-                <th className="px-4 py-3 font-medium">المشروع</th>
-                <th className="px-4 py-3 font-medium">الحالة</th>
-                <th className="px-4 py-3 font-medium">المخاطر</th>
-                <th className="px-4 py-3 font-medium">التقدم</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((project) => (
-                <tr key={project.id} className="border-t border-line">
-                  <td className="px-4 py-3 font-medium text-navy">
-                    <Link href={`/projects/${project.id}`}>{project.project_code}</Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link href={`/projects/${project.id}`} className="hover:underline">
-                      {project.name_ar}
-                    </Link>
-                    <p className="text-xs text-muted">{project.name_en}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={projectRiskTone(project.risk_level)}>
-                      {projectRiskLabel(project.risk_level)}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex min-w-[7rem] items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-strong">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, Math.max(0, project.progress_percentage))}%` }}
-                        />
-                      </div>
-                      <span className="tabular-nums text-xs text-muted">{project.progress_percentage}%</span>
-                    </div>
-                  </td>
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="text-start">
+                <tr>
+                  <th className="px-5 py-3 text-start font-semibold">{tp.colCode}</th>
+                  <th className="px-5 py-3 text-start font-semibold">{tp.colProject}</th>
+                  <th className="px-5 py-3 text-start font-semibold">{tp.colStatus}</th>
+                  <th className="px-5 py-3 text-start font-semibold">{tp.colRisk}</th>
+                  <th className="px-5 py-3 text-start font-semibold">{tp.colProgress}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((project) => {
+                  const name = pickLocalized(locale, project.name_ar, project.name_en);
+                  const altName = locale === "ar" ? project.name_en : project.name_ar;
+                  const progress = Math.min(100, Math.max(0, project.progress_percentage));
+                  return (
+                    <tr key={project.id} className="border-t border-line duration-150 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="inline-flex items-center gap-2 font-mono text-xs font-semibold text-ink hover:text-primary"
+                        >
+                          <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                            <FolderKanban className="size-3.5" aria-hidden />
+                          </span>
+                          <span dir="ltr">{project.project_code}</span>
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Link href={`/projects/${project.id}`} className="font-medium text-ink hover:text-primary" dir="auto">
+                          {name}
+                        </Link>
+                        {altName && altName !== name ? (
+                          <p className="mt-0.5 text-xs text-muted" dir="auto">
+                            {altName}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status, locale)}</Badge>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge tone={projectRiskTone(project.risk_level)}>
+                          {projectRiskLabel(project.risk_level, locale)}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex min-w-[8rem] items-center gap-2.5">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-strong">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-primary to-brand rtl:bg-gradient-to-l"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="w-9 text-end text-xs font-medium tabular-nums text-muted">
+                            {project.progress_percentage}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </TableScroll>
         </Card>
       )}
 
-      <div className="mt-4 flex items-center justify-between text-sm text-muted">
-        <p>
-          {total} مشروع · صفحة {page} من {pages}
-        </p>
+      <div className="flex items-center justify-between text-sm text-muted">
+        <p>{format(tp.summary, { total, page, pages })}</p>
         <div className="flex gap-2">
           {page > 1 ? (
-            <Link href={`/projects?page=${page - 1}`} className="underline">
-              السابق
+            <Link href={pageHref(page - 1)}>
+              <Button variant="secondary" className="px-3">
+                <ChevronRight className="size-4 ltr:-scale-x-100" aria-hidden />
+                {tp.previous}
+              </Button>
             </Link>
           ) : null}
           {page < pages ? (
-            <Link href={`/projects?page=${page + 1}`} className="underline">
-              التالي
+            <Link href={pageHref(page + 1)}>
+              <Button variant="secondary" className="px-3">
+                {tp.next}
+                <ChevronLeft className="size-4 ltr:-scale-x-100" aria-hidden />
+              </Button>
             </Link>
           ) : null}
         </div>

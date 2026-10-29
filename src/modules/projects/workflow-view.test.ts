@@ -299,3 +299,29 @@ describe("resolveStageAssignment", () => {
     });
   });
 });
+
+describe("English locale", () => {
+  it("localizes overdue, waiting and attention text while Arabic stays the default", () => {
+    expect(formatOverdueDurationAr("2026-01-01T00:00:00.000Z", "2026-01-04T01:00:00.000Z", "en")).toBe("3 days overdue");
+    expect(waitingApprovalPhrase("Sara", "en")).toBe("Awaiting approval from Sara");
+    expect(waitingApprovalPhrase(null)).toBe("بانتظار موافقة");
+    const attention = buildProjectAttention({
+      mode: "workflow",
+      instanceStatus: "active",
+      locale: "en",
+      current: {
+        nameAr: "التنفيذ",
+        nameEn: "Execution",
+        visual: "current",
+        canComplete: true,
+        canSubmitApproval: false,
+        canDecideApproval: false,
+        approverLabel: null,
+        responsibleLabel: null,
+        blockReason: null,
+        latestOfficialCode: null,
+      },
+    });
+    expect(attention).toMatchObject({ kind: "complete", title: "Action required", detail: "Complete stage: Execution" });
+  });
+});

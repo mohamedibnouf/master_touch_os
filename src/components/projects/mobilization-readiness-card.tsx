@@ -5,19 +5,21 @@ import { setMobilizationReadinessItemAction } from "@/server/use-cases/platform"
 import { procurementHrefForProject } from "@/modules/procurement/stage05-readiness";
 import {
   MOBILIZATION_ITEM_KEYS,
-  MOBILIZATION_ITEM_LABELS,
+  mobilizationItemLabel,
   MOBILIZATION_NOTE_MAX,
   type ProjectMobilizationReadiness,
 } from "@/modules/projects/stage06-mobilization";
+import { format, intlLocale, type Locale } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
-function formatStamp(value: string | null): string {
+function formatStamp(value: string | null, locale: Locale): string {
   if (!value) return "";
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
-  return new Date(parsed).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
+  return new Date(parsed).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
 }
 
-export function MobilizationReadinessCard({
+export async function MobilizationReadinessCard({
   readiness,
   projectId,
   canMutate,
@@ -28,22 +30,24 @@ export function MobilizationReadinessCard({
   canMutate: boolean;
   canOpenProcurement: boolean;
 }) {
+  const { t, locale } = await getI18n();
+  const common = t.projectWorkflow.common;
   const required = readiness.required_count || 6;
   const confirmed = readiness.confirmed_required_count;
   return (
     <section
       data-testid="mobilization-readiness"
-      className="space-y-3 rounded-[var(--radius-control)] border border-line bg-paper px-3 py-3"
+      className="space-y-3 rounded-[var(--radius-control)] border border-line bg-surface-muted px-3 py-3"
     >
       <div>
-        <h3 className="text-sm font-semibold text-navy">حالة التجهيز</h3>
+        <h3 className="text-sm font-semibold text-ink">{t.projectWorkflow.mobilization.title}</h3>
         <p className="text-xs text-muted">
           {readiness.ready
-            ? "التجهيز جاهز لإكمال المرحلة"
-            : "أكمل عناصر التجهيز المطلوبة قبل إغلاق المرحلة"}
+            ? t.projectWorkflow.mobilization.ready
+            : t.projectWorkflow.mobilization.pending}
         </p>
-        <p className="mt-1 text-sm tabular-nums text-navy" data-testid="mobilization-progress">
-          {confirmed} / {required} مكتملة
+        <p className="mt-1 text-sm font-medium tabular-nums text-ink" data-testid="mobilization-progress">
+          {format(common.completedOfTotal, { done: confirmed, total: required })}
         </p>
       </div>
       <ul className="space-y-3">
@@ -54,16 +58,16 @@ export function MobilizationReadinessCard({
             <li key={key} className="border-t border-line pt-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <span className={confirmedRow ? "text-ink" : "text-muted"}>
-                  <span className="ms-1 font-semibold text-navy" aria-hidden>
+                  <span className="ms-1 font-semibold text-primary" aria-hidden>
                     {confirmedRow ? "✓" : "○"}
                   </span>{" "}
-                  {MOBILIZATION_ITEM_LABELS[key]}
+                  {mobilizationItemLabel(key, locale)}
                 </span>
               </div>
               {confirmedRow && (item?.confirmed_by_name || item?.confirmed_at) ? (
                 <p className="mt-1 text-xs text-muted">
                   {item?.confirmed_by_name ?? "—"}
-                  {item?.confirmed_at ? ` · ${formatStamp(item.confirmed_at)}` : ""}
+                  {item?.confirmed_at ? ` · ${formatStamp(item.confirmed_at, locale)}` : ""}
                 </p>
               ) : null}
               {item?.note ? <p className="mt-1 text-xs text-ink">{item.note}</p> : null}
@@ -76,12 +80,12 @@ export function MobilizationReadinessCard({
                     <input
                       name="note"
                       maxLength={MOBILIZATION_NOTE_MAX}
-                      placeholder="ملاحظة اختيارية"
-                      className="h-9 w-full rounded-[var(--radius-control)] border border-line bg-white px-2 text-xs"
+                      placeholder={common.optionalNote}
+                      className="h-9 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-xs"
                     />
                   ) : null}
                   <Button type="submit" variant={confirmedRow ? "ghost" : "secondary"}>
-                    {confirmedRow ? "إلغاء التأكيد" : "تأكيد"}
+                    {confirmedRow ? common.unconfirm : common.confirm}
                   </Button>
                 </ServerActionForm>
               ) : null}
@@ -91,16 +95,16 @@ export function MobilizationReadinessCard({
       </ul>
       {!readiness.ready ? (
         <p className="text-sm text-warning" data-testid="mobilization-not-ready-hint">
-          يجب إكمال عناصر التجهيز المطلوبة قبل إكمال المرحلة.
+          {t.projectWorkflow.mobilization.notReadyHint}
         </p>
       ) : null}
       {canOpenProcurement ? (
         <Link href={procurementHrefForProject(projectId)} className="text-sm font-medium text-primary">
-          مراجعة المشتريات
+          {t.projectWorkflow.mobilization.reviewProcurement}
         </Link>
       ) : (
         <Link href={`/projects/${projectId}?tab=documents`} className="text-sm font-medium text-primary">
-          مستندات المشروع
+          {common.projectDocuments}
         </Link>
       )}
     </section>

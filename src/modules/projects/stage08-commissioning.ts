@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const COMMISSIONING_STEP_KEY = "testing_commissioning";
 
 export const COMMISSIONING_ITEM_KEYS = [
@@ -29,6 +31,29 @@ export const COMMISSIONING_STATUS_LABELS: Record<CommissioningItemStatus, string
   passed: "ناجح",
   failed: "فشل الاختبار",
 };
+
+const COMMISSIONING_ITEM_LABELS_EN: Record<CommissioningItemKey, string> = {
+  electrical_lighting_test: "Electrical & lighting testing",
+  hvac_test: "HVAC testing",
+  it_networks_test: "IT, networks & low-current systems testing",
+  architectural_finishes_inspection: "Architectural works & finishes inspection",
+  final_equipment_inspection: "Final equipment inspection",
+  final_observations_clearance: "Close-out of final snags",
+};
+
+const COMMISSIONING_STATUS_LABELS_EN: Record<CommissioningItemStatus, string> = {
+  pending: "Awaiting test",
+  passed: "Passed",
+  failed: "Failed",
+};
+
+export function commissioningItemLabel(key: CommissioningItemKey, locale: Locale = "ar"): string {
+  return locale === "en" ? COMMISSIONING_ITEM_LABELS_EN[key] : COMMISSIONING_ITEM_LABELS[key];
+}
+
+export function commissioningStatusLabel(status: CommissioningItemStatus, locale: Locale = "ar"): string {
+  return locale === "en" ? COMMISSIONING_STATUS_LABELS_EN[status] : COMMISSIONING_STATUS_LABELS[status];
+}
 
 export const COMMISSIONING_NOTE_MAX = 500;
 

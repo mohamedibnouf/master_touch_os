@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const RIYADH_TIME_ZONE = "Asia/Riyadh";
 const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
 
@@ -99,7 +101,7 @@ function toArabicDigits(value: string): string {
 }
 
 /** Riyadh datetime for UI — formatToParts so Node and the browser cannot disagree on Arabic commas. */
-export function formatRiyadhDateTimeAr(iso: string): string {
+export function formatRiyadhDateTimeAr(iso: string, locale: Locale = "ar"): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return "—";
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -115,7 +117,9 @@ export function formatRiyadhDateTimeAr(iso: string): string {
   const day = String(Number(get("day")));
   const month = String(Number(get("month")));
   const hour = String(Number(get("hour")));
-  const period = get("dayPeriod").toLowerCase().includes("p") ? "م" : "ص";
+  const pm = get("dayPeriod").toLowerCase().includes("p");
+  if (locale === "en") return `${day}/${month}/${get("year")} ${hour}:${get("minute")} ${pm ? "PM" : "AM"}`;
+  const period = pm ? "م" : "ص";
   return toArabicDigits(`${day}/${month}/${get("year")} ${hour}:${get("minute")} ${period}`);
 }
 
@@ -126,13 +130,22 @@ function dualAr(count: number, one: string, two: string, few: string, many: stri
   return `${count} ${many}`;
 }
 
-export function formatRemainingAr(dueAtIso: string, nowIso: string): string | null {
+function durationEn(days: number, remHours: number): string {
+  if (days === 0 && remHours === 0) return "less than an hour";
+  const parts: string[] = [];
+  if (days > 0) parts.push(days === 1 ? "1 day" : `${days} days`);
+  if (remHours > 0) parts.push(remHours === 1 ? "1 hour" : `${remHours} hours`);
+  return parts.join(" ");
+}
+
+export function formatRemainingAr(dueAtIso: string, nowIso: string, locale: Locale = "ar"): string | null {
   const due = Date.parse(dueAtIso);
   const now = Date.parse(nowIso);
   if (!Number.isFinite(due) || !Number.isFinite(now) || now >= due) return null;
   const hours = Math.floor((due - now) / 3_600_000);
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
+  if (locale === "en") return durationEn(days, remHours);
   if (days === 0 && remHours === 0) return "أقل من ساعة";
   const parts: string[] = [];
   if (days > 0) parts.push(dualAr(days, "يوم", "يومان", "أيام", "يوماً"));
@@ -140,13 +153,14 @@ export function formatRemainingAr(dueAtIso: string, nowIso: string): string | nu
   return parts.join(" و");
 }
 
-export function formatOverdueSinceAr(dueAtIso: string, nowIso: string): string | null {
+export function formatOverdueSinceAr(dueAtIso: string, nowIso: string, locale: Locale = "ar"): string | null {
   const due = Date.parse(dueAtIso);
   const now = Date.parse(nowIso);
   if (!Number.isFinite(due) || !Number.isFinite(now) || now <= due) return null;
   const hours = Math.floor((now - due) / 3_600_000);
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
+  if (locale === "en") return durationEn(days, remHours);
   if (days === 0 && remHours === 0) return "أقل من ساعة";
   const parts: string[] = [];
   if (days > 0) parts.push(dualAr(days, "يوم", "يومان", "أيام", "يوماً"));

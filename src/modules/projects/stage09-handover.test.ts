@@ -13,7 +13,8 @@ import {
 
 const sql083 = readFileSync("supabase/migrations/083_final_workflow_evidence_gates.sql", "utf8");
 const details = readFileSync("src/components/projects/workflow-stage-details.tsx", "utf8");
-const card = readFileSync("src/components/projects/handover-readiness-card.tsx", "utf8");
+// UI copy lives in the projectWorkflow dictionary.
+const card = readFileSync("src/components/projects/handover-readiness-card.tsx", "utf8") + readFileSync("src/lib/i18n/dictionaries/project-workflow.ar.ts", "utf8");
 const gate = readFileSync("src/modules/projects/approval-workflow-gate.ts", "utf8");
 const platform = readFileSync("src/server/use-cases/platform.ts", "utf8");
 

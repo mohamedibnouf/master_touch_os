@@ -41,24 +41,72 @@ const STEP_STATUS_AR: Record<string, string> = {
   rejected: "مرفوض",
 };
 
-export function projectStatusLabel(status: string): string {
-  return PROJECT_STATUS_AR[status] ?? status.replaceAll("_", " ");
+const PROJECT_STATUS_EN: Record<string, string> = {
+  draft: "Draft",
+  active: "Active",
+  on_hold: "On hold",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const PROJECT_RISK_EN: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
+};
+
+const APPROVAL_STATUS_EN: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In progress",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+  completed: "Completed",
+};
+
+const DOCUMENT_STATUS_EN: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  in_review: "In review",
+  approved: "Approved",
+  rejected: "Rejected",
+  superseded: "Superseded",
+  archived: "Archived",
+};
+
+const STEP_STATUS_EN: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In progress",
+  completed: "Completed",
+  skipped: "Skipped",
+  rejected: "Rejected",
+};
+
+type LabelLocale = "ar" | "en";
+
+function label(ar: Record<string, string>, en: Record<string, string>, code: string, locale: LabelLocale): string {
+  return (locale === "en" ? en : ar)[code] ?? code.replaceAll("_", " ");
 }
 
-export function projectRiskLabel(risk: string): string {
-  return PROJECT_RISK_AR[risk] ?? risk.replaceAll("_", " ");
+export function projectStatusLabel(status: string, locale: LabelLocale = "ar"): string {
+  return label(PROJECT_STATUS_AR, PROJECT_STATUS_EN, status, locale);
 }
 
-export function approvalStatusLabel(status: string): string {
-  return APPROVAL_STATUS_AR[status] ?? status.replaceAll("_", " ");
+export function projectRiskLabel(risk: string, locale: LabelLocale = "ar"): string {
+  return label(PROJECT_RISK_AR, PROJECT_RISK_EN, risk, locale);
 }
 
-export function documentStatusLabel(status: string): string {
-  return DOCUMENT_STATUS_AR[status] ?? status.replaceAll("_", " ");
+export function approvalStatusLabel(status: string, locale: LabelLocale = "ar"): string {
+  return label(APPROVAL_STATUS_AR, APPROVAL_STATUS_EN, status, locale);
 }
 
-export function approvalStepStatusLabel(status: string): string {
-  return STEP_STATUS_AR[status] ?? status.replaceAll("_", " ");
+export function documentStatusLabel(status: string, locale: LabelLocale = "ar"): string {
+  return label(DOCUMENT_STATUS_AR, DOCUMENT_STATUS_EN, status, locale);
+}
+
+export function approvalStepStatusLabel(status: string, locale: LabelLocale = "ar"): string {
+  return label(STEP_STATUS_AR, STEP_STATUS_EN, status, locale);
 }
 
 export function projectStatusTone(status: string): "neutral" | "success" | "info" | "warning" | "danger" {

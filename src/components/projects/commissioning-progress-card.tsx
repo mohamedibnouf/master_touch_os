@@ -7,19 +7,21 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { setCommissioningItemAction } from "@/server/use-cases/platform";
 import {
   COMMISSIONING_ITEM_KEYS,
-  COMMISSIONING_ITEM_LABELS,
+  commissioningItemLabel,
   COMMISSIONING_ITEM_STATUSES,
   COMMISSIONING_NOTE_MAX,
-  COMMISSIONING_STATUS_LABELS,
+  commissioningStatusLabel,
   type CommissioningItemStatus,
   type ProjectCommissioningProgress,
 } from "@/modules/projects/stage08-commissioning";
+import { format, intlLocale, type Locale } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 
-function formatStamp(value: string | null): string {
+function formatStamp(value: string | null, locale: Locale): string {
   if (!value) return "";
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
-  return new Date(parsed).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
+  return new Date(parsed).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
 }
 
 export function CommissioningProgressCard({
@@ -31,17 +33,19 @@ export function CommissioningProgressCard({
   projectId: string;
   canMutate: boolean;
 }) {
+  const { t, locale } = useI18n();
+  const copy = t.projectWorkflow.commissioning;
   const required = progress.required_count || 6;
   const passed = progress.passed_count;
   return (
     <section
       data-testid="commissioning-progress"
-      className="space-y-3 rounded-[var(--radius-control)] border border-line bg-paper px-3 py-3"
+      className="space-y-3 rounded-[var(--radius-control)] border border-line bg-surface-muted px-3 py-3"
     >
       <div>
-        <h3 className="text-sm font-semibold text-navy">الاختبار والتشغيل</h3>
+        <h3 className="text-sm font-semibold text-ink">{copy.title}</h3>
         <p className="mt-1 text-xs tabular-nums text-muted" data-testid="commissioning-passed-count">
-          {passed} / {required} ناجحة
+          {format(copy.passedOfTotal, { passed, total: required })}
         </p>
       </div>
       <ul className="space-y-3">
@@ -54,19 +58,19 @@ export function CommissioningProgressCard({
             <li key={key} className="border-t border-line pt-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <span className={ok ? "text-ink" : failed ? "text-danger" : "text-muted"}>
-                  <span className="ms-1 font-semibold text-navy" aria-hidden>
+                  <span className="ms-1 font-semibold text-primary" aria-hidden>
                     {ok ? "✓" : failed ? "!" : "○"}
                   </span>{" "}
-                  {COMMISSIONING_ITEM_LABELS[key]}
+                  {commissioningItemLabel(key, locale)}
                 </span>
                 <span className={`text-xs ${failed ? "text-danger" : "text-muted"}`}>
-                  {COMMISSIONING_STATUS_LABELS[status]}
+                  {commissioningStatusLabel(status, locale)}
                 </span>
               </div>
               {item?.updated_by_name || item?.updated_at ? (
                 <p className="mt-1 text-xs text-muted">
                   {item?.updated_by_name ?? "—"}
-                  {item?.updated_at ? ` · ${formatStamp(item.updated_at)}` : ""}
+                  {item?.updated_at ? ` · ${formatStamp(item.updated_at, locale)}` : ""}
                 </p>
               ) : null}
               {item?.note ? <p className="mt-1 text-xs text-ink">{item.note}</p> : null}
@@ -84,13 +88,13 @@ export function CommissioningProgressCard({
       </ul>
       {!progress.ready ? (
         <p className="text-sm text-warning" data-testid="commissioning-not-ready-hint">
-          يجب اجتياز جميع اختبارات التشغيل قبل إكمال المرحلة.
+          {copy.notReadyHint}
         </p>
       ) : (
-        <p className="text-sm text-ink">الاختبار والتشغيل جاهز لإكمال المرحلة</p>
+        <p className="text-sm text-success">{copy.ready}</p>
       )}
       <Link href={`/projects/${projectId}?tab=documents`} className="text-sm font-medium text-primary">
-        مستندات المشروع
+        {t.projectWorkflow.common.projectDocuments}
       </Link>
     </section>
   );
@@ -107,13 +111,14 @@ function CommissioningItemForm({
   status: CommissioningItemStatus;
   note: string;
 }) {
+  const { t, locale } = useI18n();
   const [currentStatus, setCurrentStatus] = useState<CommissioningItemStatus>(status);
   return (
     <ServerActionForm action={setCommissioningItemAction} className="mt-2 space-y-2">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="itemKey" value={itemKey} />
       <label className="block text-xs text-muted">
-        نتيجة الاختبار
+        {t.projectWorkflow.commissioning.testResult}
         <Select
           name="status"
           className="mt-1 min-h-11"
@@ -122,17 +127,17 @@ function CommissioningItemForm({
         >
           {COMMISSIONING_ITEM_STATUSES.map((value) => (
             <option key={value} value={value}>
-              {COMMISSIONING_STATUS_LABELS[value]}
+              {commissioningStatusLabel(value, locale)}
             </option>
           ))}
         </Select>
       </label>
       <label className="block text-xs text-muted">
-        ملاحظة
+        {t.projectWorkflow.common.note}
         <Input name="note" maxLength={COMMISSIONING_NOTE_MAX} defaultValue={note} className="mt-1 min-h-11" />
       </label>
       <Button type="submit" variant="secondary" className="min-h-11 w-full">
-        حفظ
+        {t.projectWorkflow.common.save}
       </Button>
     </ServerActionForm>
   );

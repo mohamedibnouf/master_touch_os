@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AlertTriangle, Check, Circle, Clock, Lock } from "lucide-react";
 import type { WorkflowViewNode } from "@/server/use-cases/project-workflow";
 import { cn } from "@/lib/utils";
+import { pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 const ICON: Record<WorkflowViewNode["visual"], typeof Check> = {
   completed: Check,
@@ -14,7 +16,7 @@ const ICON: Record<WorkflowViewNode["visual"], typeof Check> = {
   upcoming: Lock,
 };
 
-export function WorkflowStageNode({
+export async function WorkflowStageNode({
   node,
   href,
   selected,
@@ -25,6 +27,8 @@ export function WorkflowStageNode({
   selected: boolean;
   connector: boolean;
 }) {
+  const { locale } = await getI18n();
+  const name = pickLocalized(locale, node.nameAr, node.nameEn);
   const Icon = ICON[node.visual];
   return (
     <li className="flex min-w-0 flex-1 flex-col md:min-w-[9.5rem] md:max-w-[14rem]">
@@ -33,7 +37,7 @@ export function WorkflowStageNode({
           <Link
             href={href}
             aria-current={selected ? "step" : undefined}
-            aria-label={`${node.nameAr} — ${node.visualLabel}`}
+            aria-label={`${name} — ${node.visualLabel}`}
             className={cn(
               "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
               node.visual === "completed" && "border-success bg-success text-white",
@@ -43,7 +47,7 @@ export function WorkflowStageNode({
               (node.visual === "blocked" || node.visual === "rejected" || node.visual === "overdue") &&
                 "border-danger bg-danger/10 text-danger",
               node.visual === "changes_requested" && "border-warning bg-warning/10 text-warning",
-              node.visual === "upcoming" && "border-line bg-paper text-muted",
+              node.visual === "upcoming" && "border-line bg-surface-muted text-muted",
               selected && "ring-2 ring-primary/30",
             )}
           >
@@ -57,7 +61,9 @@ export function WorkflowStageNode({
           ) : null}
         </div>
         <Link href={href} className="min-w-0 py-1 md:py-0">
-          <p className="truncate text-sm font-medium text-ink">{node.nameAr}</p>
+          <p className="truncate text-sm font-medium text-ink" dir="auto">
+            {name}
+          </p>
           <p className="text-xs text-muted">{node.visualLabel}</p>
           {node.overdueLabel ? <p className="text-xs text-danger">{node.overdueLabel}</p> : null}
         </Link>

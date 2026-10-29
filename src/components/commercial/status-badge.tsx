@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/primitives";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import type { Locale } from "@/lib/i18n/config";
 
 const toneMap: Record<string, "neutral" | "success" | "danger" | "warning" | "navy"> = {
   draft: "neutral",
@@ -47,7 +48,7 @@ const toneMap: Record<string, "neutral" | "success" | "danger" | "warning" | "na
   claimed: "navy",
 };
 
-export function CommercialStatusBadge({ status }: { status: string }) {
+export function CommercialStatusBadge({ status, locale = "ar" }: { status: string; locale?: Locale }) {
   const tone = toneMap[status] ?? "neutral";
-  return <Badge tone={tone}>{commercialStatusLabel(status)}</Badge>;
+  return <Badge tone={tone}>{commercialStatusLabel(status, locale)}</Badge>;
 }

@@ -1,4 +1,5 @@
 import { isPostgresUuid } from "@/lib/postgres-uuid";
+import type { Locale } from "@/lib/i18n/config";
 
 export const PROCUREMENT_STEP_KEY = "procurement";
 
@@ -40,6 +41,20 @@ export const PROCUREMENT_MISSING_LABELS: Record<string, string> = {
   issued_po: "أمر شراء صادر",
   delivery_date: "تاريخ تسليم مطلوب على أمر الشراء",
 };
+
+const PROCUREMENT_MISSING_LABELS_EN: Record<string, string> = {
+  pr: "Purchase request linked to the project",
+  rfq: "RFQ issued from the purchase request",
+  quotation: "Supplier quotation against the RFQ",
+  award: "Formal award via bid comparison",
+  issued_po: "Issued purchase order",
+  delivery_date: "Required delivery date on the purchase order",
+};
+
+export function procurementMissingLabel(key: string, locale: Locale = "ar"): string {
+  const map = locale === "en" ? PROCUREMENT_MISSING_LABELS_EN : PROCUREMENT_MISSING_LABELS;
+  return map[key] ?? key;
+}
 
 export function isIssuedPurchaseOrderStatus(status: string | null | undefined): boolean {
   return Boolean(status && (ISSUED_PO_STATUSES as readonly string[]).includes(status));

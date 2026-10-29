@@ -14,6 +14,11 @@ import {
   activateProjectContractAction,
   createProjectContractAction,
 } from "@/server/use-cases/commercial";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+
+const navLinkClass =
+  "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
 
 export default async function ProjectContractPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -27,99 +32,107 @@ export default async function ProjectContractPage({ params }: { params: Promise<
   const project = await coreRepo.getProject(ctx.organization.id, projectId);
   if (!project) notFound();
 
+  const { t, locale } = await getI18n();
+  const tc = t.projectCommercial.contract;
+  const nav = t.projectCommercial.nav;
+  const none = t.projectCommercial.common.none;
+
   const contract = await repo.getProjectContractByProject(projectId);
   const canManage = hasPermission(ctx, "finance.manage");
 
   return (
     <PageContainer data-testid="project-contract-page" className="space-y-5">
       <PageHeader
-        title="عقد المشروع"
-        description={`${project.project_code} — ${project.name_ar}`}
+        title={tc.title}
+        description={format(t.projectCommercial.common.projectSubtitle, {
+          code: project.project_code,
+          name: pickLocalized(locale, project.name_ar, project.name_en),
+        })}
         actions={
-          <div className="flex flex-wrap gap-3 text-sm">
-            <Link href={`/projects/${projectId}?tab=commercial`} className="underline">
-              التجاري
+          <nav className="flex flex-wrap gap-2">
+            <Link href={`/projects/${projectId}?tab=commercial`} className={navLinkClass}>
+              {nav.commercial}
             </Link>
-            <Link href={`/projects/${projectId}/commercial/milestones`} className="underline">
-              المراحل
+            <Link href={`/projects/${projectId}/commercial/milestones`} className={navLinkClass}>
+              {nav.milestones}
             </Link>
-            <Link href={`/projects/${projectId}/commercial/cashflow`} className="underline">
-              التدفق النقدي
+            <Link href={`/projects/${projectId}/commercial/cashflow`} className={navLinkClass}>
+              {nav.cashflow}
             </Link>
-          </div>
+          </nav>
         }
       />
 
       {contract ? (
         <>
-          <div className="mb-6 grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Card>
-              <p className="text-sm text-muted">الحالة</p>
+              <p className="text-xs font-medium text-muted">{tc.status}</p>
               <div className="mt-2">
-                <CommercialStatusBadge status={contract.status} />
+                <CommercialStatusBadge status={contract.status} locale={locale} />
               </div>
             </Card>
             <Card>
-              <p className="text-sm text-muted">رقم العقد</p>
-              <p className="mt-2 font-semibold text-navy">{contract.contract_number}</p>
+              <p className="text-xs font-medium text-muted">{tc.contractNumber}</p>
+              <p className="mt-2 font-semibold text-ink">{contract.contract_number}</p>
             </Card>
             <Card>
-              <p className="text-sm text-muted">العميل</p>
-              <p className="mt-2 font-semibold">{contract.client_name}</p>
+              <p className="text-xs font-medium text-muted">{tc.client}</p>
+              <p className="mt-2 font-semibold text-ink">{contract.client_name}</p>
             </Card>
             <Card>
-              <p className="text-sm text-muted">قيمة العقد</p>
-              <p className="mt-2 font-bold text-navy">
-                <MoneyDisplay amount={contract.contract_value} currency={contract.currency} />
+              <p className="text-xs font-medium text-muted">{tc.contractValue}</p>
+              <p className="mt-2 text-lg font-semibold text-primary">
+                <MoneyDisplay amount={contract.contract_value} currency={contract.currency} locale={locale} />
               </p>
             </Card>
           </div>
 
-          <Card className="mb-6">
-            <h2 className="mb-3 font-semibold text-navy">تفاصيل العقد</h2>
-            <dl className="grid gap-2 text-sm md:grid-cols-2">
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">تاريخ العقد</dt>
-                <dd>{contract.contract_date ?? "—"}</dd>
+          <Card>
+            <h2 className="mb-4 text-sm font-semibold text-ink">{tc.detailsTitle}</h2>
+            <dl className="grid gap-x-8 gap-y-2 text-sm md:grid-cols-2">
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.contractDate}</dt>
+                <dd className="tabular-nums">{contract.contract_date ?? none}</dd>
               </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">ضريبة القيمة المضافة</dt>
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.vatAmount}</dt>
                 <dd>
-                  <MoneyDisplay amount={contract.vat_amount} currency={contract.currency} />
+                  <MoneyDisplay amount={contract.vat_amount} currency={contract.currency} locale={locale} />
                 </dd>
               </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">نسبة الاحتجاز</dt>
-                <dd>{contract.retention_percent}%</dd>
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.retentionPercent}</dt>
+                <dd className="tabular-nums">{contract.retention_percent}%</dd>
               </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">نسبة الدفعة المقدمة</dt>
-                <dd>{contract.advance_payment_percent}%</dd>
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.advancePaymentPercent}</dt>
+                <dd className="tabular-nums">{contract.advance_payment_percent}%</dd>
               </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">تاريخ البداية</dt>
-                <dd>{contract.start_date ?? "—"}</dd>
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.startDate}</dt>
+                <dd className="tabular-nums">{contract.start_date ?? none}</dd>
               </div>
-              <div className="flex justify-between border-b border-line pb-1">
-                <dt className="text-muted">الإنجاز المخطط</dt>
-                <dd>{contract.planned_completion ?? "—"}</dd>
+              <div className="flex justify-between gap-3 border-b border-line pb-2">
+                <dt className="text-muted">{tc.plannedCompletion}</dt>
+                <dd className="tabular-nums">{contract.planned_completion ?? none}</dd>
               </div>
               {contract.payment_terms ? (
-                <div className="md:col-span-2 border-b border-line pb-2">
-                  <dt className="text-muted mb-1">شروط الدفع</dt>
-                  <dd>{contract.payment_terms}</dd>
+                <div className="border-b border-line pb-2 md:col-span-2">
+                  <dt className="mb-1 text-muted">{tc.paymentTerms}</dt>
+                  <dd className="text-ink">{contract.payment_terms}</dd>
                 </div>
               ) : null}
               {contract.delay_penalty_terms ? (
-                <div className="md:col-span-2 border-b border-line pb-2">
-                  <dt className="text-muted mb-1">غرامات التأخير</dt>
-                  <dd>{contract.delay_penalty_terms}</dd>
+                <div className="border-b border-line pb-2 md:col-span-2">
+                  <dt className="mb-1 text-muted">{tc.delayPenalties}</dt>
+                  <dd className="text-ink">{contract.delay_penalty_terms}</dd>
                 </div>
               ) : null}
               {contract.variation_rules ? (
                 <div className="md:col-span-2">
-                  <dt className="text-muted mb-1">قواعد أوامر التغيير</dt>
-                  <dd>{contract.variation_rules}</dd>
+                  <dt className="mb-1 text-muted">{tc.variationRules}</dt>
+                  <dd className="text-ink">{contract.variation_rules}</dd>
                 </div>
               ) : null}
             </dl>
@@ -127,15 +140,13 @@ export default async function ProjectContractPage({ params }: { params: Promise<
 
           {canManage && contract.status === "draft" ? (
             <Card data-testid="contract-activate-card">
-              <h2 className="mb-3 font-semibold text-navy">تفعيل العقد</h2>
-              <p className="mb-4 text-sm text-muted">
-                بعد التفعيل لا يمكن تعديل قيمة العقد الأصلية — استخدم أوامر التغيير للزيادات.
-              </p>
+              <h2 className="mb-2 text-sm font-semibold text-ink">{tc.activateTitle}</h2>
+              <p className="mb-4 text-sm text-muted">{tc.activateHint}</p>
               <ServerActionForm action={activateProjectContractAction} data-testid="contract-activate-form">
                 <input type="hidden" name="contractId" value={contract.id} />
                 <input type="hidden" name="projectId" value={projectId} />
                 <Button type="submit" data-testid="contract-activate-submit">
-                  تفعيل العقد ✓
+                  {tc.activateSubmit} ✓
                 </Button>
               </ServerActionForm>
             </Card>
@@ -143,63 +154,63 @@ export default async function ProjectContractPage({ params }: { params: Promise<
         </>
       ) : canManage ? (
         <Card>
-          <h2 className="mb-4 font-semibold text-navy">إنشاء عقد جديد</h2>
+          <h2 className="mb-4 text-sm font-semibold text-ink">{tc.createTitle}</h2>
           <ServerActionForm action={createProjectContractAction} className="grid gap-4" data-testid="contract-create-form">
             <input type="hidden" name="projectId" value={projectId} />
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="اسم العميل">
+              <Field label={tc.clientName}>
                 <Input name="clientName" required data-testid="contract-client-name" />
               </Field>
-              <Field label="رقم العقد">
+              <Field label={tc.contractNumber}>
                 <Input name="contractNumber" required data-testid="contract-number" />
               </Field>
-              <Field label="تاريخ العقد">
+              <Field label={tc.contractDate}>
                 <Input name="contractDate" type="date" />
               </Field>
-              <Field label="قيمة العقد (قبل الضريبة)">
+              <Field label={tc.contractValueExVat}>
                 <Input name="contractValue" type="number" step="0.01" min="0" required defaultValue="0" data-testid="contract-value" />
               </Field>
-              <Field label="العملة">
+              <Field label={tc.currency}>
                 <Select name="currency" defaultValue="SAR">
                   <option value="SAR">SAR</option>
                   <option value="USD">USD</option>
                 </Select>
               </Field>
-              <Field label="نسبة ضريبة القيمة المضافة (%)">
+              <Field label={tc.vatRate}>
                 <Input name="vatRate" type="number" step="0.001" min="0" defaultValue="15" />
               </Field>
-              <Field label="نسبة الاحتجاز (%)">
+              <Field label={tc.retentionPercentField}>
                 <Input name="retentionPercent" type="number" step="0.001" min="0" max="100" defaultValue="10" />
               </Field>
-              <Field label="نسبة الدفعة المقدمة (%)">
+              <Field label={tc.advancePaymentPercentField}>
                 <Input name="advancePaymentPercent" type="number" step="0.001" min="0" max="100" defaultValue="0" />
               </Field>
-              <Field label="تاريخ البداية">
+              <Field label={tc.startDate}>
                 <Input name="startDate" type="date" />
               </Field>
-              <Field label="الإنجاز المخطط">
+              <Field label={tc.plannedCompletion}>
                 <Input name="plannedCompletion" type="date" />
               </Field>
             </div>
-            <Field label="شروط الدفع">
-              <Textarea name="paymentTerms" placeholder="شروط الدفع..." />
+            <Field label={tc.paymentTerms}>
+              <Textarea name="paymentTerms" placeholder={tc.paymentTermsPlaceholder} />
             </Field>
-            <Field label="غرامات التأخير">
+            <Field label={tc.delayPenalties}>
               <Textarea name="delayPenaltyTerms" />
             </Field>
-            <Field label="قواعد أوامر التغيير">
+            <Field label={tc.variationRules}>
               <Textarea name="variationRules" />
             </Field>
             <div className="flex justify-end">
               <Button type="submit" data-testid="contract-create-submit">
-                حفظ العقد
+                {tc.save}
               </Button>
             </div>
           </ServerActionForm>
         </Card>
       ) : (
         <Card>
-          <p className="text-sm text-muted">لا يوجد عقد لهذا المشروع بعد.</p>
+          <p className="text-sm text-muted">{tc.noContract}</p>
         </Card>
       )}
     </PageContainer>

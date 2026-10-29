@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const EXECUTION_STEP_KEY = "execution";
 
 export const EXECUTION_ITEM_KEYS = [
@@ -30,6 +32,30 @@ export const EXECUTION_STATUS_LABELS: Record<ExecutionItemStatus, string> = {
   blocked: "متعثر",
   completed: "مكتمل",
 };
+
+const EXECUTION_ITEM_LABELS_EN: Record<ExecutionItemKey, string> = {
+  architectural_partitions: "Architectural works & partitions",
+  electrical_lighting: "Electrical & lighting works",
+  hvac: "HVAC works",
+  it_networks: "IT, networks & low-current systems",
+  finishes: "Flooring, ceilings & painting",
+  ff_and_e: "Final fixtures, fittings & furniture (FF&E)",
+};
+
+const EXECUTION_STATUS_LABELS_EN: Record<ExecutionItemStatus, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  blocked: "Blocked",
+  completed: "Completed",
+};
+
+export function executionItemLabel(key: ExecutionItemKey, locale: Locale = "ar"): string {
+  return locale === "en" ? EXECUTION_ITEM_LABELS_EN[key] : EXECUTION_ITEM_LABELS[key];
+}
+
+export function executionStatusLabel(status: ExecutionItemStatus, locale: Locale = "ar"): string {
+  return locale === "en" ? EXECUTION_STATUS_LABELS_EN[status] : EXECUTION_STATUS_LABELS[status];
+}
 
 export const EXECUTION_NOTE_MAX = 500;
 

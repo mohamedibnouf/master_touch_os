@@ -19,7 +19,7 @@ const sql076 = readFileSync("supabase/migrations/076_project_workflow_step_respo
 const sql014 = readFileSync("supabase/migrations/014_assignee_enforcement.sql", "utf8");
 const platformSrc = readFileSync("src/server/use-cases/platform.ts", "utf8");
 const loaderSrc = readFileSync("src/server/use-cases/project-workflow.ts", "utf8");
-const detailsSrc = readFileSync("src/components/projects/workflow-stage-details.tsx", "utf8");
+const detailsSrc = readFileSync("src/components/projects/workflow-stage-details.tsx", "utf8") + readFileSync("src/lib/i18n/dictionaries/project-workflow.ar.ts", "utf8");
 const workerSrc = readFileSync("src/server/services/notification-delivery-worker.ts", "utf8");
 
 const predicateSql = sql077.split("create or replace function public.apply_workflow_step_outcome")[0] ?? "";

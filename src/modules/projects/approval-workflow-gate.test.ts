@@ -250,3 +250,11 @@ describe("activity + notifications policy", () => {
     expect(createWhatsAppProvider().enabled).toBe(false);
   });
 });
+
+describe("activityNarrative (English)", () => {
+  it("returns English text when asked", () => {
+    expect(activityNarrative("project.stage.started", { automatic: true }, "en")).toBe(
+      "The project moved to the next stage automatically",
+    );
+  });
+});

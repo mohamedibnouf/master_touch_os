@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isPostgresUuid } from "@/lib/postgres-uuid";
+import type { Locale } from "@/lib/i18n/config";
 import { uniqueProfileIds } from "@/modules/projects/deadline";
 
 const postgresUuid = z.string().refine(isPostgresUuid, { message: "Invalid uuid" });
@@ -47,23 +48,30 @@ export function workflowStepNotificationRecipients(input: {
   return uniqueProfileIds([input.responsibleUserId, input.assignedUserId, ...input.roleHolderIds]);
 }
 
-export function localizeProjectMembershipLabel(roleLabel: string | null | undefined): string | null {
+export function localizeProjectMembershipLabel(
+  roleLabel: string | null | undefined,
+  locale: Locale = "ar",
+): string | null {
   if (!roleLabel) return null;
   const trimmed = roleLabel.trim();
   if (!trimmed) return null;
   const normalized = trimmed.toLowerCase();
-  if (normalized === "member") return "عضو الفريق";
-  if (normalized === "project_manager") return "مدير المشروع";
-  if (/^[a-z][a-z0-9_]*$/i.test(trimmed)) return "عضو الفريق";
+  const member = locale === "en" ? "Team member" : "عضو الفريق";
+  if (normalized === "member") return member;
+  if (normalized === "project_manager") return locale === "en" ? "Project manager" : "مدير المشروع";
+  if (/^[a-z][a-z0-9_]*$/i.test(trimmed)) return member;
   return trimmed;
 }
 
-export function responsibleCandidateOptionLabel(input: {
-  name: string;
-  projectRole?: string | null;
-  jobTitle?: string | null;
-}): string {
-  return [input.name, localizeProjectMembershipLabel(input.projectRole ?? null), input.jobTitle ?? null]
+export function responsibleCandidateOptionLabel(
+  input: {
+    name: string;
+    projectRole?: string | null;
+    jobTitle?: string | null;
+  },
+  locale: Locale = "ar",
+): string {
+  return [input.name, localizeProjectMembershipLabel(input.projectRole ?? null, locale), input.jobTitle ?? null]
     .filter(Boolean)
     .join(" · ");
 }

@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const MOBILIZATION_STEP_KEY = "mobilization";
 
 export const MOBILIZATION_ITEM_KEYS = [
@@ -19,6 +21,19 @@ export const MOBILIZATION_ITEM_LABELS: Record<MobilizationItemKey, string> = {
   safety_ppe_ready: "تأكيد السلامة ومعدات الوقاية",
   procurement_coordination_ready: "تنسيق توريد المواد/المعدات المطلوبة",
 };
+
+const MOBILIZATION_ITEM_LABELS_EN: Record<MobilizationItemKey, string> = {
+  site_ready: "Site / work area ready",
+  site_access_ready: "Site access / permit confirmed",
+  execution_team_ready: "Execution crew ready",
+  tools_equipment_ready: "Tools and equipment ready",
+  safety_ppe_ready: "Safety and PPE confirmed",
+  procurement_coordination_ready: "Material / equipment deliveries coordinated",
+};
+
+export function mobilizationItemLabel(key: MobilizationItemKey, locale: Locale = "ar"): string {
+  return locale === "en" ? MOBILIZATION_ITEM_LABELS_EN[key] : MOBILIZATION_ITEM_LABELS[key];
+}
 
 export const MOBILIZATION_NOTE_MAX = 500;
 

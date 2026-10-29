@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export type WorkflowVisualState =
   | "completed"
   | "current"
@@ -41,19 +43,19 @@ export type ProjectAttention = {
   waitForLabel: string | null;
 };
 
-const VISUAL_LABEL: Record<WorkflowVisualState, string> = {
-  completed: "مكتملة",
-  current: "المرحلة الحالية",
-  waiting_approval: "بانتظار موافقة",
-  changes_requested: "تم طلب تعديل",
-  rejected: "تم الرفض",
-  blocked: "موقوفة",
-  overdue: "متأخرة",
-  upcoming: "قادمة",
+const VISUAL_LABEL: Record<WorkflowVisualState, { ar: string; en: string }> = {
+  completed: { ar: "مكتملة", en: "Completed" },
+  current: { ar: "المرحلة الحالية", en: "Current stage" },
+  waiting_approval: { ar: "بانتظار موافقة", en: "Awaiting approval" },
+  changes_requested: { ar: "تم طلب تعديل", en: "Changes requested" },
+  rejected: { ar: "تم الرفض", en: "Rejected" },
+  blocked: { ar: "موقوفة", en: "On hold" },
+  overdue: { ar: "متأخرة", en: "Overdue" },
+  upcoming: { ar: "قادمة", en: "Upcoming" },
 };
 
-export function workflowVisualLabel(state: WorkflowVisualState): string {
-  return VISUAL_LABEL[state];
+export function workflowVisualLabel(state: WorkflowVisualState, locale: Locale = "ar"): string {
+  return VISUAL_LABEL[state][locale];
 }
 
 export function officialCodeToWorkflowOutcome(
@@ -87,11 +89,15 @@ export function deriveStageProgress(
   };
 }
 
-export function formatOverdueDurationAr(dueAt: string, nowIso: string): string | null {
+export function formatOverdueDurationAr(dueAt: string, nowIso: string, locale: Locale = "ar"): string | null {
   const due = Date.parse(dueAt);
   const now = Date.parse(nowIso);
   if (!Number.isFinite(due) || !Number.isFinite(now) || now <= due) return null;
   const days = Math.floor((now - due) / 86_400_000);
+  if (locale === "en") {
+    if (days <= 0) return "Overdue";
+    return days === 1 ? "1 day overdue" : `${days} days overdue`;
+  }
   if (days <= 0) return "متأخرة";
   if (days === 1) return "متأخرة يوماً";
   if (days === 2) return "متأخرة يومين";
@@ -132,7 +138,8 @@ export function mapEngineStatusToVisual(input: {
   return "current";
 }
 
-export function waitingApprovalPhrase(approverLabel: string | null): string {
+export function waitingApprovalPhrase(approverLabel: string | null, locale: Locale = "ar"): string {
+  if (locale === "en") return approverLabel ? `Awaiting approval from ${approverLabel}` : "Awaiting approval";
   if (approverLabel) return `بانتظار موافقة ${approverLabel}`;
   return "بانتظار موافقة";
 }
@@ -173,18 +180,20 @@ export function blockReasonForNode(input: {
   latestOfficialCode: OfficialApprovalCode | null;
   overdueLabel: string | null;
   missingAssignee: boolean;
+  locale?: Locale;
 }): string | null {
-  if (input.visual === "upcoming") return "بانتظار إكمال المرحلة السابقة";
-  if (input.visual === "rejected") return "تم الرفض";
-  if (input.visual === "changes_requested") return "المدير طلب تعديلات";
+  const en = input.locale === "en";
+  if (input.visual === "upcoming") return en ? "Waiting for the previous stage to finish" : "بانتظار إكمال المرحلة السابقة";
+  if (input.visual === "rejected") return en ? "Rejected" : "تم الرفض";
+  if (input.visual === "changes_requested") return en ? "The manager requested changes" : "المدير طلب تعديلات";
   if (input.missingAssignee && input.requiresApproval) {
-    return "لم يُحدد معتمد لهذه المرحلة";
+    return en ? "No approver has been set for this stage" : "لم يُحدد معتمد لهذه المرحلة";
   }
   if (input.visual === "waiting_approval" || (input.visual === "overdue" && input.openApproval)) {
-    return waitingApprovalPhrase(input.openApproval?.approverLabel ?? null);
+    return waitingApprovalPhrase(input.openApproval?.approverLabel ?? null, input.locale);
   }
   if (input.visual === "overdue") return input.overdueLabel;
-  if (input.visual === "blocked") return "المرحلة موقوفة";
+  if (input.visual === "blocked") return en ? "This stage is on hold" : "المرحلة موقوفة";
   return null;
 }
 
@@ -193,6 +202,8 @@ export function buildProjectAttention(input: {
   instanceStatus: string | null;
   current: {
     nameAr: string;
+    /** Used for the English path; falls back to nameAr. */
+    nameEn?: string | null;
     visual: WorkflowVisualState;
     canComplete: boolean;
     canSubmitApproval: boolean;
@@ -202,12 +213,19 @@ export function buildProjectAttention(input: {
     blockReason: string | null;
     latestOfficialCode: OfficialApprovalCode | null;
   } | null;
+  locale?: Locale;
 }): ProjectAttention {
+  const en = input.locale === "en";
+  const L = (ar: string, english: string) => (en ? english : ar);
+
   if (input.mode === "empty") {
     return {
       kind: "start_workflow",
-      title: "لا يوجد مسار عمل نشط",
-      detail: "يمكن بدء مسار عمل معتمد أو متابعة مراحل المشروع الحالية.",
+      title: L("لا يوجد مسار عمل نشط", "No active workflow"),
+      detail: L(
+        "يمكن بدء مسار عمل معتمد أو متابعة مراحل المشروع الحالية.",
+        "Start an approved workflow or keep following the project's current stages.",
+      ),
       waitForLabel: null,
     };
   }
@@ -215,8 +233,8 @@ export function buildProjectAttention(input: {
   if (input.mode === "preview") {
     return {
       kind: "start_workflow",
-      title: "مسار العمل لم يبدأ بعد",
-      detail: "عيّن مسؤول كل مرحلة ثم ابدأ المسار.",
+      title: L("مسار العمل لم يبدأ بعد", "The workflow has not started yet"),
+      detail: L("عيّن مسؤول كل مرحلة ثم ابدأ المسار.", "Assign an owner to each stage, then start the workflow."),
       waitForLabel: null,
     };
   }
@@ -224,8 +242,11 @@ export function buildProjectAttention(input: {
   if (input.instanceStatus === "completed") {
     return {
       kind: "workflow_complete",
-      title: "اكتمل مسار العمل",
-      detail: "جميع المراحل مكتملة. يمكن مراجعة السجل من تفاصيل كل مرحلة.",
+      title: L("اكتمل مسار العمل", "Workflow completed"),
+      detail: L(
+        "جميع المراحل مكتملة. يمكن مراجعة السجل من تفاصيل كل مرحلة.",
+        "All stages are complete. Review the history from each stage's details.",
+      ),
       waitForLabel: null,
     };
   }
@@ -233,8 +254,11 @@ export function buildProjectAttention(input: {
   if (input.instanceStatus === "cancelled") {
     return {
       kind: "rejected",
-      title: "أُلغي مسار العمل",
-      detail: "توقف المسار بعد قرار رفض دون مسار عودة محدد.",
+      title: L("أُلغي مسار العمل", "Workflow cancelled"),
+      detail: L(
+        "توقف المسار بعد قرار رفض دون مسار عودة محدد.",
+        "The workflow stopped after a rejection with no defined return path.",
+      ),
       waitForLabel: null,
     };
   }
@@ -243,17 +267,19 @@ export function buildProjectAttention(input: {
   if (!current) {
     return {
       kind: "none",
-      title: "لا يوجد إجراء مطلوب منك حالياً",
-      detail: "لا توجد مرحلة نشطة تحتاج تدخلك الآن.",
+      title: L("لا يوجد إجراء مطلوب منك حالياً", "Nothing needs your action right now"),
+      detail: L("لا توجد مرحلة نشطة تحتاج تدخلك الآن.", "No active stage needs your input at the moment."),
       waitForLabel: null,
     };
   }
 
+  const name = en ? current.nameEn?.trim() || current.nameAr : current.nameAr;
+
   if (current.canDecideApproval) {
     return {
       kind: "approve",
-      title: "يتطلب إجراء منك",
-      detail: `موافقة على المرحلة: ${current.nameAr}`,
+      title: L("يتطلب إجراء منك", "Action required"),
+      detail: L(`موافقة على المرحلة: ${name}`, `Approve stage: ${name}`),
       waitForLabel: null,
     };
   }
@@ -261,8 +287,8 @@ export function buildProjectAttention(input: {
   if (current.canSubmitApproval) {
     return {
       kind: "submit_approval",
-      title: "يتطلب إجراء منك",
-      detail: `إرسال مرحلة ${current.nameAr} للاعتماد`,
+      title: L("يتطلب إجراء منك", "Action required"),
+      detail: L(`إرسال مرحلة ${name} للاعتماد`, `Submit stage "${name}" for approval`),
       waitForLabel: null,
     };
   }
@@ -270,8 +296,8 @@ export function buildProjectAttention(input: {
   if (current.canComplete) {
     return {
       kind: "complete",
-      title: "يتطلب إجراء منك",
-      detail: `إكمال المرحلة: ${current.nameAr}`,
+      title: L("يتطلب إجراء منك", "Action required"),
+      detail: L(`إكمال المرحلة: ${name}`, `Complete stage: ${name}`),
       waitForLabel: null,
     };
   }
@@ -279,10 +305,10 @@ export function buildProjectAttention(input: {
   if (current.visual === "changes_requested" || current.latestOfficialCode === "C") {
     return {
       kind: "changes_requested",
-      title: "المدير طلب تعديلات",
+      title: L("المدير طلب تعديلات", "The manager requested changes"),
       detail: current.responsibleLabel
-        ? `المسؤول: ${current.responsibleLabel}`
-        : "أعد العمل ثم أرسل المرحلة مجدداً للاعتماد.",
+        ? L(`المسؤول: ${current.responsibleLabel}`, `Owner: ${current.responsibleLabel}`)
+        : L("أعد العمل ثم أرسل المرحلة مجدداً للاعتماد.", "Rework the stage, then resubmit it for approval."),
       waitForLabel: current.responsibleLabel,
     };
   }
@@ -290,14 +316,14 @@ export function buildProjectAttention(input: {
   if (current.visual === "rejected") {
     return {
       kind: "rejected",
-      title: "تم الرفض",
-      detail: current.blockReason ?? "رُفضت المرحلة وفق مسار الاعتماد.",
+      title: L("تم الرفض", "Rejected"),
+      detail: current.blockReason ?? L("رُفضت المرحلة وفق مسار الاعتماد.", "The stage was rejected through the approval route."),
       waitForLabel: null,
     };
   }
 
   if (current.visual === "waiting_approval" || current.visual === "overdue") {
-    const wait = waitingApprovalPhrase(current.approverLabel);
+    const wait = waitingApprovalPhrase(current.approverLabel, input.locale);
     return {
       kind: "wait",
       title: wait,
@@ -309,16 +335,16 @@ export function buildProjectAttention(input: {
   if (current.responsibleLabel) {
     return {
       kind: "wait",
-      title: `بانتظار ${current.responsibleLabel}`,
-      detail: current.blockReason ?? `المرحلة الحالية: ${current.nameAr}`,
+      title: L(`بانتظار ${current.responsibleLabel}`, `Waiting on ${current.responsibleLabel}`),
+      detail: current.blockReason ?? L(`المرحلة الحالية: ${name}`, `Current stage: ${name}`),
       waitForLabel: current.responsibleLabel,
     };
   }
 
   return {
     kind: "none",
-    title: "لا يوجد إجراء مطلوب منك حالياً",
-    detail: `المرحلة الحالية: ${current.nameAr}`,
+    title: L("لا يوجد إجراء مطلوب منك حالياً", "Nothing needs your action right now"),
+    detail: L(`المرحلة الحالية: ${name}`, `Current stage: ${name}`),
     waitForLabel: null,
   };
 }
@@ -431,18 +457,20 @@ export function resolveStageAssignment(input: {
   roleNames: Map<string, string>;
   departmentNames: Map<string, string>;
   jobTitles: Map<string, string>;
+  locale?: Locale;
 }): StageAssignmentView {
+  const en = input.locale === "en";
   const requiredRoleLabel = input.assignedRoleId
-    ? (input.roleNames.get(input.assignedRoleId) ?? "دور معيّن")
+    ? (input.roleNames.get(input.assignedRoleId) ?? (en ? "Assigned role" : "دور معيّن"))
     : null;
   const requiredDepartmentLabel = input.assignedDepartmentId
-    ? (input.departmentNames.get(input.assignedDepartmentId) ?? "قسم معيّن")
+    ? (input.departmentNames.get(input.assignedDepartmentId) ?? (en ? "Assigned department" : "قسم معيّن"))
     : null;
   const displayUserId = input.responsibleUserId || input.assignedUserId || null;
   if (displayUserId) {
     return {
       kind: "user",
-      label: input.profileNames.get(displayUserId) ?? "مستخدم معيّن",
+      label: input.profileNames.get(displayUserId) ?? (en ? "Assigned user" : "مستخدم معيّن"),
       subtitle: input.jobTitles.get(displayUserId) ?? null,
       responsibleUserId: displayUserId,
       requiredRoleLabel,
@@ -451,7 +479,7 @@ export function resolveStageAssignment(input: {
   }
   return {
     kind: "none",
-    label: "غير محدد",
+    label: en ? "Not set" : "غير محدد",
     subtitle: null,
     responsibleUserId: null,
     requiredRoleLabel,

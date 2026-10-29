@@ -193,3 +193,11 @@ describe("074 contract", () => {
     expect(update).toContain('authorize(await getAuthContext(), "workflow.manage")');
   });
 });
+
+describe("deadline labels in English", () => {
+  it("formats remaining / overdue durations and Riyadh time with Latin digits", () => {
+    expect(formatRemainingAr("2026-01-02T03:00:00.000Z", "2026-01-01T00:00:00.000Z", "en")).toBe("1 day 3 hours");
+    expect(formatOverdueSinceAr("2026-01-01T00:00:00.000Z", "2026-01-01T00:30:00.000Z", "en")).toBe("less than an hour");
+    expect(formatRiyadhDateTimeAr("2026-01-01T12:05:00.000Z", "en")).toBe("1/1/2026 3:05 PM");
+  });
+});

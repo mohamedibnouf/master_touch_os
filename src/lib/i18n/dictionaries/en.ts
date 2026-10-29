@@ -1,6 +1,12 @@
 import type { Dictionary } from "./ar";
+import { projectDetailEn } from "./project-detail.en";
+import { projectWorkflowEn } from "./project-workflow.en";
+import { projectCommercialEn } from "./project-commercial.en";
 
 export const en: Dictionary = {
+  projectDetail: projectDetailEn,
+  projectWorkflow: projectWorkflowEn,
+  projectCommercial: projectCommercialEn,
   meta: {
     title: "Master Touch | Internal Operating System",
     description: "Business operating system for Master Touch",
@@ -88,6 +94,38 @@ export const en: Dictionary = {
     heroTitle: "One platform for projects, teams and operations",
     heroBody: "Projects, procurement, HR and finance in one place, with precise permissions for every role.",
     heroPoints: ["Live tracking of projects and stages", "Approvals and documents with a clear trail", "Accurate attendance, payroll and leave"],
+  },
+  projects: {
+    title: "Projects",
+    description: "Company project register with filters and paging",
+    create: "New project",
+    searchPlaceholder: "Search by name or code",
+    allStatuses: "All statuses",
+    allRisks: "All risk levels",
+    filter: "Filter",
+    empty: "No matching projects.",
+    colCode: "Code",
+    colProject: "Project",
+    colStatus: "Status",
+    colRisk: "Risk",
+    colProgress: "Progress",
+    summary: "{total} projects · page {page} of {pages}",
+    previous: "Previous",
+    next: "Next",
+    newTitle: "New project",
+    newDescription: "The project code is generated automatically and safely by the database",
+    nameAr: "Project name (Arabic)",
+    nameEn: "Project name (English)",
+    descriptionField: "Description",
+    manager: "Project manager",
+    unassigned: "Unassigned",
+    priority: "Priority",
+    priorities: { low: "Low", medium: "Medium", high: "High", critical: "Critical" },
+    startDate: "Start date",
+    plannedEndDate: "Planned end date",
+    location: "Location",
+    save: "Save project",
+    cancel: "Cancel",
   },
   home: {
     greeting: "Welcome, {name}",

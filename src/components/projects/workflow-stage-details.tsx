@@ -18,15 +18,17 @@ import { MOBILIZATION_STEP_KEY, type ProjectMobilizationReadiness } from "@/modu
 import { EXECUTION_STEP_KEY, type ProjectExecutionProgress } from "@/modules/projects/stage07-execution";
 import { COMMISSIONING_STEP_KEY, type ProjectCommissioningProgress } from "@/modules/projects/stage08-commissioning";
 import { HANDOVER_STEP_KEY, type ProjectHandoverReadiness } from "@/modules/projects/stage09-handover";
+import { intlLocale, pickLocalized, type Locale } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
-function formatStamp(value: string | null): string {
+function formatStamp(value: string | null, locale: Locale): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
-  return new Date(parsed).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
+  return new Date(parsed).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
 }
 
-export function WorkflowStageDetails({
+export async function WorkflowStageDetails({
   node,
   projectId,
   projectCode,
@@ -53,12 +55,23 @@ export function WorkflowStageDetails({
   commissioningProgress?: ProjectCommissioningProgress | null;
   handoverReadiness?: ProjectHandoverReadiness | null;
 }) {
+  const { t, locale } = await getI18n();
+  const copy = t.projectWorkflow.details;
+  const common = t.projectWorkflow.common;
+  const name = pickLocalized(locale, node.nameAr, node.nameEn);
+  const secondaryName = locale === "en" ? node.nameAr : node.nameEn;
   return (
     <div data-testid="workflow-stage-details" className="space-y-4">
       <div>
-        <p className="text-xs text-muted">تفاصيل المرحلة</p>
-        <h2 className="text-lg font-semibold text-ink">{node.nameAr}</h2>
-        <p className="text-sm text-muted">{node.nameEn}</p>
+        <p className="text-xs text-muted">{copy.eyebrow}</p>
+        <h2 className="text-lg font-semibold text-ink" dir="auto">
+          {name}
+        </h2>
+        {secondaryName && secondaryName !== name ? (
+          <p className="text-sm text-muted" dir="auto">
+            {secondaryName}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge
@@ -76,54 +89,54 @@ export function WorkflowStageDetails({
         >
           {node.visualLabel}
         </Badge>
-        <Badge>{node.gate === "APPROVAL" ? "بوابة اعتماد" : "إكمال معتمد"}</Badge>
+        <Badge>{node.gate === "APPROVAL" ? copy.approvalGate : copy.approvedCompletion}</Badge>
       </div>
       <dl className="grid gap-2 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-muted">المسؤول</dt>
-          <dd>{node.responsibleLabel ?? "غير محدد"}</dd>
+          <dt className="text-muted">{common.owner}</dt>
+          <dd>{node.responsibleLabel ?? common.notSet}</dd>
         </div>
         {node.requiredRoleLabel ? (
           <div>
-            <dt className="text-muted">الدور المطلوب</dt>
+            <dt className="text-muted">{common.requiredRole}</dt>
             <dd>{node.requiredRoleLabel}</dd>
           </div>
         ) : null}
         <div>
-          <dt className="text-muted">الموافقة المطلوبة</dt>
-          <dd>{node.requiresApproval ? (node.approverLabel ?? "نعم") : "لا"}</dd>
+          <dt className="text-muted">{copy.approvalRequired}</dt>
+          <dd>{node.requiresApproval ? (node.approverLabel ?? copy.yes) : copy.no}</dd>
         </div>
         <div>
-          <dt className="text-muted">بدأت</dt>
-          <dd>{formatStamp(node.startedAt)}</dd>
+          <dt className="text-muted">{copy.started}</dt>
+          <dd className="tabular-nums">{formatStamp(node.startedAt, locale)}</dd>
         </div>
         <div>
-          <dt className="text-muted">موعد الإغلاق</dt>
-          <dd>{formatStamp(node.dueAt)}</dd>
+          <dt className="text-muted">{copy.dueAt}</dt>
+          <dd className="tabular-nums">{formatStamp(node.dueAt, locale)}</dd>
         </div>
         <div>
-          <dt className="text-muted">اكتملت</dt>
-          <dd>{formatStamp(node.completedAt)}</dd>
+          <dt className="text-muted">{copy.completed}</dt>
+          <dd className="tabular-nums">{formatStamp(node.completedAt, locale)}</dd>
         </div>
         <div>
-          <dt className="text-muted">أنجزها</dt>
+          <dt className="text-muted">{copy.completedBy}</dt>
           <dd>{node.completedByLabel ?? "—"}</dd>
         </div>
       </dl>
       <WorkflowDeadlinePanel node={node} projectId={projectId} />
       {node.blockReason ? (
-        <p className="rounded-[var(--radius-control)] border border-line bg-paper px-3 py-2 text-sm">{node.blockReason}</p>
+        <p className="rounded-[var(--radius-control)] border border-line bg-surface-muted px-3 py-2 text-sm text-ink">{node.blockReason}</p>
       ) : null}
       {node.requiresApproval && !node.openApproval && node.visual !== "completed" ? (
-        <p className="text-sm text-muted">هذه مرحلة بوابة اعتماد. لا يمكن إكمالها يدوياً قبل قرار المعتمد.</p>
+        <p className="text-sm text-muted">{copy.gateHint}</p>
       ) : null}
       {node.activationHint ? (
-        <p className="text-sm text-navy" data-testid="workflow-auto-advance-hint">
+        <p className="text-sm text-primary" data-testid="workflow-auto-advance-hint">
           {node.activationHint}
         </p>
       ) : null}
-      {node.latestOfficialCode === "C" ? <p className="text-sm text-warning">تم طلب تعديل. العمل السابق محفوظ.</p> : null}
-      {node.latestOfficialCode === "D" ? <p className="text-sm text-danger">تم الرفض.</p> : null}
+      {node.latestOfficialCode === "C" ? <p className="text-sm text-warning">{copy.changesRequested}</p> : null}
+      {node.latestOfficialCode === "D" ? <p className="text-sm text-danger">{copy.rejected}</p> : null}
 
       <ApprovalActionPanel node={node} projectId={projectId} />
 
@@ -195,7 +208,7 @@ export function WorkflowStageDetails({
               (node.stepKey === HANDOVER_STEP_KEY && handoverReadiness?.ready === false)
             }
           >
-            إكمال المرحلة
+            {common.completeStage}
           </Button>
         </ServerActionForm>
       ) : null}
@@ -205,7 +218,7 @@ export function WorkflowStageDetails({
           <input type="hidden" name="stageId" value={node.projectStageId} />
           <input type="hidden" name="projectId" value={projectId} />
           <Button type="submit" variant="success">
-            إكمال المرحلة
+            {common.completeStage}
           </Button>
         </ServerActionForm>
       ) : null}

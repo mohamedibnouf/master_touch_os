@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Field, Input, Select, TableScroll } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, Section, Select, TableScroll } from "@/components/ui/primitives";
 import { EntityHeader } from "@/components/ui/entity-header";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
@@ -24,6 +24,9 @@ import {
 } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl } from "@/components/documents/document-lifecycle-controls";
 import { documentStatusLabel, projectRiskLabel, projectRiskTone, projectStatusLabel, projectStatusTone } from "@/lib/ui/operational-labels";
+import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 import { ProjectProgress } from "@/components/projects/project-progress";
 import { ProjectAttentionCard } from "@/components/projects/project-attention-card";
 import { CaseFlowStep, ProjectCaseFlow } from "@/components/projects/project-case-flow";
@@ -52,7 +55,7 @@ import {
   projectNeedsStagePackages,
 } from "@/modules/projects/project-detail-loaders";
 
-const laterTabs = ["السلامة", "الجودة", "الاتصالات"];
+const LATER_TAB_KEYS = ["safety", "quality", "communications"] as const;
 
 export default async function ProjectDetailPage({
   params,
@@ -63,6 +66,8 @@ export default async function ProjectDetailPage({
 }) {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
+  const { t, locale } = await getI18n();
+  const td = t.projectDetail;
 
   const { id } = await params;
   const { tab = "overview", stage: stageParam } = await searchParams;
@@ -103,10 +108,10 @@ export default async function ProjectDetailPage({
     repo.listProjectMembers(project.id),
     needDocs ? repo.listDocuments(ctx.organization.id, project.id) : Promise.resolve([]),
     needUsers ? repo.listUsers(ctx.organization.id) : Promise.resolve([]),
-    supabase.from("workflow_definitions").select("id, name_ar").eq("status", "published").eq("entity_type", "project"),
+    supabase.from("workflow_definitions").select("id, name_ar, name_en").eq("status", "published").eq("entity_type", "project"),
     supabase.rpc("compute_project_health", { p_project_id: project.id }),
-    supabase.from("roles").select("id, name_ar").or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`),
-    supabase.from("departments").select("id, name_ar").eq("organization_id", ctx.organization.id),
+    supabase.from("roles").select("id, name_ar, name_en").or(`organization_id.eq.${ctx.organization.id},organization_id.is.null`),
+    supabase.from("departments").select("id, name_ar, name_en").eq("organization_id", ctx.organization.id),
   ]);
 
   const currentFiles =
@@ -125,19 +130,24 @@ export default async function ProjectDetailPage({
   const jobTitles = new Map<string, string>();
   for (const row of users) {
     const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    const name = profile?.full_name_ar || profile?.full_name_en;
+    const name = pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en);
     if (name) profileNames.set(row.profile_id, name);
     const employees = Array.isArray(row.employees) ? row.employees : [];
-    const title = employees.find((emp) => emp.job_title_ar)?.job_title_ar;
+    const titledEmployee = employees.find((emp) => emp.job_title_ar || emp.job_title_en);
+    const title = titledEmployee ? pickLocalized(locale, titledEmployee.job_title_ar, titledEmployee.job_title_en) : "";
     if (title) jobTitles.set(row.profile_id, title);
   }
   for (const member of members) {
     const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-    const name = profile?.full_name_ar || profile?.full_name_en;
+    const name = pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en);
     if (name && !profileNames.has(member.profile_id)) profileNames.set(member.profile_id, name);
   }
-  const roleNames = new Map((roleRows.data ?? []).map((r) => [r.id as string, r.name_ar as string]));
-  const departmentNames = new Map((departmentRows.data ?? []).map((d) => [d.id as string, d.name_ar as string]));
+  const roleNames = new Map(
+    (roleRows.data ?? []).map((r) => [r.id as string, pickLocalized(locale, r.name_ar as string, r.name_en as string)]),
+  );
+  const departmentNames = new Map(
+    (departmentRows.data ?? []).map((d) => [d.id as string, pickLocalized(locale, d.name_ar as string, d.name_en as string)]),
+  );
 
   const workflow = await loadProjectWorkflowProjection({
     supabase,
@@ -149,6 +159,7 @@ export default async function ProjectDetailPage({
     departmentNames,
     jobTitles,
     instance: instanceRes.data ?? null,
+    locale,
   });
   const focusedStageId = workflowStageFocusId(
     workflow.nodes.map((node) => node.id),
@@ -234,7 +245,10 @@ export default async function ProjectDetailPage({
     seenResponsible.add(member.profile_id);
     responsibleCandidates.push({
       id: member.profile_id,
-      name: profile?.full_name_ar || profile?.full_name_en || profileNames.get(member.profile_id) || member.profile_id,
+      name:
+        pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en) ||
+        profileNames.get(member.profile_id) ||
+        member.profile_id,
       projectRole: member.role_label ?? null,
       jobTitle: jobTitles.get(member.profile_id) ?? null,
     });
@@ -243,7 +257,7 @@ export default async function ProjectDetailPage({
     responsibleCandidates.unshift({
       id: project.project_manager_id,
       name: profileNames.get(project.project_manager_id) || project.project_manager_id,
-      projectRole: "مدير المشروع",
+      projectRole: td.team.projectManager,
       jobTitle: jobTitles.get(project.project_manager_id) ?? null,
     });
   }
@@ -254,7 +268,7 @@ export default async function ProjectDetailPage({
     const profileActive = profile?.is_active !== false;
     const employeeOk = employees.length === 0 || employees.some((emp) => emp.is_active === true);
     if (!memberActive || !profileActive || !employeeOk) return [];
-    return [{ id: row.profile_id, name: profile?.full_name_ar || row.profile_id }];
+    return [{ id: row.profile_id, name: pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en) || row.profile_id }];
   });
   const managerName = project.project_manager_id ? (profileNames.get(project.project_manager_id) ?? null) : null;
 
@@ -329,7 +343,7 @@ export default async function ProjectDetailPage({
       return {
         documentId: row.document_id as string,
         documentVersionId: row.document_version_id as string,
-        title: title ?? "مستند",
+        title: title ?? td.documents.untitled,
         revision: row.revision as string,
         fileSource: file?.file_source ?? null,
         filePath: file?.file_path ?? null,
@@ -363,30 +377,31 @@ export default async function ProjectDetailPage({
     entityType: row.entity_type as string,
     createdAt: row.created_at as string,
     actorLabel: row.actor_id ? (profileNames.get(row.actor_id as string) ?? null) : null,
-    automaticDetail: activityNarrative(row.action as string, row.new_values),
+    automaticDetail: activityNarrative(row.action as string, row.new_values, locale),
   }));
 
   const canSeeFinance =
     hasPermission(ctx, "finance.read") || hasPermission(ctx, "commercial_reports.read");
   const emptyList = { data: [] as never[], error: null };
-  const tabs = [
-    { id: "overview", label: "نظرة عامة" },
-    { id: "stages", label: "المراحل" },
-    { id: "team", label: "الفريق" },
-    { id: "engineering", label: "الهندسة" },
-    { id: "documents", label: "المستندات" },
-    { id: "rfis", label: "RFI" },
-    { id: "submittals", label: "اعتمادات" },
-    { id: "shop", label: "مخططات" },
-    { id: "inspections", label: "فحوصات" },
-    { id: "ncr", label: "NCR" },
-    { id: "reports", label: "تقارير" },
-    { id: "correspondence", label: "مراسلات" },
-    { id: "commercial", label: "التجاري" },
-    { id: "approvals", label: "الموافقات" },
-    { id: "activity", label: "النشاط" },
-    ...(canAnalyzeProjectAi(ctx) ? [{ id: "ai", label: "المساعد الذكي" }] : []),
-  ];
+  const tabIds = [
+    "overview",
+    "stages",
+    "team",
+    "engineering",
+    "documents",
+    "rfis",
+    "submittals",
+    "shop",
+    "inspections",
+    "ncr",
+    "reports",
+    "correspondence",
+    "commercial",
+    "approvals",
+    "activity",
+    ...(canAnalyzeProjectAi(ctx) ? (["ai"] as const) : []),
+  ] as const;
+  const tabs = tabIds.map((tabId) => ({ id: tabId, label: td.tabs[tabId] }));
 
   const [projectRfis, projectMats, projectShds, projectIrs, projectNcrs, projectReports, projectCors, projectPrs, projectPos, projectSupplierInv, commercialSummary, commercialHealth] =
     await Promise.all([
@@ -490,28 +505,60 @@ export default async function ProjectDetailPage({
   const healthTone =
     health.data === "red" ? "danger" : health.data === "amber" ? "warning" : "success";
   const healthLabel =
-    health.data === "red" ? "أحمر" : health.data === "amber" ? "كهرماني" : "أخضر";
+    health.data === "red" ? td.health.red : health.data === "amber" ? td.health.amber : td.health.green;
+  const commercialHealthLabel =
+    commercialHealth.data === "red"
+      ? td.health.red
+      : commercialHealth.data === "amber"
+        ? td.health.amber
+        : commercialHealth.data === "green"
+          ? td.health.green
+          : String(commercialHealth.data ?? "");
+  const summaryKeyLabels: Record<string, string> = td.commercial.summaryKeys;
+  const numberFormat = new Intl.NumberFormat(intlLocale(locale));
+  const formatDateTime = (value: string) =>
+    new Date(value).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
+  const statusText = (status: string) => commercialStatusLabel(status, locale);
+  const definitionLabel = (item: { name_ar: string | null; name_en: string | null }) =>
+    pickLocalized(locale, item.name_ar, item.name_en);
+  const userLabel = (row: (typeof users)[number]) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en) || row.profile_id;
+  };
+  const projectTitle = pickLocalized(locale, project.name_ar, project.name_en);
+  const projectAltName = locale === "ar" ? project.name_en : project.name_ar;
+  const currentStageName = currentStage ? pickLocalized(locale, currentStage.nameAr, currentStage.nameEn) : "—";
+  const commercialLinkClass = "text-sm font-medium text-primary underline-offset-4 hover:underline";
 
   return (
     <PageContainer className="space-y-5">
       <EntityHeader
         initials={project.project_code.slice(0, 2)}
-        title={project.name_ar}
-        subtitle={`${project.project_code} · ${project.name_en}`}
+        title={projectTitle}
+        subtitle={projectAltName ? `${project.project_code} · ${projectAltName}` : project.project_code}
         meta={
           <span>
-            المرحلة الحالية: {workflow.nodes.find((n) => n.id === workflow.currentNodeId)?.nameAr ?? "—"}
-            {managerName ? ` · المسؤول: ${managerName}` : ""}
+            <bdi>{format(td.header.currentStage, { stage: currentStageName })}</bdi>
+            {managerName ? (
+              <>
+                {" · "}
+                <bdi>{format(td.header.owner, { name: managerName })}</bdi>
+              </>
+            ) : null}
           </span>
         }
         badges={
           <>
-            <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Badge>
+            <Badge tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status, locale)}</Badge>
             <Badge tone={projectRiskTone(project.risk_level)}>
-              المخاطر: {projectRiskLabel(project.risk_level)}
+              {format(td.header.risk, { risk: projectRiskLabel(project.risk_level, locale) })}
             </Badge>
-            <Badge tone={healthTone as "danger" | "warning" | "success"}>صحة المشروع: {healthLabel}</Badge>
-            {project.planned_end_date ? <Badge>الاستحقاق: {project.planned_end_date}</Badge> : null}
+            <Badge tone={healthTone as "danger" | "warning" | "success"}>
+              {format(td.header.health, { health: healthLabel })}
+            </Badge>
+            {project.planned_end_date ? (
+              <Badge>{format(td.header.due, { date: project.planned_end_date })}</Badge>
+            ) : null}
           </>
         }
       />
@@ -523,7 +570,9 @@ export default async function ProjectDetailPage({
             total={workflow.progress.total}
             tone={progressTone}
           />
-          <p className="mt-3 text-sm text-muted">الإجراء المطلوب: {workflow.nextRequiredAction}</p>
+          <p className="mt-3 border-t border-line pt-3 text-sm text-muted">
+            {format(td.header.requiredAction, { action: workflow.nextRequiredAction })}
+          </p>
         </Card>
         <ProjectAttentionCard attention={workflow.attention} />
       </div>
@@ -531,73 +580,86 @@ export default async function ProjectDetailPage({
         <ProjectAiCard projectId={project.id} enabled={getAiPlatformConfig().enabled} />
       ) : null}
 
-      <div className="mb-6 min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap">
+      <nav
+        aria-label={td.tabsAria}
+        className="mb-6 flex min-w-0 max-w-full gap-1 overflow-x-auto overscroll-x-contain border-b border-line pb-2 whitespace-nowrap"
+      >
         {tabs.map((item) => (
           <Link
             key={item.id}
             href={`/projects/${project.id}?tab=${item.id}`}
             prefetch={false}
-            className={`inline-block shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm ${tab === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted"}`}
+            aria-current={tab === item.id ? "page" : undefined}
+            className={`inline-block shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm transition-colors ${tab === item.id ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted hover:text-ink"}`}
           >
             {item.label}
           </Link>
         ))}
-        {laterTabs.map((item) => (
-          <span key={item} className="shrink-0 rounded-md px-3 py-2 text-sm text-muted/50">
-            {item} · لاحقاً
+        {LATER_TAB_KEYS.map((key) => (
+          <span
+            key={key}
+            aria-disabled="true"
+            className="inline-block shrink-0 rounded-[var(--radius-control)] px-3 py-2 text-sm text-muted/50"
+          >
+            {format(td.laterTab, { label: td.laterTabs[key] })}
           </span>
         ))}
-      </div>
+      </nav>
 
       {tab === "overview" ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <h2 className="mb-3 font-semibold text-navy">البيانات الأساسية</h2>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">الموقع</dt>
-                <dd>{project.location ?? "—"}</dd>
+          <Section title={td.overview.basicInfo}>
+            <dl className="divide-y divide-line text-sm">
+              <div className="flex justify-between gap-4 py-2 first:pt-0">
+                <dt className="text-muted">{td.overview.location}</dt>
+                <dd className="text-ink" dir="auto">{project.location ?? "—"}</dd>
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">البداية</dt>
-                <dd>{project.start_date ?? "—"}</dd>
+              <div className="flex justify-between gap-4 py-2">
+                <dt className="text-muted">{td.overview.start}</dt>
+                <dd className="tabular-nums text-ink">{project.start_date ?? "—"}</dd>
               </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">الانتهاء المخطط</dt>
-                <dd>{project.planned_end_date ?? "—"}</dd>
+              <div className="flex justify-between gap-4 py-2">
+                <dt className="text-muted">{td.overview.plannedEnd}</dt>
+                <dd className="tabular-nums text-ink">{project.planned_end_date ?? "—"}</dd>
               </div>
               {canSeeFinance ? (
                 <>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted">قيمة العقد</dt>
-                    <dd>{project.contract_value ?? "—"}</dd>
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted">{td.overview.contractValue}</dt>
+                    <dd className="tabular-nums text-ink">{project.contract_value ?? "—"}</dd>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted">الميزانية</dt>
-                    <dd>{project.budget ?? "—"}</dd>
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted">{td.overview.budget}</dt>
+                    <dd className="tabular-nums text-ink">{project.budget ?? "—"}</dd>
                   </div>
                 </>
               ) : null}
             </dl>
-          </Card>
-          <Card>
-            <h2 className="mb-3 font-semibold text-navy">الوصف</h2>
-            <p className="text-sm leading-7 text-muted">{project.description ?? "لا يوجد وصف."}</p>
-          </Card>
+          </Section>
+          <Section title={td.overview.description}>
+            <p className="text-sm leading-7 text-muted" dir="auto">
+              {project.description ?? td.overview.noDescription}
+            </p>
+          </Section>
         </div>
       ) : null}
 
       {tab === "stages" ? (
         <div className="space-y-4">
           {workflow.mode === "empty" ? (
-            <EmptyState title="لا توجد مراحل ولا مسار عمل لهذا المشروع." />
+            <EmptyState title={td.stages.empty} />
           ) : (
             <>
               <Card className="p-4 md:p-5">
                 <p className="mb-4 text-sm text-muted">
-                  {workflow.definitionName
-                    ? `المسار: ${workflow.definitionName}${workflow.mode === "preview" ? " — عيّن المسؤولين قبل بدء المسار" : ""}`
-                    : "عرض مراحل المشروع الحالية. إكمال المرحلة يفعّل التالية تلقائياً."}
+                  {workflow.definitionName ? (
+                    <bdi>
+                      {format(td.stages.definitionLine, { name: workflow.definitionName })}
+                      {workflow.mode === "preview" ? ` — ${td.stages.previewHint}` : ""}
+                    </bdi>
+                  ) : (
+                    td.stages.defaultHint
+                  )}
                 </p>
                 <ProjectCaseFlow>
                   {workflow.nodes.map((node, index) => (
@@ -630,115 +692,112 @@ export default async function ProjectDetailPage({
             </>
           )}
           {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
+            <Section title={td.stages.startWorkflow}>
               {(definitions.data ?? []).length === 0 ? (
-                <p className="text-sm text-muted">لا يوجد قالب مسار عمل منشور للمشاريع.</p>
+                <p className="text-sm text-muted">{td.stages.noTemplates}</p>
               ) : (
-              <ServerActionForm action={startWorkflowAction} className="space-y-3">
-                <input type="hidden" name="entityType" value="project" />
-                <input type="hidden" name="entityId" value={project.id} />
-                <Field label="القالب">
-                  <Select name="definitionId" required>
-                    {(definitions.data ?? []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name_ar}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Button type="submit">بدء المسار</Button>
-              </ServerActionForm>
+                <ServerActionForm action={startWorkflowAction} className="space-y-3">
+                  <input type="hidden" name="entityType" value="project" />
+                  <input type="hidden" name="entityId" value={project.id} />
+                  <Field label={td.stages.template}>
+                    <Select name="definitionId" required>
+                      {(definitions.data ?? []).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {definitionLabel(item)}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Button type="submit">{td.stages.startButton}</Button>
+                </ServerActionForm>
               )}
-            </Card>
+            </Section>
           ) : null}
         </div>
       ) : null}
 
       {tab === "team" ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <h2 className="mb-3 font-semibold text-navy">أعضاء الفريق</h2>
+          <Section title={td.team.members}>
             {members.length === 0 ? (
-              <p className="text-sm text-muted">لا يوجد أعضاء بعد.</p>
+              <p className="text-sm text-muted">{td.team.noMembers}</p>
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {members.map((member) => {
                   const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
                   return (
-                    <li key={member.id} className="flex justify-between border-b border-line pb-2">
-                      <span>{profile?.full_name_ar || profile?.full_name_en}</span>
-                      <span className="text-muted">{member.role_label}</span>
+                    <li key={member.id} className="flex justify-between gap-4 py-2 first:pt-0">
+                      <span className="font-medium text-ink" dir="auto">
+                        {pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en)}
+                      </span>
+                      <span className="text-muted" dir="auto">{member.role_label}</span>
                     </li>
                   );
                 })}
               </ul>
             )}
-          </Card>
+          </Section>
           {hasPermission(ctx, "project.manage_team") ? (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">تعيين عضو</h2>
+            <Section title={td.team.assign}>
               <ServerActionForm action={assignProjectMemberAction} className="space-y-3">
                 <input type="hidden" name="projectId" value={project.id} />
-                <Field label="المستخدم">
+                <Field label={td.team.user}>
                   <Select name="profileId" required>
-                    {users.map((row) => {
-                      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-                      return (
-                        <option key={row.profile_id} value={row.profile_id}>
-                          {profile?.full_name_ar || row.profile_id}
-                        </option>
-                      );
-                    })}
+                    {users.map((row) => (
+                      <option key={row.profile_id} value={row.profile_id}>
+                        {userLabel(row)}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
-                <Field label="الدور في المشروع">
+                <Field label={td.team.projectRole}>
                   <Input name="roleLabel" defaultValue="member" />
                 </Field>
-                <Button type="submit">تعيين</Button>
+                <Button type="submit">{td.team.assignButton}</Button>
               </ServerActionForm>
-            </Card>
+            </Section>
           ) : null}
         </div>
       ) : null}
 
       {tab === "engineering" ? (
-        <Card>
-          <h2 className="mb-2 text-base font-semibold text-navy">عمليات الهندسة لهذا المشروع</h2>
-          <p className="mb-4 text-sm text-muted">
-            صحة المشروع: {healthLabel}. استخدم التبويبات أدناه أو لوحة الهندسة للإدخال الكامل.
-          </p>
-          <a
-            href={`/engineering?project=${project.id}`}
-            className="inline-flex rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white"
-          >
-            فتح لوحة الهندسة
-          </a>
-          <a
-            href={`/document-control?q=${encodeURIComponent(project.project_code)}`}
-            className="ms-3 inline-flex rounded-md border border-line px-3.5 py-2 text-sm font-medium"
-          >
-            سجل مراقبة الوثائق
-          </a>
-        </Card>
+        <Section
+          title={td.engineering.title}
+          description={format(td.engineering.description, { health: healthLabel })}
+        >
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={`/engineering?project=${project.id}`}
+              className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover md:min-h-9"
+            >
+              {td.engineering.openBoard}
+            </a>
+            <a
+              href={`/document-control?q=${encodeURIComponent(project.project_code)}`}
+              className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-9"
+            >
+              {td.engineering.documentControl}
+            </a>
+          </div>
+        </Section>
       ) : null}
 
       {tab === "rfis" ? (
         <ProjectMiniTable
-          title="طلبات الاستفسار الفني"
-          empty="لا توجد طلبات RFI."
-          headers={["الرقم", "الموضوع", "الحالة"]}
+          title={td.rfis.title}
+          empty={td.rfis.empty}
+          headers={[td.columns.number, td.columns.subject, td.columns.status]}
           rows={(projectRfis.data ?? []).map((r) => [r.rfi_number, r.subject, r.status])}
           actionHref={`/engineering?module=rfi&project=${project.id}`}
-          actionLabel="إدارة RFI"
+          actionLabel={td.rfis.action}
         />
       ) : null}
 
       {tab === "submittals" ? (
         <ProjectMiniTable
-          title="اعتمادات المواد"
-          empty="لا توجد اعتمادات."
-          headers={["الرقم", "الفئة", "الحالة", "القرار"]}
+          title={td.submittals.title}
+          empty={td.submittals.empty}
+          headers={[td.columns.number, td.columns.category, td.columns.status, td.columns.decision]}
           rows={(projectMats.data ?? []).map((m) => [
             m.mat_number,
             m.material_category,
@@ -746,42 +805,42 @@ export default async function ProjectDetailPage({
             m.official_decision ?? "—",
           ])}
           actionHref={`/engineering?module=mat&project=${project.id}`}
-          actionLabel="إدارة الاعتمادات"
+          actionLabel={td.submittals.action}
         />
       ) : null}
 
       {tab === "shop" ? (
         <ProjectMiniTable
-          title="المخططات التنفيذية"
-          empty="لا توجد مخططات."
-          headers={["الرقم", "العنوان", "الحالة", "معتمد للتنفيذ"]}
+          title={td.shop.title}
+          empty={td.shop.empty}
+          headers={[td.columns.number, td.columns.title, td.columns.status, td.columns.approvedForExecution]}
           rows={(projectShds.data ?? []).map((s) => [
             s.shd_number,
             s.drawing_title,
             s.status,
-            s.approved_for_execution ? "معتمد للتنفيذ" : "—",
+            s.approved_for_execution ? td.columns.approvedForExecution : "—",
           ])}
           actionHref={`/engineering?module=shd&project=${project.id}`}
-          actionLabel="إدارة المخططات"
+          actionLabel={td.shop.action}
         />
       ) : null}
 
       {tab === "inspections" ? (
         <ProjectMiniTable
-          title="طلبات الفحص"
-          empty="لا توجد فحوصات."
-          headers={["الرقم", "النشاط", "الحالة"]}
+          title={td.inspections.title}
+          empty={td.inspections.empty}
+          headers={[td.columns.number, td.columns.activity, td.columns.status]}
           rows={(projectIrs.data ?? []).map((i) => [i.ir_number, i.related_activity ?? "—", i.status])}
           actionHref={`/engineering?module=ir&project=${project.id}`}
-          actionLabel="إدارة الفحوصات"
+          actionLabel={td.inspections.action}
         />
       ) : null}
 
       {tab === "ncr" ? (
         <ProjectMiniTable
-          title="تقارير عدم المطابقة"
-          empty="لا توجد تقارير."
-          headers={["الرقم", "الوصف", "الخطورة", "الحالة"]}
+          title={td.ncr.title}
+          empty={td.ncr.empty}
+          headers={[td.columns.number, td.columns.description, td.columns.severity, td.columns.status]}
           rows={(projectNcrs.data ?? []).map((n) => [
             n.ncr_number,
             n.description.slice(0, 80),
@@ -789,15 +848,15 @@ export default async function ProjectDetailPage({
             n.status,
           ])}
           actionHref={`/engineering?module=ncr&project=${project.id}`}
-          actionLabel="إدارة NCR"
+          actionLabel={td.ncr.action}
         />
       ) : null}
 
       {tab === "reports" ? (
         <ProjectMiniTable
-          title="تقارير المشروع"
-          empty="لا توجد تقارير."
-          headers={["النوع", "من", "إلى", "الحالة"]}
+          title={td.reports.title}
+          empty={td.reports.empty}
+          headers={[td.columns.type, td.columns.from, td.columns.to, td.columns.status]}
           rows={(projectReports.data ?? []).map((r) => [
             r.report_type,
             r.period_start,
@@ -809,9 +868,9 @@ export default async function ProjectDetailPage({
 
       {tab === "correspondence" ? (
         <ProjectMiniTable
-          title="سجل المراسلات"
-          empty="لا توجد مراسلات."
-          headers={["المرجع", "الموضوع", "الاتجاه", "الحالة"]}
+          title={td.correspondence.title}
+          empty={td.correspondence.empty}
+          headers={[td.columns.reference, td.columns.subject, td.columns.direction, td.columns.status]}
           rows={(projectCors.data ?? []).map((c) => [
             c.reference_number,
             c.subject,
@@ -824,10 +883,10 @@ export default async function ProjectDetailPage({
       {tab === "commercial" ? (
         <div className="space-y-6">
           {canSeeFinance && commercialSummary.data ? (
-            <Card>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-navy">ملخص تجاري</h2>
-                {commercialHealth.data ? (
+            <Section
+              title={td.commercial.summary}
+              actions={
+                commercialHealth.data ? (
                   <Badge
                     tone={
                       commercialHealth.data === "red"
@@ -837,84 +896,83 @@ export default async function ProjectDetailPage({
                           : "success"
                     }
                   >
-                    صحة تجارية: {commercialHealth.data}
+                    {format(td.commercial.health, { health: commercialHealthLabel })}
                   </Badge>
-                ) : null}
-              </div>
-              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                ) : null
+              }
+            >
+              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {Object.entries(commercialSummary.data as Record<string, number>).map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4 border-b border-line pb-2">
-                    <dt className="text-muted">{k}</dt>
-                    <dd className="font-medium text-navy">{Number(v).toLocaleString("ar-SA")}</dd>
+                    <dt className="text-muted">{summaryKeyLabels[k] ?? k}</dt>
+                    <dd className="font-medium tabular-nums text-ink">{numberFormat.format(Number(v))}</dd>
                   </div>
                 ))}
               </dl>
-            </Card>
+            </Section>
           ) : (
             <Card>
-              <p className="text-sm text-muted">
-                الملخص التجاري يتطلب صلاحية المالية أو التقارير التجارية.
-              </p>
+              <p className="text-sm text-muted">{td.commercial.noPermission}</p>
             </Card>
           )}
           {canSeeFinance ? (
-            <div className="flex flex-wrap gap-3">
-              <Link href={`/projects/${id}/commercial/contract`} className="text-sm text-navy underline">
-                العقد
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <Link href={`/projects/${id}/commercial/contract`} className={commercialLinkClass}>
+                {td.commercial.links.contract}
               </Link>
-              <Link href={`/projects/${id}/commercial/milestones`} className="text-sm text-navy underline">
-                مراحل الدفع
+              <Link href={`/projects/${id}/commercial/milestones`} className={commercialLinkClass}>
+                {td.commercial.links.milestones}
               </Link>
-              <Link href={`/projects/${id}/commercial/cashflow`} className="text-sm text-navy underline">
-                التدفق النقدي
+              <Link href={`/projects/${id}/commercial/cashflow`} className={commercialLinkClass}>
+                {td.commercial.links.cashflow}
               </Link>
-              <Link href="/finance/client-valuations" className="text-sm text-navy underline">
-                مستخلصات العميل
+              <Link href="/finance/client-valuations" className={commercialLinkClass}>
+                {td.commercial.links.clientValuations}
               </Link>
-              <Link href="/finance/variations" className="text-sm text-navy underline">
-                أوامر التغيير
+              <Link href="/finance/variations" className={commercialLinkClass}>
+                {td.commercial.links.variations}
               </Link>
             </div>
           ) : null}
           <div className="grid gap-6 xl:grid-cols-2">
             <ProjectMiniTable
-              title="طلبات الشراء"
-              empty="لا توجد طلبات شراء."
-              headers={["الرقم", "الحالة", "التكلفة"]}
+              title={td.commercial.purchaseRequests.title}
+              empty={td.commercial.purchaseRequests.empty}
+              headers={[td.columns.number, td.columns.status, td.columns.cost]}
               rows={(projectPrs.data ?? []).map((p) => [
                 p.pr_number,
-                p.status,
+                statusText(p.status),
                 p.estimated_cost != null ? `${p.estimated_cost} ${p.currency}` : "—",
               ])}
               actionHref={`/procurement?project=${project.id}`}
-              actionLabel="المشتريات"
+              actionLabel={td.commercial.procurementAction}
             />
             <ProjectMiniTable
-              title="أوامر الشراء"
-              empty="لا توجد أوامر شراء."
-              headers={["الرقم", "الحالة", "الإجمالي"]}
+              title={td.commercial.purchaseOrders.title}
+              empty={td.commercial.purchaseOrders.empty}
+              headers={[td.columns.number, td.columns.status, td.columns.total]}
               rows={(projectPos.data ?? []).map((p) => [
                 p.po_number,
-                p.status,
+                statusText(p.status),
                 `${p.total} ${p.currency}`,
               ])}
               actionHref={`/procurement?project=${project.id}`}
-              actionLabel="المشتريات"
+              actionLabel={td.commercial.procurementAction}
             />
           </div>
           {canSeeFinance ? (
             <ProjectMiniTable
-              title="فواتير الموردين"
-              empty="لا توجد فواتير."
-              headers={["الرقم", "الحالة", "المبلغ", "الاستحقاق"]}
+              title={td.commercial.supplierInvoices.title}
+              empty={td.commercial.supplierInvoices.empty}
+              headers={[td.columns.number, td.columns.status, td.columns.amount, td.columns.dueDate]}
               rows={(projectSupplierInv.data ?? []).map((i) => [
                 i.invoice_number,
-                i.status,
+                statusText(i.status),
                 `${i.total} ${i.currency}`,
                 i.due_date ?? "—",
               ])}
               actionHref="/finance"
-              actionLabel="المالية"
+              actionLabel={td.commercial.financeAction}
             />
           ) : null}
         </div>
@@ -923,24 +981,22 @@ export default async function ProjectDetailPage({
       {tab === "documents" ? (
         <div className="space-y-4" data-testid="project-documents-panel">
           <Card>
-            <h2 className="mb-3 font-semibold text-navy">مستندات المشروع</h2>
+            <h2 className="mb-4 text-sm font-semibold text-ink">{td.documents.title}</h2>
             {documents.length === 0 ? (
-              <EmptyState title="لا توجد مستندات مرتبطة بهذا المشروع بعد." />
+              <EmptyState title={td.documents.empty} />
             ) : (
               <>
                 <ul className="space-y-3 md:hidden">
                   {documents.map((doc) => {
                     const file = fileByDoc.get(doc.id) ?? null;
                     return (
-                      <li key={doc.id} className="rounded-lg border border-line p-3">
-                        <p className="font-medium text-navy">{doc.title}</p>
+                      <li key={doc.id} className="rounded-[var(--radius-control)] border border-line p-3">
+                        <p className="font-medium text-ink" dir="auto">{doc.title}</p>
                         <p className="mt-1 text-xs text-muted">
                           {doc.document_number ? `${doc.document_number} · ` : ""}
-                          {doc.category} · {doc.current_revision} · {documentStatusLabel(doc.status)}
+                          {doc.category} · {doc.current_revision} · {documentStatusLabel(doc.status, locale)}
                         </p>
-                        <p className="mt-1 text-xs text-muted">
-                          {new Date(doc.updated_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
-                        </p>
+                        <p className="mt-1 text-xs text-muted">{formatDateTime(doc.updated_at)}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <DocumentSourceBadge source={file?.file_source} />
                           <DocumentOpenControl documentId={doc.id} file={file} canOpenStorage={canOpenStorage} />
@@ -953,36 +1009,34 @@ export default async function ProjectDetailPage({
                     );
                   })}
                 </ul>
-                <TableScroll className="hidden rounded-lg border border-line md:block">
+                <TableScroll className="hidden rounded-[var(--radius-control)] border border-line md:block">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-paper text-start text-muted">
+                    <thead className="bg-surface-muted text-xs text-muted">
                       <tr>
-                        <th className="px-3 py-2 font-medium">المستند</th>
-                        <th className="px-3 py-2 font-medium">التصنيف</th>
-                        <th className="px-3 py-2 font-medium">الإصدار</th>
-                        <th className="px-3 py-2 font-medium">الحالة</th>
-                        <th className="px-3 py-2 font-medium">التحديث</th>
-                        <th className="px-3 py-2 font-medium">المصدر</th>
-                        <th className="px-3 py-2 font-medium">إجراءات</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.document}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.category}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.revision}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.status}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.updated}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.source}</th>
+                        <th className="px-3 py-2 text-start font-medium">{td.documents.actions}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {documents.map((doc) => {
                         const file = fileByDoc.get(doc.id) ?? null;
                         return (
-                          <tr key={doc.id} className="border-t border-line">
+                          <tr key={doc.id} className="border-t border-line hover:bg-surface-muted/60">
                             <td className="px-3 py-2">
-                              <p className="font-medium text-navy">{doc.title}</p>
+                              <p className="font-medium text-ink" dir="auto">{doc.title}</p>
                               {doc.document_number ? (
                                 <p className="text-xs text-muted">{doc.document_number}</p>
                               ) : null}
                             </td>
                             <td className="px-3 py-2">{doc.category}</td>
-                            <td className="px-3 py-2">{doc.current_revision}</td>
-                            <td className="px-3 py-2">{documentStatusLabel(doc.status)}</td>
-                            <td className="px-3 py-2 text-muted">
-                              {new Date(doc.updated_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
-                            </td>
+                            <td className="px-3 py-2 tabular-nums">{doc.current_revision}</td>
+                            <td className="px-3 py-2">{documentStatusLabel(doc.status, locale)}</td>
+                            <td className="px-3 py-2 text-muted">{formatDateTime(doc.updated_at)}</td>
                             <td className="px-3 py-2">
                               <DocumentSourceBadge source={file?.file_source} />
                             </td>
@@ -994,9 +1048,9 @@ export default async function ProjectDetailPage({
                                   canOpenStorage={canOpenStorage}
                                 />
                                 <DocumentDetailsLink documentId={doc.id} />
-                              {canArchiveDocs ? (
-                                <DocumentArchiveControl documentId={doc.id} fileSource={file?.file_source} />
-                              ) : null}
+                                {canArchiveDocs ? (
+                                  <DocumentArchiveControl documentId={doc.id} fileSource={file?.file_source} />
+                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -1006,14 +1060,14 @@ export default async function ProjectDetailPage({
                   </table>
                 </TableScroll>
                 {documents.length >= 50 ? (
-                  <p className="mt-2 text-xs text-muted">يُعرض أحدث 50 مستنداً لهذا المشروع.</p>
+                  <p className="mt-2 text-xs text-muted">{td.documents.latestLimit}</p>
                 ) : null}
               </>
             )}
           </Card>
           {canUploadDocs ? (
             <Card data-testid="project-add-document">
-              <h2 className="mb-4 font-semibold text-navy">إضافة مستند</h2>
+              <h2 className="mb-4 text-sm font-semibold text-ink">{td.documents.add}</h2>
               <DocumentSourceForm projectId={project.id} />
             </Card>
           ) : null}
@@ -1036,58 +1090,56 @@ export default async function ProjectDetailPage({
             />
           ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
-          {hasPermission(ctx, "approval.create") ? (
-            <Card data-testid="generic-project-approval-card">
-              <h2 className="mb-1 font-semibold text-navy">طلبات موافقة عامة</h2>
-              <p className="mb-3 text-sm text-muted">
-                هذا الطلب يرتبط بالمشروع فقط، ولا يحرّك مرحلة مسار العمل. لاستخدام بوابة الاعتماد استخدم «اعتماد المرحلة الحالية».
-              </p>
-              <ServerActionForm action={createApprovalAction} className="space-y-3">
-                <input type="hidden" name="entityType" value="project" />
-                <input type="hidden" name="entityId" value={project.id} />
-                <input type="hidden" name="projectId" value={project.id} />
-                <Field label="العنوان">
-                  <Input name="title" defaultValue={`موافقة مشروع ${project.project_code}`} required />
-                </Field>
-                <Field label="المعتمد">
-                  <Select name="approverProfileId" required>
-                    {users.map((row) => {
-                      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-                      return (
+            {hasPermission(ctx, "approval.create") ? (
+              <Card data-testid="generic-project-approval-card">
+                <h2 className="mb-1 text-sm font-semibold text-ink">{td.approvals.genericTitle}</h2>
+                <p className="mb-4 text-sm text-muted">{td.approvals.genericDescription}</p>
+                <ServerActionForm action={createApprovalAction} className="space-y-3">
+                  <input type="hidden" name="entityType" value="project" />
+                  <input type="hidden" name="entityId" value={project.id} />
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <Field label={td.approvals.titleLabel}>
+                    <Input
+                      name="title"
+                      defaultValue={format(td.approvals.defaultTitle, { code: project.project_code })}
+                      required
+                    />
+                  </Field>
+                  <Field label={td.approvals.approver}>
+                    <Select name="approverProfileId" required>
+                      {users.map((row) => (
                         <option key={row.profile_id} value={row.profile_id}>
-                          {profile?.full_name_ar || row.profile_id}
+                          {userLabel(row)}
                         </option>
-                      );
-                    })}
-                  </Select>
-                </Field>
-                <Button type="submit">إنشاء طلب عام</Button>
-              </ServerActionForm>
-            </Card>
-          ) : null}
-          {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
-            <Card>
-              <h2 className="mb-3 font-semibold text-navy">بدء مسار عمل</h2>
-              {(definitions.data ?? []).length === 0 ? (
-                <p className="text-sm text-muted">لا يوجد قالب مسار عمل منشور للمشاريع.</p>
-              ) : (
-              <ServerActionForm action={startWorkflowAction} className="space-y-3">
-                <input type="hidden" name="entityType" value="project" />
-                <input type="hidden" name="entityId" value={project.id} />
-                <Field label="القالب">
-                  <Select name="definitionId" required>
-                    {(definitions.data ?? []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name_ar}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Button type="submit">بدء</Button>
-              </ServerActionForm>
-              )}
-            </Card>
-          ) : null}
+                      ))}
+                    </Select>
+                  </Field>
+                  <Button type="submit">{td.approvals.createGeneric}</Button>
+                </ServerActionForm>
+              </Card>
+            ) : null}
+            {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
+              <Section title={td.stages.startWorkflow}>
+                {(definitions.data ?? []).length === 0 ? (
+                  <p className="text-sm text-muted">{td.stages.noTemplates}</p>
+                ) : (
+                  <ServerActionForm action={startWorkflowAction} className="space-y-3">
+                    <input type="hidden" name="entityType" value="project" />
+                    <input type="hidden" name="entityId" value={project.id} />
+                    <Field label={td.stages.template}>
+                      <Select name="definitionId" required>
+                        {(definitions.data ?? []).map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {definitionLabel(item)}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Button type="submit">{td.stages.startShort}</Button>
+                  </ServerActionForm>
+                )}
+              </Section>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1117,24 +1169,25 @@ function ProjectMiniTable({
   actionLabel?: string;
 }) {
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-navy">{title}</h2>
-        {actionHref ? (
-          <a href={actionHref} className="text-sm text-navy underline">
-            {actionLabel ?? "إدارة"}
+    <Section
+      title={title}
+      actions={
+        actionHref && actionLabel ? (
+          <a href={actionHref} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+            {actionLabel}
           </a>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       {rows.length === 0 ? (
         <EmptyState title={empty} />
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroll className="rounded-[var(--radius-control)] border border-line">
           <table className="min-w-full text-sm">
-            <thead className="bg-paper text-start text-muted">
+            <thead className="bg-surface-muted text-xs text-muted">
               <tr>
                 {headers.map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">
+                  <th key={h} className="px-3 py-2 text-start font-medium">
                     {h}
                   </th>
                 ))}
@@ -1142,9 +1195,9 @@ function ProjectMiniTable({
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={i} className="border-t border-line">
+                <tr key={i} className="border-t border-line hover:bg-surface-muted/60">
                   {row.map((cell, j) => (
-                    <td key={j} className={`px-3 py-2 ${j === 0 ? "font-medium text-navy" : ""}`}>
+                    <td key={j} className={`px-3 py-2 ${j === 0 ? "font-medium text-ink" : ""}`} dir="auto">
                       {cell}
                     </td>
                   ))}
@@ -1152,8 +1205,8 @@ function ProjectMiniTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
-    </Card>
+    </Section>
   );
 }

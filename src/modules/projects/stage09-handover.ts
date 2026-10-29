@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const HANDOVER_STEP_KEY = "handover";
 
 export const HANDOVER_ITEM_KEYS = [
@@ -17,6 +19,18 @@ export const HANDOVER_ITEM_LABELS: Record<HandoverItemKey, string> = {
   client_observations_recorded: "تسجيل ملاحظات العميل",
   receipt_confirmed: "تأكيد الاستلام",
 };
+
+const HANDOVER_ITEM_LABELS_EN: Record<HandoverItemKey, string> = {
+  works_delivered: "Works handed over to the client",
+  final_documents_delivered: "Final documents handed over",
+  warranties_attachments_delivered: "Warranties / attachments handed over (if any)",
+  client_observations_recorded: "Client comments recorded",
+  receipt_confirmed: "Receipt confirmed",
+};
+
+export function handoverItemLabel(key: HandoverItemKey, locale: Locale = "ar"): string {
+  return locale === "en" ? HANDOVER_ITEM_LABELS_EN[key] : HANDOVER_ITEM_LABELS[key];
+}
 
 export const HANDOVER_NOTE_MAX = 500;
 
