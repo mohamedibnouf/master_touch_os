@@ -40,12 +40,14 @@ export async function WorkflowGateSubmitFields({
   projectId,
   projectCode,
   stageNameAr,
+  stageNameEn,
   approvers,
   documents,
 }: {
   projectId: string;
   projectCode: string;
   stageNameAr: string;
+  stageNameEn?: string | null;
   approvers: Array<{ id: string; name: string }>;
   documents: GateSupportingDocumentOption[];
 }) {
@@ -55,6 +57,11 @@ export async function WorkflowGateSubmitFields({
     <ServerActionForm action={createCurrentWorkflowGateApprovalAction} className="space-y-3" testId="workflow-gate-submit-form">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="title" value={`اعتماد مرحلة ${stageNameAr} — ${projectCode}`} />
+      <input
+        type="hidden"
+        name="title_en"
+        value={`Stage approval: ${stageNameEn?.trim() || stageNameAr} — ${projectCode}`}
+      />
       <Field label={copy.approver}>
         <Select name="approverProfileId" required>
           {approvers.map((user) => (
@@ -185,6 +192,7 @@ export async function WorkflowGateApprovalCard({
             projectId={projectId}
             projectCode={projectCode}
             stageNameAr={node.nameAr}
+            stageNameEn={node.nameEn}
             approvers={approvers}
             documents={documents}
           />

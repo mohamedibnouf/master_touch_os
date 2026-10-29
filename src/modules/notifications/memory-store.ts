@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/config";
 import type { ActiveMember, PreferenceRow } from "./catalog";
 import type { HubDelivery, HubNotification, HubStore } from "./orchestrator";
 
@@ -8,7 +9,7 @@ export class MemoryHubStore implements HubStore {
   preferences: PreferenceRow[] = [];
   contacts = new Map<
     string,
-    { email: string | null; phone: string | null; name: string | null; whatsappOptIn?: boolean }
+    { email: string | null; phone: string | null; name: string | null; whatsappOptIn?: boolean; locale?: Locale | null }
   >();
   push = new Map<string, Array<{ endpoint: string }>>();
   managementEmail = new Map<string, string | null>();

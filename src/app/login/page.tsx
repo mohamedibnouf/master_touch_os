@@ -2,6 +2,7 @@ import Image from "next/image";
 import { CheckCircle2 } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
 import { LanguageSwitch } from "@/components/layout/language-switch";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getI18n } from "@/lib/i18n/server";
 
 export default async function LoginPage({
@@ -20,7 +21,10 @@ export default async function LoginPage({
             <Image src="/icons/icon-192x192.png" alt="" width={36} height={36} priority className="size-9 rounded-[0.6rem]" />
             <span className="text-[0.9375rem] font-semibold tracking-tight text-ink">{t.common.appName}</span>
           </div>
-          <LanguageSwitch />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <LanguageSwitch />
+          </div>
         </div>
 
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">

@@ -7,6 +7,7 @@ import { buildBusinessCaseExtractionSystemPrompt } from "./prompt";
 import { mockExtractBusinessCase } from "./mock-extract";
 import { validateBusinessCaseExtraction } from "./validate-extraction";
 import type { BusinessCaseExtraction, DocumentChunk } from "./schema";
+import type { Locale } from "@/lib/i18n/config";
 
 export type DocumentAIConfig = {
   provider: "none" | "mock" | "openai";
@@ -35,6 +36,8 @@ export function getDocumentAIConfig(): DocumentAIConfig {
 
 export async function extractBusinessCaseWithAI(input: {
   chunks: DocumentChunk[];
+  /** Language for free-text extracted values (Arabic by default). */
+  locale?: Locale;
 }): Promise<{ extraction: BusinessCaseExtraction; provider: string; model: string | null }> {
   const cfg = getDocumentAIConfig();
   if (!cfg.enabled) {
@@ -84,7 +87,7 @@ export async function extractBusinessCaseWithAI(input: {
         temperature: L.temperature,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildBusinessCaseExtractionSystemPrompt() },
+          { role: "system", content: buildBusinessCaseExtractionSystemPrompt(input.locale ?? "ar") },
           {
             role: "user",
             content: [

@@ -12,6 +12,18 @@ export function workflowStepActivatedMessage(input: { nameAr: string | null; due
     .join(" — ");
 }
 
+/** English counterpart of `workflowStepActivatedMessage` (falls back to the Arabic stage name). */
+export function workflowStepActivatedMessageEn(input: {
+  nameEn: string | null;
+  nameAr: string | null;
+  dueLabel: string | null;
+}): string {
+  const name = input.nameEn?.trim() || input.nameAr?.trim() || null;
+  return [name ? `Stage: ${name}` : "The next stage of the workflow has been activated.", input.dueLabel ? `Due: ${input.dueLabel}` : null]
+    .filter(Boolean)
+    .join(" — ");
+}
+
 export function workflowActivationRecipients(input: {
   responsibleUserId: string | null;
   assignedUserId: string | null;

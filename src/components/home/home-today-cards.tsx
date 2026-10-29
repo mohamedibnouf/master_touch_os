@@ -95,7 +95,7 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-2 bg-white px-4 py-3 md:px-5">
+          <div className="flex flex-col gap-2 bg-surface px-4 py-3 md:px-5">
             {canCheckIn ? (
               geofenceReady ? (
                 <GeofencePunchButton action="check_in" label={t.home.checkIn} testId="home-check-in" />

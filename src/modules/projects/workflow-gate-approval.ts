@@ -124,12 +124,14 @@ export function parseGateApprovalForm(formData: FormData):
       projectId: string;
       approverProfileId: string;
       title: string | undefined;
+      titleEn: string | undefined;
       documentVersionIds: string[];
     }
   | { ok: false } {
   const projectId = String(formData.get("projectId") ?? "");
   const approverProfileId = String(formData.get("approverProfileId") ?? "");
   const titleRaw = String(formData.get("title") ?? "").trim();
+  const titleEnRaw = String(formData.get("title_en") ?? "").trim();
   if (!isPostgresUuid(projectId) || !isPostgresUuid(approverProfileId)) {
     return { ok: false };
   }
@@ -142,6 +144,7 @@ export function parseGateApprovalForm(formData: FormData):
     projectId,
     approverProfileId,
     title: titleRaw.length >= 2 ? titleRaw : undefined,
+    titleEn: titleEnRaw.length >= 2 ? titleEnRaw.slice(0, 240) : undefined,
     documentVersionIds,
   };
 }

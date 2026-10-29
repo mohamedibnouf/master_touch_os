@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
+import type { Locale } from "@/lib/i18n/config";
 
 export type AiArtifactKind =
   | "project_intelligence"
@@ -16,8 +17,12 @@ export function hashAiInput(parts: unknown): string {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
-function memKey(orgId: string, kind: string, targetId: string): string {
-  return `${orgId}:${kind}:${targetId}`;
+/**
+ * In-memory cache key. The output locale is part of the key so an English request never
+ * receives a cached Arabic answer (and vice versa). Locale defaults to Arabic.
+ */
+export function aiCacheKey(orgId: string, kind: string, targetId: string, locale: Locale = "ar"): string {
+  return `${orgId}:${kind}:${targetId}:${locale}`;
 }
 
 export function getCachedAiArtifact<T>(input: {
@@ -25,8 +30,9 @@ export function getCachedAiArtifact<T>(input: {
   kind: AiArtifactKind;
   targetId: string;
   inputHash: string;
+  locale?: Locale;
 }): { payload: T; createdAt: string } | null {
-  const hit = memory.get(memKey(input.organizationId, input.kind, input.targetId));
+  const hit = memory.get(aiCacheKey(input.organizationId, input.kind, input.targetId, input.locale));
   if (!hit || hit.hash !== input.inputHash) return null;
   return { payload: hit.payload as T, createdAt: hit.createdAt };
 }
@@ -37,9 +43,10 @@ export function setCachedAiArtifact(input: {
   targetId: string;
   inputHash: string;
   payload: unknown;
+  locale?: Locale;
 }): string {
   const createdAt = new Date().toISOString();
-  memory.set(memKey(input.organizationId, input.kind, input.targetId), {
+  memory.set(aiCacheKey(input.organizationId, input.kind, input.targetId, input.locale), {
     hash: input.inputHash,
     payload: input.payload,
     createdAt,

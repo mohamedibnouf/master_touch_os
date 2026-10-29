@@ -22,6 +22,7 @@ async function ensureApprovalAndDecide(
     entityType: string;
     entityId: string;
     title: string;
+    titleEn?: string;
     approverId: string;
   },
 ) {
@@ -74,6 +75,8 @@ async function ensureApprovalAndDecide(
       type: "approval.required",
       title: input.title,
       message: "مطلوب إجراء موافقة",
+      titleEn: input.titleEn,
+      messageEn: "Your approval is required.",
       entityType: input.entityType,
       entityId: input.entityId,
       priority: "high",
@@ -467,6 +470,8 @@ export async function submitClientValuationForReviewAction(
     type: "approval.required",
     title: `مراجعة مستخلص ${val.valuation_number}`,
     message: "مطلوب مراجعة داخلية للمستخلص",
+    titleEn: `Review valuation ${val.valuation_number}`,
+    messageEn: "An internal review of the valuation is required.",
     entityType: "client_valuation",
     entityId: valuationId,
     priority: "high",
@@ -496,6 +501,7 @@ export async function approveClientValuationInternalAction(
     entityType: "client_valuation",
     entityId: valuationId,
     title: `اعتماد داخلي مستخلص ${val.valuation_number}`,
+    titleEn: `Internal approval of valuation ${val.valuation_number}`,
     approverId: ctx.userId,
   });
 

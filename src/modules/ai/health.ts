@@ -80,7 +80,115 @@ export function classifyProjectHealth(input: {
   return "healthy";
 }
 
-export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date()): DeterministicRisk[] {
+type RiskCopy = {
+  stage: (name: string) => string;
+  dueAt: (due: string) => string;
+  noDueAt: string;
+  status: (status: string) => string;
+  overdueTitle: (name: string) => string;
+  overdueExplanation: (name: string) => string;
+  overdueRecommendation: string;
+  dueSoonTitle: (name: string) => string;
+  dueSoonExplanation: (name: string) => string;
+  dueSoonRecommendation: string;
+  missingAssigneeTitle: (name: string) => string;
+  missingAssigneeExplanation: string;
+  missingAssigneeRecommendation: string;
+  longPendingTitle: (name: string) => string;
+  pendingTitle: (name: string) => string;
+  longPendingExplanation: string;
+  pendingExplanation: string;
+  request: (title: string) => string;
+  openApproval: string;
+  ageHours: (hours: number) => string;
+  ageUnavailable: string;
+  pendingRecommendation: string;
+  blockedTitle: (name: string) => string;
+  blockedExplanation: string;
+  blockedRecommendation: string;
+  endDateTitle: string;
+  endDateExplanation: string;
+  plannedEnd: (date: string) => string;
+  progress: (completed: number, total: number) => string;
+  endDateRecommendation: string;
+};
+
+const RISK_COPY_AR: RiskCopy = {
+  stage: (name) => `المرحلة: ${name}`,
+  dueAt: (due) => `موعد الإغلاق: ${due}`,
+  noDueAt: "لا يوجد موعد مخزّن",
+  status: (status) => `الحالة: ${status}`,
+  overdueTitle: (name) => `مرحلة متأخرة: ${name}`,
+  overdueExplanation: (name) => `المرحلة «${name}» متأخرة حسب موعد النظام.`,
+  overdueRecommendation: "راجع سبب التأخير من شاشة مسار العمل، ولا يغيّر الذكاء الاصطناعي الموعد.",
+  dueSoonTitle: (name) => `مرحلة قاربت الاستحقاق: ${name}`,
+  dueSoonExplanation: (name) => `المرحلة «${name}» ضمن نافذة التنبيه.`,
+  dueSoonRecommendation: "تابع المسؤول المعيّن قبل حلول الموعد.",
+  missingAssigneeTitle: (name) => `بدون مسؤول: ${name}`,
+  missingAssigneeExplanation: "المرحلة النشطة بلا مسؤول ظاهر في السياق المعتمد.",
+  missingAssigneeRecommendation: "عيّن مسؤولاً للمرحلة عبر صلاحيات إدارة الفريق في النظام.",
+  longPendingTitle: (name) => `موافقة معلّقة طويلاً: ${name}`,
+  pendingTitle: (name) => `موافقة معلّقة: ${name}`,
+  longPendingExplanation: "توجد موافقة معلّقة تجاوزت حد المتابعة التشغيلية المحسوب في التطبيق.",
+  pendingExplanation: "توجد موافقة معلّقة على المرحلة.",
+  request: (title) => `الطلب: ${title}`,
+  openApproval: "موافقة مفتوحة",
+  ageHours: (hours) => `عمر تقريبي بالساعات: ${hours}`,
+  ageUnavailable: "عمر الموافقة غير متاح",
+  pendingRecommendation: "راجع الموافقة المعلقة من شاشة الاعتمادات المعتمدة.",
+  blockedTitle: (name) => `مسار متوقف: ${name}`,
+  blockedExplanation: "المرحلة في حالة توقف حسب محرك مسار العمل.",
+  blockedRecommendation: "عالج سبب التوقف من شاشة المراحل. الذكاء الاصطناعي لا يُكمل المرحلة.",
+  endDateTitle: "تجاوز تاريخ الانتهاء المخطط",
+  endDateExplanation: "تاريخ الانتهاء المخطط قد مضى بينما العمل غير مكتمل حسب عدّاد المراحل.",
+  plannedEnd: (date) => `الانتهاء المخطط: ${date}`,
+  progress: (completed, total) => `التقدم: ${completed}/${total}`,
+  endDateRecommendation: "راجع خطة الإغلاق أو حدّث التواريخ عبر الإجراءات المعتمدة في النظام.",
+};
+
+const RISK_COPY_EN: RiskCopy = {
+  stage: (name) => `Stage: ${name}`,
+  dueAt: (due) => `Due: ${due}`,
+  noDueAt: "No stored due date",
+  status: (status) => `Status: ${status}`,
+  overdueTitle: (name) => `Overdue stage: ${name}`,
+  overdueExplanation: (name) => `Stage "${name}" is overdue according to the system deadline.`,
+  overdueRecommendation: "Review the cause of the delay from the workflow screen. AI does not change the deadline.",
+  dueSoonTitle: (name) => `Stage due soon: ${name}`,
+  dueSoonExplanation: (name) => `Stage "${name}" is within the alert window.`,
+  dueSoonRecommendation: "Follow up with the assigned owner before the deadline.",
+  missingAssigneeTitle: (name) => `No owner: ${name}`,
+  missingAssigneeExplanation: "The active stage has no visible owner in the authorized context.",
+  missingAssigneeRecommendation: "Assign an owner to the stage through the team-management permissions in the system.",
+  longPendingTitle: (name) => `Approval pending for a long time: ${name}`,
+  pendingTitle: (name) => `Pending approval: ${name}`,
+  longPendingExplanation: "An approval has been pending beyond the operational follow-up threshold computed by the app.",
+  pendingExplanation: "There is a pending approval on this stage.",
+  request: (title) => `Request: ${title}`,
+  openApproval: "Open approval",
+  ageHours: (hours) => `Approximate age in hours: ${hours}`,
+  ageUnavailable: "Approval age not available",
+  pendingRecommendation: "Review the pending approval from the approvals screen.",
+  blockedTitle: (name) => `Blocked workflow: ${name}`,
+  blockedExplanation: "The stage is blocked according to the workflow engine.",
+  blockedRecommendation: "Resolve the cause of the block from the stages screen. AI does not complete the stage.",
+  endDateTitle: "Planned end date passed",
+  endDateExplanation: "The planned end date has passed while work is incomplete according to the stage counter.",
+  plannedEnd: (date) => `Planned end: ${date}`,
+  progress: (completed, total) => `Progress: ${completed}/${total}`,
+  endDateRecommendation: "Review the closing plan or update dates through the approved actions in the system.",
+};
+
+/**
+ * Deterministic project risks. Labels are Arabic by default; pass locale "en" for English.
+ * Field names keep the `_ar` suffix and hold the text in the requested language.
+ */
+export function collectDeterministicRisks(
+  facts: ProjectAiFacts,
+  now = new Date(),
+  locale: Locale = "ar",
+): DeterministicRisk[] {
+  const c = locale === "en" ? RISK_COPY_EN : RISK_COPY_AR;
   const risks: DeterministicRisk[] = [];
 
   for (const stage of facts.stages) {
@@ -88,26 +196,23 @@ export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date(
       risks.push({
         type: "OVERDUE_STAGE",
         severity: "high",
-        title_ar: `مرحلة متأخرة: ${stage.nameAr}`,
-        explanation_ar: `المرحلة «${stage.nameAr}» متأخرة حسب موعد النظام.`,
+        title_ar: c.overdueTitle(stage.nameAr),
+        explanation_ar: c.overdueExplanation(stage.nameAr),
         evidence: [
-          `المرحلة: ${stage.nameAr}`,
-          stage.dueAt ? `موعد الإغلاق: ${stage.dueAt}` : "لا يوجد موعد مخزّن",
-          `الحالة: ${stage.engineStatus}`,
+          c.stage(stage.nameAr),
+          stage.dueAt ? c.dueAt(stage.dueAt) : c.noDueAt,
+          c.status(stage.engineStatus),
         ],
-        recommendation_ar: "راجع سبب التأخير من شاشة مسار العمل، ولا يغيّر الذكاء الاصطناعي الموعد.",
+        recommendation_ar: c.overdueRecommendation,
       });
     } else if (stage.deadlineState === "DUE_SOON") {
       risks.push({
         type: "DUE_SOON",
         severity: "medium",
-        title_ar: `مرحلة قاربت الاستحقاق: ${stage.nameAr}`,
-        explanation_ar: `المرحلة «${stage.nameAr}» ضمن نافذة التنبيه.`,
-        evidence: [
-          `المرحلة: ${stage.nameAr}`,
-          stage.dueAt ? `موعد الإغلاق: ${stage.dueAt}` : "لا يوجد موعد مخزّن",
-        ],
-        recommendation_ar: "تابع المسؤول المعيّن قبل حلول الموعد.",
+        title_ar: c.dueSoonTitle(stage.nameAr),
+        explanation_ar: c.dueSoonExplanation(stage.nameAr),
+        evidence: [c.stage(stage.nameAr), stage.dueAt ? c.dueAt(stage.dueAt) : c.noDueAt],
+        recommendation_ar: c.dueSoonRecommendation,
       });
     }
 
@@ -116,10 +221,10 @@ export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date(
       risks.push({
         type: "MISSING_ASSIGNEE",
         severity: "medium",
-        title_ar: `بدون مسؤول: ${stage.nameAr}`,
-        explanation_ar: "المرحلة النشطة بلا مسؤول ظاهر في السياق المعتمد.",
-        evidence: [`المرحلة: ${stage.nameAr}`, `الحالة: ${stage.engineStatus}`],
-        recommendation_ar: "عيّن مسؤولاً للمرحلة عبر صلاحيات إدارة الفريق في النظام.",
+        title_ar: c.missingAssigneeTitle(stage.nameAr),
+        explanation_ar: c.missingAssigneeExplanation,
+        evidence: [c.stage(stage.nameAr), c.status(stage.engineStatus)],
+        recommendation_ar: c.missingAssigneeRecommendation,
       });
     }
 
@@ -129,16 +234,14 @@ export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date(
       risks.push({
         type: longPending ? "LONG_PENDING_APPROVAL" : "PENDING_APPROVAL",
         severity: longPending ? "high" : "medium",
-        title_ar: longPending ? `موافقة معلّقة طويلاً: ${stage.nameAr}` : `موافقة معلّقة: ${stage.nameAr}`,
-        explanation_ar: longPending
-          ? "توجد موافقة معلّقة تجاوزت حد المتابعة التشغيلية المحسوب في التطبيق."
-          : "توجد موافقة معلّقة على المرحلة.",
+        title_ar: longPending ? c.longPendingTitle(stage.nameAr) : c.pendingTitle(stage.nameAr),
+        explanation_ar: longPending ? c.longPendingExplanation : c.pendingExplanation,
         evidence: [
-          `المرحلة: ${stage.nameAr}`,
-          stage.openApprovalTitle ? `الطلب: ${stage.openApprovalTitle}` : "موافقة مفتوحة",
-          ageH != null ? `عمر تقريبي بالساعات: ${Math.floor(ageH)}` : "عمر الموافقة غير متاح",
+          c.stage(stage.nameAr),
+          stage.openApprovalTitle ? c.request(stage.openApprovalTitle) : c.openApproval,
+          ageH != null ? c.ageHours(Math.floor(ageH)) : c.ageUnavailable,
         ],
-        recommendation_ar: "راجع الموافقة المعلقة من شاشة الاعتمادات المعتمدة.",
+        recommendation_ar: c.pendingRecommendation,
       });
     }
 
@@ -146,10 +249,10 @@ export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date(
       risks.push({
         type: "BLOCKED_WORKFLOW",
         severity: "high",
-        title_ar: `مسار متوقف: ${stage.nameAr}`,
-        explanation_ar: stage.blockReason ?? "المرحلة في حالة توقف حسب محرك مسار العمل.",
-        evidence: [`المرحلة: ${stage.nameAr}`, stage.blockReason ?? `الحالة: ${stage.engineStatus}`],
-        recommendation_ar: "عالج سبب التوقف من شاشة المراحل. الذكاء الاصطناعي لا يُكمل المرحلة.",
+        title_ar: c.blockedTitle(stage.nameAr),
+        explanation_ar: stage.blockReason ?? c.blockedExplanation,
+        evidence: [c.stage(stage.nameAr), stage.blockReason ?? c.status(stage.engineStatus)],
+        recommendation_ar: c.blockedRecommendation,
       });
     }
   }
@@ -161,13 +264,10 @@ export function collectDeterministicRisks(facts: ProjectAiFacts, now = new Date(
       risks.push({
         type: "PROJECT_END_DATE_RISK",
         severity: "high",
-        title_ar: "تجاوز تاريخ الانتهاء المخطط",
-        explanation_ar: "تاريخ الانتهاء المخطط قد مضى بينما العمل غير مكتمل حسب عدّاد المراحل.",
-        evidence: [
-          `الانتهاء المخطط: ${facts.planned_end_date}`,
-          `التقدم: ${facts.completed_stages}/${facts.total_stages}`,
-        ],
-        recommendation_ar: "راجع خطة الإغلاق أو حدّث التواريخ عبر الإجراءات المعتمدة في النظام.",
+        title_ar: c.endDateTitle,
+        explanation_ar: c.endDateExplanation,
+        evidence: [c.plannedEnd(facts.planned_end_date), c.progress(facts.completed_stages, facts.total_stages)],
+        recommendation_ar: c.endDateRecommendation,
       });
     }
   }

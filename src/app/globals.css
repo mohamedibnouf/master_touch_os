@@ -33,10 +33,10 @@
   --sidebar-ink: #eceef2;
   --sidebar-muted: #8f96a3;
   --sidebar-line: rgba(255, 255, 255, 0.07);
-  --success-soft: color-mix(in srgb, var(--success) 10%, #fff);
-  --warning-soft: color-mix(in srgb, var(--warning) 10%, #fff);
-  --danger-soft: color-mix(in srgb, var(--danger) 10%, #fff);
-  --info-soft: color-mix(in srgb, var(--info) 10%, #fff);
+  --success-soft: color-mix(in srgb, var(--success) var(--soft-mix), var(--surface));
+  --warning-soft: color-mix(in srgb, var(--warning) var(--soft-mix), var(--surface));
+  --danger-soft: color-mix(in srgb, var(--danger) var(--soft-mix), var(--surface));
+  --info-soft: color-mix(in srgb, var(--info) var(--soft-mix), var(--surface));
   --success-border: color-mix(in srgb, var(--success) 28%, var(--line));
   --warning-border: color-mix(in srgb, var(--warning) 28%, var(--line));
   --danger-border: color-mix(in srgb, var(--danger) 28%, var(--line));
@@ -53,7 +53,7 @@
   --foreground: var(--ink);
   --foreground-muted: var(--text-secondary);
   --border: var(--line);
-  --primary-soft: color-mix(in srgb, var(--primary) 10%, #fff);
+  --primary-soft: color-mix(in srgb, var(--primary) var(--soft-mix), var(--surface));
 
   --shadow-1: 0 1px 2px rgba(21, 23, 28, 0.04), 0 1px 1px rgba(21, 23, 28, 0.02);
   --shadow-2: 0 10px 30px -12px rgba(21, 23, 28, 0.18), 0 2px 6px rgba(21, 23, 28, 0.05);
@@ -62,11 +62,77 @@
   --radius-hero: 1.125rem;
 
   --app-font: var(--font-ibm-arabic), var(--font-ibm);
+  --soft-mix: 10%;
+  color-scheme: light;
 }
 
 /* Latin-first font stack for the English interface. */
 :root:lang(en) {
   --app-font: var(--font-ibm), var(--font-ibm-arabic);
+}
+
+/*
+ * Dark theme. data-theme="dark" is an explicit choice; with data-theme="system" (or no
+ * attribute) the OS preference decides. Both blocks must stay identical.
+ */
+:root[data-theme="dark"] {
+  --background: #0d0f13;
+  --surface: #15181e;
+  --surface-muted: #1a1e25;
+  --surface-subtle: #1f232b;
+  --surface-strong: #282d36;
+  --ink: #eceef2;
+  --text-secondary: #a4acb9;
+  --text-muted: #7c8595;
+  --line: #262a33;
+  --border-strong: #363c47;
+  --primary: #d4461a;
+  --primary-hover: #e45522;
+  --brand: #ff6a33;
+  --info: #60a5fa;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --ring: #ff6a33;
+  --disabled-foreground: #5d6573;
+  --sidebar: #0a0b0e;
+  --sidebar-elevated: #14161b;
+  --sidebar-line: rgba(255, 255, 255, 0.06);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 14px 34px -14px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --soft-mix: 16%;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --background: #0d0f13;
+    --surface: #15181e;
+    --surface-muted: #1a1e25;
+    --surface-subtle: #1f232b;
+    --surface-strong: #282d36;
+    --ink: #eceef2;
+    --text-secondary: #a4acb9;
+    --text-muted: #7c8595;
+    --line: #262a33;
+    --border-strong: #363c47;
+    --primary: #d4461a;
+    --primary-hover: #e45522;
+    --brand: #ff6a33;
+    --info: #60a5fa;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --ring: #ff6a33;
+    --disabled-foreground: #5d6573;
+    --sidebar: #0a0b0e;
+    --sidebar-elevated: #14161b;
+    --sidebar-line: rgba(255, 255, 255, 0.06);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 14px 34px -14px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35);
+    --soft-mix: 16%;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -177,7 +243,7 @@ summary::-webkit-details-marker {
 }
 
 .mt-tint-warning {
-  background: color-mix(in srgb, var(--warning) 10%, #fff);
+  background: color-mix(in srgb, var(--warning) var(--soft-mix), var(--surface));
 }
 
 .mt-tint-info {
@@ -185,7 +251,7 @@ summary::-webkit-details-marker {
 }
 
 .mt-tint-success {
-  background: color-mix(in srgb, var(--success) 10%, #fff);
+  background: color-mix(in srgb, var(--success) var(--soft-mix), var(--surface));
 }
 
 .mt-tint-sand {
@@ -345,6 +411,131 @@ table.table-register thead {
 
 .animate-nav-indeterminate {
   animation: nav-indeterminate 10s ease-out forwards;
+}
+
+/*
+ * Motion. Only transform/opacity are animated (GPU-composited, no layout work), every
+ * animation is short, and all of it is switched off under prefers-reduced-motion.
+ */
+@keyframes mt-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mt-scale-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mt-pop {
+  0% {
+    transform: scale(0.6) rotate(-30deg);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes mt-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes mt-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Page content settles in on every navigation. */
+  .mt-page {
+    animation: mt-fade-up 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  /* KPI cards cascade in. */
+  .mt-stat {
+    animation: mt-fade-up 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .mt-stat:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .mt-stat:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .mt-stat:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .mt-stat:nth-child(n + 5) {
+    animation-delay: 160ms;
+  }
+
+  /* Popovers and menus. */
+  .mt-pop-in {
+    transform-origin: top;
+    animation: mt-scale-in 0.16s ease-out both;
+  }
+
+  /* Progress bars fill from the start edge. */
+  .mt-progress-fill {
+    transform-origin: left;
+    animation: mt-grow-x 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  [dir="rtl"] .mt-progress-fill {
+    transform-origin: right;
+  }
+
+  /* Cards that are links lift slightly. */
+  a > .mt-surface,
+  .mt-hover-lift {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+  }
+  a:hover > .mt-surface,
+  .mt-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-2);
+    border-color: var(--border-strong);
+  }
+}
+
+/* Skeleton shimmer (replaces the pulse). */
+.mt-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-strong);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mt-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 55%, transparent), transparent);
+    animation: mt-shimmer 1.3s ease-in-out infinite;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

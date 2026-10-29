@@ -32,7 +32,7 @@ export function Button({
         variant === "secondary" &&
           "border border-line bg-surface text-ink shadow-card hover:border-border-strong hover:bg-surface-muted",
         variant === "outline" &&
-          "border border-line bg-white text-ink hover:border-border-strong hover:bg-surface-muted",
+          "border border-line bg-surface text-ink hover:border-border-strong hover:bg-surface-muted",
         variant === "ghost" && "text-muted hover:bg-surface-muted hover:text-ink",
         variant === "danger" && "bg-danger text-white hover:bg-danger/90",
         variant === "icon" &&
@@ -48,7 +48,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        "h-10 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-white px-3 text-sm text-ink placeholder:text-muted disabled:bg-paper disabled:text-disabled-foreground md:h-10",
+        "h-10 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-ink placeholder:text-muted disabled:bg-paper disabled:text-disabled-foreground md:h-10",
         "hover:border-border-strong aria-invalid:border-danger",
         controlFocus,
         className,
@@ -62,7 +62,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "h-10 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-white px-3 text-sm text-ink disabled:bg-paper disabled:text-disabled-foreground md:h-10",
+        "h-10 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-ink disabled:bg-paper disabled:text-disabled-foreground md:h-10",
         "hover:border-border-strong aria-invalid:border-danger",
         controlFocus,
         className,
@@ -76,7 +76,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "min-h-24 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted disabled:bg-paper disabled:text-disabled-foreground",
+        "min-h-24 w-full max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted disabled:bg-paper disabled:text-disabled-foreground",
         "hover:border-border-strong aria-invalid:border-danger",
         controlFocus,
         className,
@@ -138,7 +138,7 @@ export function StatCard({
   tone?: "neutral" | "info" | "success" | "warning" | "danger";
 }) {
   return (
-    <div className="mt-surface flex items-start justify-between gap-3 p-4 md:p-5">
+    <div className="mt-surface mt-stat flex items-start justify-between gap-3 p-4 md:p-5">
       <div className="min-w-0">
         <p className="text-xs font-medium text-muted">{label}</p>
         <p

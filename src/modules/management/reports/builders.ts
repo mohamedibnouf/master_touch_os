@@ -169,6 +169,7 @@ export function buildOperationsReport(input: {
       return {
         id: a.id,
         title: a.title ?? a.id.slice(0, 8),
+        titleEn: a.title_en ?? null,
         status: a.status,
         openDays: daysBetweenYmd(since, asOf),
         href: "/approvals",

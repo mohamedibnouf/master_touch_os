@@ -1,6 +1,7 @@
 import { safeNotificationHref } from "@/modules/notifications/safety";
 import type { ManagementInsight } from "../schemas";
 import type { ExecutiveIntelligenceFacts } from "./types";
+import type { Locale } from "@/lib/i18n/config";
 
 const NUMBER_TOKEN = /\d+(?:\.\d+)?/g;
 const GENERIC = /^(راجع|تابع|تحسين|يجب العمل|يُنصح بشكل عام)/;
@@ -36,6 +37,8 @@ export function sanitizeInsightHref(
 export function groundManagementInsight(
   insight: ManagementInsight,
   facts: ExecutiveIntelligenceFacts,
+  /** Language of the deterministic fallback headline only; grounding rules are unchanged. */
+  locale: Locale = "ar",
 ): ManagementInsight {
   const known = facts.knownNumbers.concat([0, 1, facts.delayedProjects.length]);
   const allowedIds = new Set(facts.allowedProjectIds);
@@ -76,7 +79,11 @@ export function groundManagementInsight(
   let headline = insight.headline_ar.trim();
   let summary = insight.executive_summary_ar.trim();
   if (usesUnknownNumber(headline, known)) {
-    headline = observations[0]?.title_ar || "تحليل مبني على المقاييس الحتمية المعروضة.";
+    headline =
+      observations[0]?.title_ar ||
+      (locale === "en"
+        ? "Analysis based on the deterministic metrics shown."
+        : "تحليل مبني على المقاييس الحتمية المعروضة.");
   }
   if (usesUnknownNumber(summary, known)) {
     summary = headline;

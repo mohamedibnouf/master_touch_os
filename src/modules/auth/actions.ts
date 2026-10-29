@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, isLocale } from "@/lib/i18n/config";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -117,9 +118,23 @@ export async function signInAction(
   }
 
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return { error: EMPLOYEE_LOGIN_FAILURE_AR };
+  }
+
+  // Restore the language saved on the profile so it follows the user across devices.
+  if (signIn.user) {
+    const { data: profile } = await supabase.from("profiles").select("locale").eq("id", signIn.user.id).maybeSingle();
+    if (isLocale(profile?.locale)) {
+      (await cookies()).set(LOCALE_COOKIE, profile.locale, {
+        path: "/",
+        maxAge: LOCALE_COOKIE_MAX_AGE,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: false,
+      });
+    }
   }
 
   const env = getServerEnv();

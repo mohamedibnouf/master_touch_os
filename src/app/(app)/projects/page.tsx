@@ -151,7 +151,7 @@ export default async function ProjectsPage({
                         <div className="flex min-w-[8rem] items-center gap-2.5">
                           <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-strong">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-primary to-brand rtl:bg-gradient-to-l"
+                              className="mt-progress-fill h-full rounded-full bg-gradient-to-r from-primary to-brand rtl:bg-gradient-to-l"
                               style={{ width: `${progress}%` }}
                             />
                           </div>

@@ -12,12 +12,13 @@ import { auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import { decideApprovalAction } from "@/server/use-cases/platform";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
 import { ServerActionForm } from "@/components/forms/server-action-form";
-import { format, intlLocale } from "@/lib/i18n/config";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 
 type ApprovalRow = {
   id: string;
   title: string;
+  title_en?: string | null;
   status: string;
   due_at: string | null;
   entity_type: string;
@@ -98,7 +99,7 @@ export default async function ApprovalsPage({
               <Card key={request.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-ink">{request.title}</h2>
+                    <h2 className="text-base font-semibold text-ink">{pickLocalized(locale, request.title, request.title_en) || request.title}</h2>
                     <p className="mt-1 text-xs text-muted">
                       {auditEntityLabel(request.entity_type, locale)} · {approvalStatusLabel(request.status, locale)}
                     </p>

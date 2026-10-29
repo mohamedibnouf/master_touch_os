@@ -58,6 +58,8 @@ async function notifyEmployeeProfile(
     type: string;
     title: string;
     message: string;
+    titleEn?: string;
+    messageEn?: string;
     entityId: string;
     priority?: "low" | "normal" | "high";
   },
@@ -77,6 +79,8 @@ async function notifyEmployeeProfile(
     type: payload.type,
     title: payload.title,
     message: payload.message,
+    titleEn: payload.titleEn,
+    messageEn: payload.messageEn,
     entityType: "attendance_record",
     entityId: payload.entityId,
     priority: payload.priority ?? "normal",
@@ -251,6 +255,8 @@ export async function adjustAttendanceRecordAction(
       type: "attendance.adjusted",
       title: "تم تعديل سجل الحضور",
       message: "عدّلت الموارد البشرية سجل حضورك. راجع التفاصيل من صفحة الحضور.",
+      titleEn: "Your attendance record was updated",
+      messageEn: "HR updated your attendance record. Review the details on the Attendance page.",
       entityId: record.id,
       priority: "high",
     });

@@ -16,6 +16,7 @@ import { getCachedAiArtifact, hashAiInput, setCachedAiArtifact } from "../cache"
 import { AI_DISCLAIMER_AR, AI_LIMITS } from "../limits";
 import { truncateText } from "../security/sanitize";
 import { classifyDocumentSource } from "../classify-source";
+import type { Locale } from "@/lib/i18n/config";
 
 export type { DocumentSourceClass } from "../classify-source";
 export { classifyDocumentSource };
@@ -29,6 +30,8 @@ export async function analyzeDocumentText(input: {
   text: string;
   pageCount: number | null;
   forceRefresh?: boolean;
+  /** Analysis language (Arabic by default). The `*_ar` fields hold text in this language. */
+  locale?: Locale;
 }): Promise<{
   document?: DocumentAnalysis;
   businessCase?: BusinessCaseAnalysis;
@@ -36,6 +39,7 @@ export async function analyzeDocumentText(input: {
   disclaimerAr: string;
   promptVersion: string;
 }> {
+  const locale = input.locale ?? "ar";
   const bounded = truncateText(input.text, AI_LIMITS.maxDocumentChars);
   if (bounded.text.trim().length < 20) {
     throw new ValidationError("تعذر استخراج نص قابل للتحليل من هذا المستند.", "No extractable text.", {
@@ -46,7 +50,13 @@ export async function analyzeDocumentText(input: {
   const wrapped = wrapUntrustedDocumentText(bounded.text);
   const citations =
     input.pageCount && input.pageCount > 0
-      ? [{ label_ar: `المصدر: صفحة ضمن ${input.pageCount}`, page: null as number | null }]
+      ? [
+          {
+            label_ar:
+              locale === "en" ? `Source: page within a ${input.pageCount}-page document` : `المصدر: صفحة ضمن ${input.pageCount}`,
+            page: null as number | null,
+          },
+        ]
       : [];
 
   const inputHash = hashAiInput({
@@ -57,6 +67,7 @@ export async function analyzeDocumentText(input: {
     versionId: input.versionId,
     textHash: hashAiInput(bounded.text),
     model: input.provider.model,
+    locale,
   });
 
   const kind = input.analysisType === "business_case" ? "business_case" : "document_analysis";
@@ -66,6 +77,7 @@ export async function analyzeDocumentText(input: {
       kind,
       targetId: `${input.documentId}:${input.versionId}`,
       inputHash,
+      locale,
     });
     if (cached) {
       if (input.analysisType === "business_case") {
@@ -95,7 +107,8 @@ export async function analyzeDocumentText(input: {
     const structured = await input.provider.generateStructured({
       schemaName: "business-case",
       schema: businessCaseAnalysisSchema,
-      systemPrompt: buildBusinessCasePrompt(),
+      systemPrompt: buildBusinessCasePrompt(locale),
+      locale,
       userPayload,
       modelKind: "document",
       timeoutMs: AI_LIMITS.documentTimeoutMs,
@@ -112,6 +125,7 @@ export async function analyzeDocumentText(input: {
       targetId: `${input.documentId}:${input.versionId}`,
       inputHash,
       payload: structured.value,
+      locale,
     });
     return {
       businessCase: structured.value,
@@ -124,7 +138,8 @@ export async function analyzeDocumentText(input: {
   const structured = await input.provider.generateStructured({
     schemaName: "document-analysis",
     schema: documentAnalysisSchema,
-    systemPrompt: buildDocumentAnalysisPrompt(),
+    systemPrompt: buildDocumentAnalysisPrompt(locale),
+    locale,
     userPayload,
     modelKind: "document",
     timeoutMs: AI_LIMITS.documentTimeoutMs,
@@ -145,6 +160,7 @@ export async function analyzeDocumentText(input: {
     targetId: `${input.documentId}:${input.versionId}`,
     inputHash,
     payload: document,
+    locale,
   });
   return {
     document,

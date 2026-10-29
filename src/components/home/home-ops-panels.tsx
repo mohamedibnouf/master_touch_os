@@ -21,14 +21,15 @@ import { resolveNotificationHref } from "@/lib/notifications/href";
 import { NotificationNavLink } from "@/components/notifications/notification-nav-link";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import type { AuthContext } from "@/types/models";
-import { format, intlLocale, type Locale } from "@/lib/i18n/config";
+import { format, intlLocale, pickLocalized, type Locale } from "@/lib/i18n/config";
+import { approvalTitleColumns, selectWithOptionalTitleEn } from "@/lib/approvals/title-en";
 import { getI18n } from "@/lib/i18n/server";
 import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
 
 type ProcAction = { id: string; label: string; href: string; status: string; overdue: boolean };
 
 const loadHomeOps = cache(async (ctx: AuthContext) => {
-  const { t } = await getI18n();
+  const { t, locale } = await getI18n();
   const o = t.home.ops;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
@@ -46,13 +47,17 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
   // Sequential on purpose: these are permission-gated authenticated RLS reads.
   // Running them all in one Promise.all previously contributed to 57014 contention.
   if (hasPermission(ctx, "purchase_request.approve")) {
-    const { data: prSteps } = await supabase
-      .from("approval_steps")
-      .select("id, due_at, approval_requests(entity_type, entity_id, title)")
-      .eq("organization_id", ctx.organization.id)
-      .eq("user_id", ctx.userId)
-      .eq("status", "pending")
-      .limit(20);
+    type PrRequestEmbed = { entity_type: string; entity_id: string; title: string | null; title_en?: string | null };
+    const { data: prSteps } = await selectWithOptionalTitleEn((withTitleEn) =>
+      supabase
+        .from("approval_steps")
+        .select(`id, due_at, approval_requests(${approvalTitleColumns("entity_type, entity_id, title", withTitleEn)})`)
+        .eq("organization_id", ctx.organization.id)
+        .eq("user_id", ctx.userId)
+        .eq("status", "pending")
+        .limit(20)
+        .returns<Array<{ id: string; due_at: string | null; approval_requests: PrRequestEmbed | PrRequestEmbed[] | null }>>(),
+    );
     for (const s of prSteps ?? []) {
       const req = Array.isArray(s.approval_requests) ? s.approval_requests[0] : s.approval_requests;
       if (!req) continue;
@@ -60,7 +65,7 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
       if (href) {
         procActions.push({
           id: s.id,
-          label: req.title ?? req.entity_type,
+          label: pickLocalized(locale, req.title, req.title_en) || req.entity_type,
           href,
           status: o.statusAwaitingMyDecision,
           overdue: Boolean(s.due_at && s.due_at < new Date().toISOString()),
@@ -426,7 +431,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink" dir="auto">
-                      {action.title}
+                      {pickLocalized(locale, action.title, action.titleEn) || action.title}
                     </p>
                     <p className="text-[11px] leading-relaxed text-muted">{workKindLabel(action.kind, o)}</p>
                   </div>
@@ -509,7 +514,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
             <ol className="relative space-y-0 border-s-2 border-primary/15 ps-4">
               {dashboard.recentActivity.map((item) => (
                 <li key={item.id} className="relative pb-4 last:pb-0">
-                  <span className="absolute top-1.5 -start-[21px] h-2.5 w-2.5 rounded-full border-2 border-white bg-primary" aria-hidden />
+                  <span className="absolute top-1.5 -start-[21px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-primary" aria-hidden />
                   <p className="text-sm font-semibold leading-relaxed text-ink">{auditActionLabel(item.action, locale)}</p>
                   <p className="text-[11px] text-muted">
                     {auditEntityLabel(item.entity_type, locale)} · {formatStamp(item.created_at, locale)}

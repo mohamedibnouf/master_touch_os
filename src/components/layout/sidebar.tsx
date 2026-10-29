@@ -164,7 +164,7 @@ export function Sidebar({
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex w-[17rem] shrink-0 flex-col bg-sidebar text-sidebar-ink print:hidden",
+        "flex w-[17rem] shrink-0 flex-col border-e border-sidebar-line bg-sidebar text-sidebar-ink print:hidden",
         "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out max-xl:transition-transform",
         "xl:sticky xl:top-0 xl:z-auto xl:translate-x-0 xl:transition-none",
         "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",

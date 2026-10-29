@@ -68,7 +68,7 @@ export function HeaderNotifications({
         <div
           id={panelId}
           aria-label={t.shell.notifications}
-          className="absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-surface)] border border-line bg-white p-2 shadow-[var(--shadow-2)]"
+          className="mt-pop-in absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-surface)] border border-line bg-surface p-2 shadow-[var(--shadow-2)]"
         >
           {items.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-muted">{t.shell.noNotifications}</p>

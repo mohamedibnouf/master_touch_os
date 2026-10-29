@@ -68,6 +68,8 @@ async function notifyProfiles(
     type: string;
     title: string;
     message: string;
+    titleEn?: string;
+    messageEn?: string;
     entityId: string;
     priority?: "low" | "normal" | "high";
   },
@@ -85,6 +87,8 @@ async function notifyProfiles(
           type: payload.type,
           title: payload.title,
           message: payload.message,
+          titleEn: payload.titleEn,
+          messageEn: payload.messageEn,
           entityType: "payroll_period",
           entityId: payload.entityId,
           priority: payload.priority ?? "normal",
@@ -174,6 +178,8 @@ export async function submitPayrollForReviewAction(
     type: "payroll.submitted",
     title: "مسير رواتب بانتظار المراجعة",
     message: "تم إرسال مسير رواتب للمراجعة المالية.",
+    titleEn: "Payroll run awaiting review",
+    messageEn: "A payroll run was sent for finance review.",
     entityId: parsed.data.periodId,
     priority: "high",
   });
@@ -206,6 +212,8 @@ export async function markPayrollReviewedAction(
     type: "payroll.reviewed",
     title: "مسير رواتب بانتظار الاعتماد",
     message: "اكتملت مراجعة المسير وهو بانتظار الاعتماد.",
+    titleEn: "Payroll run awaiting approval",
+    messageEn: "The payroll review is complete and the run is awaiting approval.",
     entityId: parsed.data.periodId,
     priority: "high",
   });
@@ -238,6 +246,8 @@ export async function approvePayrollPeriodAction(
     type: "payroll.approved",
     title: "تم اعتماد مسير الرواتب",
     message: "تم اعتماد المسير ويمكن قفله وتسجيل الصرف.",
+    titleEn: "Payroll run approved",
+    messageEn: "The payroll run is approved and can be locked and the payment recorded.",
     entityId: parsed.data.periodId,
     priority: "high",
   });
@@ -284,6 +294,8 @@ export async function lockPayrollPeriodAction(
           type: "payroll.locked",
           title: "قسيمة راتب متاحة",
           message: `أصبحت قسيمة راتب ${period.year}/${period.month} متاحة للعرض.`,
+          titleEn: "Payslip available",
+          messageEn: `Your payslip for ${period.year}/${period.month} is now available.`,
           entityType: "payroll_period",
           entityId: period.id,
           priority: "normal",

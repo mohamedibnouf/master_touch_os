@@ -120,7 +120,7 @@ export default async function NewSupplierInvoicePage({
           <div className="flex justify-end gap-3 border-t border-line pt-4">
             <Link
               href="/finance/supplier-invoices"
-              className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-9"
+              className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-9"
             >
               {common.cancel}
             </Link>

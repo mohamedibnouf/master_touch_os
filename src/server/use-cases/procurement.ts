@@ -183,7 +183,7 @@ export async function createPurchaseRequestAction(
 async function createCommercialApproval(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   ctx: NonNullable<Awaited<ReturnType<typeof getAuthContext>>>,
-  input: { title: string; entityType: string; entityId: string; approverProfileId: string },
+  input: { title: string; titleEn?: string; entityType: string; entityId: string; approverProfileId: string },
 ) {
   const dueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { data: request, error } = await supabase
@@ -221,6 +221,8 @@ async function createCommercialApproval(
     type: "approval.required",
     title: input.title,
     message: "مطلوب إجراء موافقة",
+    titleEn: input.titleEn,
+    messageEn: "Your approval is required.",
     entityType: input.entityType,
     entityId: input.entityId,
   });
@@ -280,6 +282,7 @@ export async function submitPurchaseRequestForApprovalAction(
 
   const approvalId = await createCommercialApproval(supabase, ctx, {
     title: `اعتماد طلب شراء ${existing.pr_number}`,
+    titleEn: `Approve purchase request ${existing.pr_number}`,
     entityType: "purchase_request",
     entityId: prId,
     approverProfileId,
@@ -830,6 +833,7 @@ export async function recommendAwardAction(
 
   const approvalId = await createCommercialApproval(supabase, ctx, {
     title: `اعتماد ترسية عرض ${Number(quote.total).toLocaleString("ar-SA")} — قاعدة ${rule.min_amount}`,
+    titleEn: `Approve quotation award ${Number(quote.total).toLocaleString("en-GB")} — rule ${rule.min_amount}`,
     entityType: "quotation_comparison",
     entityId: comparison.id,
     approverProfileId,
@@ -949,6 +953,7 @@ export async function submitPurchaseOrderForApprovalAction(
 
   const approvalId = await createCommercialApproval(supabase, ctx, {
     title: `اعتماد أمر شراء ${po.po_number}`,
+    titleEn: `Approve purchase order ${po.po_number}`,
     entityType: "purchase_order",
     entityId: poId,
     approverProfileId,

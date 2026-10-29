@@ -19,6 +19,7 @@ import { extractAuthorizedDocumentText } from "@/server/use-cases/document-ai-so
 import { canUseAiCapability } from "@/modules/ai/security/permissions";
 import { chunkDocumentText } from "@/modules/document-intelligence/chunking";
 import { extractBusinessCaseWithAI, getDocumentAIConfig } from "@/modules/document-intelligence/ai-extract";
+import { getLocale } from "@/lib/i18n/server";
 
 async function loadAuthorizedDocument(documentId: string) {
   const ctx = await getAuthContext();
@@ -118,7 +119,7 @@ export async function analyzeDocumentIntelligenceAction(input: {
         googleAccessToken: input.googleAccessToken,
       });
       const chunks = chunkDocumentText(extracted.text);
-      const { extraction, provider, model } = await extractBusinessCaseWithAI({ chunks });
+      const { extraction, provider, model } = await extractBusinessCaseWithAI({ chunks, locale: await getLocale() });
 
       const saved = await repo.markExtracted({
         id: row.id,

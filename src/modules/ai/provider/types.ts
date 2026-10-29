@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { Locale } from "@/lib/i18n/config";
 
 export type AiProviderObserve = {
   operation?: string;
@@ -16,6 +17,11 @@ export type AiGenerateTextInput = {
   userPayload: string;
   timeoutMs?: number;
   observe?: AiProviderObserve;
+  /**
+   * Requested output language (Arabic by default). Real providers get the language through the
+   * system prompt; the mock provider uses this to pick its canned Arabic or English content.
+   */
+  locale?: Locale;
 };
 
 export type AiGenerateStructuredInput<T> = {
@@ -23,6 +29,8 @@ export type AiGenerateStructuredInput<T> = {
   schema: z.ZodType<T>;
   systemPrompt: string;
   userPayload: string;
+  /** See AiGenerateTextInput.locale. */
+  locale?: Locale;
   timeoutMs?: number;
   modelKind?: "default" | "document";
   observe?: AiProviderObserve;

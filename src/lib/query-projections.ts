@@ -83,3 +83,10 @@ export const APPROVAL_STEP_LIST_COLUMNS = "id, sequence, status, user_id, due_at
 
 export const APPROVAL_LIST_SELECT =
   `${APPROVAL_REQUEST_LIST_COLUMNS}, approval_steps(${APPROVAL_STEP_LIST_COLUMNS})` as const;
+
+/**
+ * Same as APPROVAL_LIST_SELECT plus `title_en` (migration 086). Use through
+ * `selectWithOptionalTitleEn` so reads still work before 086 is applied.
+ */
+export const APPROVAL_LIST_SELECT_WITH_TITLE_EN =
+  `${APPROVAL_REQUEST_LIST_COLUMNS}, title_en, approval_steps(${APPROVAL_STEP_LIST_COLUMNS})` as const;

@@ -66,6 +66,8 @@ async function notifyProfiles(
     type: string;
     title: string;
     message: string;
+    titleEn?: string;
+    messageEn?: string;
     entityId: string;
     priority?: "low" | "normal" | "high";
   },
@@ -79,6 +81,8 @@ async function notifyProfiles(
       type: payload.type,
       title: payload.title,
       message: payload.message,
+      titleEn: payload.titleEn,
+      messageEn: payload.messageEn,
       entityType: "leave_request",
       entityId: payload.entityId,
       priority: payload.priority ?? "normal",
@@ -129,6 +133,8 @@ export async function submitLeaveRequestAction(
       type: "leave_request.submitted",
       title: "طلب إجازة بانتظار اعتمادك",
       message: "تم تقديم طلب إجازة جديد من أحد أعضاء فريقك.",
+      titleEn: "Leave request awaiting your approval",
+      messageEn: "A team member submitted a new leave request.",
       entityType: "leave_request",
       entityId: req.id,
       priority: "high",
@@ -139,6 +145,8 @@ export async function submitLeaveRequestAction(
       type: "leave_request.submitted",
       title: "طلب إجازة بانتظار اعتماد الموارد البشرية",
       message: "تم تقديم طلب إجازة يتطلب اعتماد الموارد البشرية.",
+      titleEn: "Leave request awaiting HR approval",
+      messageEn: "A leave request requiring HR approval has been submitted.",
       entityId: req.id,
       priority: "high",
     });
@@ -213,6 +221,8 @@ export async function decideLeaveRequestAction(
         type: "leave_request.manager_approved",
         title: "اعتمد المدير طلب إجازتك",
         message: "تم اعتماد المدير المباشر؛ الطلب بانتظار الموارد البشرية.",
+        titleEn: "Your manager approved your leave request",
+        messageEn: "Your direct manager approved it; the request is now awaiting HR.",
         entityType: "leave_request",
         entityId: req.id,
       });
@@ -221,6 +231,8 @@ export async function decideLeaveRequestAction(
         type: "leave_request.manager_approved",
         title: "طلب إجازة بانتظار اعتماد الموارد البشرية",
         message: "اعتمد المدير المباشر طلباً؛ يلزم اعتماد الموارد البشرية.",
+        titleEn: "Leave request awaiting HR approval",
+        messageEn: "A direct manager approved a request; HR approval is required.",
         entityId: req.id,
         priority: "high",
       });
@@ -275,6 +287,8 @@ export async function cancelLeaveRequestAction(
       type: "leave_request.cancelled",
       title: "تم إلغاء طلب الإجازة",
       message: "تم إلغاء طلب الإجازة الخاص بك.",
+      titleEn: "Leave request cancelled",
+      messageEn: "Your leave request has been cancelled.",
       entityType: "leave_request",
       entityId: req.id,
     });
@@ -286,6 +300,8 @@ export async function cancelLeaveRequestAction(
       type: "leave_request.cancelled",
       title: "إلغاء طلب إجازة",
       message: "تم إلغاء طلب إجازة كان بانتظارك أو ضمن فريقك.",
+      titleEn: "Leave request cancelled",
+      messageEn: "A leave request that was awaiting you or within your team has been cancelled.",
       entityType: "leave_request",
       entityId: req.id,
     });

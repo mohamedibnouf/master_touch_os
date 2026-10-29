@@ -99,7 +99,7 @@ const DOCUMENT_ARRAY_KEYS = [
 export function documentAnalysisResponseInstructions(): string {
   return [
     "Return exactly one JSON object with these required keys:",
-    "summary_ar (non-empty string, Arabic preferred),",
+    "summary_ar (non-empty string, written in the requested output language),",
     "key_points, obligations, dates, risks, missing_information, management_questions (arrays of strings; use [] when none),",
     "citations (array of objects { label_ar: string, page: integer or null }).",
     "risks must be strings, never objects.",

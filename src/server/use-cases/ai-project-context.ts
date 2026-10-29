@@ -8,11 +8,14 @@ import { buildProjectAiContext } from "@/modules/ai/context/project-context";
 import type { ProjectAiFacts } from "@/modules/ai/health";
 import { AUDIT_FEED_COLUMNS } from "@/lib/query-projections";
 import { NotFoundError } from "@/lib/errors";
+import type { Locale } from "@/lib/i18n/config";
 
 export async function loadAuthorizedProjectAiFacts(input: {
   supabase: SupabaseClient;
   ctx: AuthContext;
   projectId: string;
+  /** Language for deterministic labels / localized names in the facts (Arabic by default). */
+  locale?: Locale;
 }): Promise<ProjectAiFacts> {
   const repo = new CoreRepository(input.supabase);
   const project = await repo.getProject(input.ctx.organization.id, input.projectId);
@@ -75,6 +78,7 @@ export async function loadAuthorizedProjectAiFacts(input: {
     : { data: [] as Array<{ action: string; created_at: string }> };
 
   return buildProjectAiContext({
+    locale: input.locale,
     project,
     workflow,
     team,

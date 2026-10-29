@@ -36,8 +36,28 @@ import {
   PROJECT_MEMBER_COLUMNS,
   ROLE_LIST_COLUMNS,
   APPROVAL_LIST_SELECT,
+  APPROVAL_LIST_SELECT_WITH_TITLE_EN,
 } from "@/lib/query-projections";
 import { resolveNotificationHref } from "@/lib/notifications/href";
+import { approvalTitleColumns, selectWithOptionalTitleEn } from "@/lib/approvals/title-en";
+
+type MyApprovalRequestEmbed = { title: string; title_en?: string | null; entity_type: string; entity_id: string };
+type ApprovalListRow = {
+  id: string;
+  title: string;
+  title_en?: string | null;
+  status: string;
+  due_at: string | null;
+  entity_type: string;
+  entity_id: string;
+  approval_steps: Array<{ id: string; sequence: number; status: string; user_id: string | null; due_at: string | null }> | null;
+};
+type MyApprovalStepRow = {
+  id: string;
+  due_at: string | null;
+  request_id: string;
+  approval_requests: MyApprovalRequestEmbed | MyApprovalRequestEmbed[] | null;
+};
 
 function fail(error: { message?: string; code?: string } | null): never {
   logger.error("supabase query failed", { code: error?.code ?? null });
@@ -373,12 +393,15 @@ export class CoreRepository {
   }
 
   async listApprovals(organizationId: string) {
-    const { data, error } = await this.supabase
-      .from("approval_requests")
-      .select(APPROVAL_LIST_SELECT)
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(50);
+    const { data, error } = await selectWithOptionalTitleEn((withTitleEn) =>
+      this.supabase
+        .from("approval_requests")
+        .select<string>(withTitleEn ? APPROVAL_LIST_SELECT_WITH_TITLE_EN : APPROVAL_LIST_SELECT)
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(50)
+        .returns<ApprovalListRow[]>(),
+    );
     if (error) fail(error);
     return data ?? [];
   }
@@ -583,13 +606,18 @@ export class CoreRepository {
         .select("id", { count: "exact", head: true })
         .eq("recipient_profile_id", profileId)
         .is("read_at", null),
-      this.supabase
-        .from("approval_steps")
-        .select("id, due_at, request_id, approval_requests(title, entity_type, entity_id)")
-        .eq("organization_id", organizationId)
-        .eq("user_id", profileId)
-        .in("status", ["pending", "in_progress"])
-        .limit(10),
+      selectWithOptionalTitleEn((withTitleEn) =>
+        this.supabase
+          .from("approval_steps")
+          .select(
+            `id, due_at, request_id, approval_requests(${approvalTitleColumns("title, entity_type, entity_id", withTitleEn)})`,
+          )
+          .eq("organization_id", organizationId)
+          .eq("user_id", profileId)
+          .in("status", ["pending", "in_progress"])
+          .limit(10)
+          .returns<MyApprovalStepRow[]>(),
+      ),
       this.supabase
         .from("workflow_instance_steps")
         .select("id, due_at, step_key, instance_id")
@@ -645,6 +673,7 @@ export class CoreRepository {
         id: row.id,
         kind: "approval",
         title: request?.title ?? "موافقة",
+        titleEn: request?.title_en ?? (request?.title ? null : "Approval"),
         entityType: request?.entity_type ?? "approval",
         entityId: request?.entity_id ?? row.request_id,
         dueAt: row.due_at,

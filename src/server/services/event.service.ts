@@ -37,6 +37,8 @@ export class EventService {
         type: event.type,
         title: "طلب موافقة جديد",
         message: "يوجد طلب موافقة يحتاج إلى إجراء.",
+        titleEn: "New approval request",
+        messageEn: "An approval request needs your action.",
         entityType: event.entityType,
         entityId: event.entityId,
         priority: "high",

@@ -12,19 +12,23 @@ import { invalidProviderResponseError } from "../provider-errors";
 import { coerceExecutiveFacts } from "../executive-intelligence/facts-builder";
 import { groundManagementInsight } from "../executive-intelligence/grounding";
 import type { ExecutiveIntelligenceFacts } from "../executive-intelligence/types";
+import type { Locale } from "@/lib/i18n/config";
 
 export async function explainManagementInsights(input: {
   provider: AiProvider;
   organizationId: string;
   facts: ManagementInsightFacts | ExecutiveIntelligenceFacts;
   forceRefresh?: boolean;
+  /** Brief language (Arabic by default). The `*_ar` insight fields hold text in this language. */
+  locale?: Locale;
 }): Promise<{
   insight: ManagementInsight;
   cached: boolean;
   facts: ExecutiveIntelligenceFacts;
   disclaimerAr: string;
 }> {
-  const facts = coerceExecutiveFacts(input.facts);
+  const locale = input.locale ?? "ar";
+  const facts = coerceExecutiveFacts(input.facts, locale);
   const items = facts.projectNotes.slice(0, 5).map((p) => ({
     title_ar: p.nameAr,
     explanation_ar: p.reasonAr,
@@ -61,13 +65,19 @@ export async function explainManagementInsights(input: {
     limitations_ar: facts.limitationsAr,
   };
 
-  const inputHash = hashAiInput({ v: AI_PROMPT_VERSIONS.managementInsights, factsPayload, model: input.provider.model });
+  const inputHash = hashAiInput({
+    v: AI_PROMPT_VERSIONS.managementInsights,
+    locale,
+    factsPayload,
+    model: input.provider.model,
+  });
   if (!input.forceRefresh) {
     const cached = getCachedAiArtifact<ManagementInsight>({
       organizationId: input.organizationId,
       kind: "management_insights",
       targetId: input.organizationId,
       inputHash,
+      locale,
     });
     if (cached) {
       return { insight: cached.payload, cached: true, facts, disclaimerAr: AI_DISCLAIMER_AR };
@@ -77,7 +87,8 @@ export async function explainManagementInsights(input: {
   const structured = await input.provider.generateStructured({
     schemaName: "management-insights",
     schema: managementInsightSchema,
-    systemPrompt: buildManagementInsightsPrompt(),
+    systemPrompt: buildManagementInsightsPrompt(locale),
+    locale,
     userPayload: JSON.stringify({ MASTER_TOUCH_CONTEXT: "DATA_ONLY", facts: factsPayload }),
     observe: {
       operation: "management_insights",
@@ -106,6 +117,7 @@ export async function explainManagementInsights(input: {
       data_as_of: facts.dataAsOf,
     },
     facts,
+    locale,
   );
 
   setCachedAiArtifact({
@@ -114,6 +126,7 @@ export async function explainManagementInsights(input: {
     targetId: input.organizationId,
     inputHash,
     payload: insight,
+    locale,
   });
 
   return { insight, cached: false, facts, disclaimerAr: AI_DISCLAIMER_AR };

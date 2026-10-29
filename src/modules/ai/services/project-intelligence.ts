@@ -12,14 +12,18 @@ import { projectFactsForPrompt } from "../context/project-context";
 import { getCachedAiArtifact, hashAiInput, setCachedAiArtifact } from "../cache";
 import { estimateChars } from "../security/sanitize";
 import { AI_DISCLAIMER_AR } from "../limits";
+import type { Locale } from "@/lib/i18n/config";
 
 export async function buildProjectIntelligence(input: {
   provider: AiProvider;
   facts: ProjectAiFacts;
   actor: AuthContext;
   forceRefresh?: boolean;
+  /** Output language for the model answer and deterministic labels (Arabic by default). */
+  locale?: Locale;
 }): Promise<ProjectIntelligenceView> {
-  const risks = collectDeterministicRisks(input.facts);
+  const locale = input.locale ?? "ar";
+  const risks = collectDeterministicRisks(input.facts, undefined, locale);
   const health = classifyProjectHealth({
     risks,
     completed: input.facts.completed_stages,
@@ -41,6 +45,7 @@ export async function buildProjectIntelligence(input: {
 
   const inputHash = hashAiInput({
     v: AI_PROMPT_VERSIONS.projectIntelligence,
+    locale,
     health,
     facts: input.facts,
     model: input.provider.model,
@@ -52,6 +57,7 @@ export async function buildProjectIntelligence(input: {
       kind: "project_intelligence",
       targetId: input.facts.projectId,
       inputHash,
+      locale,
     });
     if (cached) {
       return {
@@ -71,7 +77,8 @@ export async function buildProjectIntelligence(input: {
   const structured = await input.provider.generateStructured({
     schemaName: "project-intelligence",
     schema: projectIntelligenceSchema,
-    systemPrompt: buildProjectIntelligencePrompt(),
+    systemPrompt: buildProjectIntelligencePrompt(locale),
+    locale,
     userPayload: projectFactsForPrompt(input.facts, extra),
   });
 
@@ -85,7 +92,8 @@ export async function buildProjectIntelligence(input: {
     await input.provider.generateStructured({
       schemaName: "risk-explanation",
       schema: riskExplanationSchema,
-      systemPrompt: buildRiskExplanationPrompt(),
+      systemPrompt: buildRiskExplanationPrompt(locale),
+      locale,
       userPayload: projectFactsForPrompt(input.facts, extra),
     });
   } catch {
@@ -98,6 +106,7 @@ export async function buildProjectIntelligence(input: {
     targetId: input.facts.projectId,
     inputHash,
     payload: intelligence,
+    locale,
   });
 
   void estimateChars(extra);

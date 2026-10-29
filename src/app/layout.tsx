@@ -4,6 +4,8 @@ import { PwaRegister } from "@/components/pwa-register";
 import { dirFor } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
 import "./globals.css";
 
 const ibmArabic = IBM_Plex_Sans_Arabic({
@@ -45,7 +47,10 @@ const baseMetadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FFFFFF",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f5f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0f13" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -54,8 +59,14 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const { locale, t } = await getI18n();
+  const theme = resolveTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang={locale} dir={dirFor(locale)} className={`${ibmArabic.variable} ${ibmSans.variable} h-full`}>
+    <html
+      lang={locale}
+      dir={dirFor(locale)}
+      data-theme={theme}
+      className={`${ibmArabic.variable} ${ibmSans.variable} h-full`}
+    >
       <body className="min-h-full bg-background font-sans text-ink antialiased">
         <I18nProvider locale={locale} dictionary={t}>
           <PwaRegister />

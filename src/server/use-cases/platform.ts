@@ -63,6 +63,7 @@ import {
   workflowStepNotificationRecipients,
 } from "@/modules/projects/workflow-responsibility";
 import { logger } from "@/lib/logger";
+import { setApprovalRequestTitleEn } from "@/lib/approvals/title-en";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { assignmentRejectReason, canUnassignUserRole } from "@/lib/rbac/custom-roles";
@@ -160,6 +161,8 @@ async function notifyWorkflowCompleted(input: {
     type: "workflow.completed",
     title: "اكتمل مسار عمل المشروع",
     message: "اكتملت جميع مراحل مسار العمل.",
+    titleEn: "Project workflow completed",
+    messageEn: "All stages of the workflow are complete.",
     entityType: projectId ? "project" : "workflow_instance",
     entityId: projectId ?? input.instanceId,
     href: projectId ? `/projects/${projectId}?tab=stages` : null,
@@ -445,7 +448,7 @@ export async function updateWorkflowStepDeadlineAction(
     const supabase = await createServerSupabaseClient();
     const { data: current } = await supabase
       .from("workflow_instance_steps")
-      .select("id, organization_id, instance_id, status, started_at, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar)")
+      .select("id, organization_id, instance_id, status, started_at, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar, name_en)")
       .eq("id", parsed.data.instanceStepId)
       .maybeSingle<{
         id: string;
@@ -457,7 +460,7 @@ export async function updateWorkflowStepDeadlineAction(
         assigned_user_id: string | null;
         assigned_role_id: string | null;
         responsible_user_id: string | null;
-        workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
+        workflow_steps: { name_ar: string; name_en?: string | null } | { name_ar: string; name_en?: string | null }[] | null;
       }>();
     if (!current || current.organization_id !== ctx.organization.id) {
       throw new NotFoundError("المرحلة", "Stage");
@@ -486,6 +489,8 @@ export async function updateWorkflowStepDeadlineAction(
     const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
     const nameRel = current.workflow_steps;
     const name = Array.isArray(nameRel) ? nameRel[0]?.name_ar : nameRel?.name_ar;
+    const nameEnRaw = Array.isArray(nameRel) ? nameRel[0]?.name_en : nameRel?.name_en;
+    const nameEn = nameEnRaw?.trim() || name;
     const recipients = workflowStepNotificationRecipients({
       responsibleUserId: current.responsible_user_id,
       assignedUserId: current.assigned_user_id,
@@ -493,6 +498,7 @@ export async function updateWorkflowStepDeadlineAction(
     }).filter((id) => id !== ctx.userId);
     const notifications = createNotificationService(supabase);
     const dueLabel = formatRiyadhDateTimeAr(dueAt);
+    const dueLabelEn = formatRiyadhDateTimeAr(dueAt, "en");
     for (const userId of recipients) {
       await notifications.notify({
         organizationId: current.organization_id,
@@ -500,6 +506,8 @@ export async function updateWorkflowStepDeadlineAction(
         type: "workflow.step.deadline_changed",
         title: name ? `تم تحديث موعد مرحلة «${name}»` : "تم تحديث موعد المرحلة",
         message: `الموعد الجديد: ${dueLabel}`,
+        titleEn: nameEn ? `Stage deadline updated: ${nameEn}` : "The stage deadline was updated",
+        messageEn: `New deadline: ${dueLabelEn}`,
         entityType: projectId ? "project" : "workflow_instance_step",
         entityId: projectId ?? current.id,
         href: projectId ? `/projects/${projectId}?tab=stages` : null,
@@ -574,7 +582,7 @@ export async function assignWorkflowStepResponsibleAction(
     const { data: liveStep } = liveInstance
       ? await supabase
           .from("workflow_instance_steps")
-          .select("id, status, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar)")
+          .select("id, status, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar, name_en)")
           .eq("instance_id", liveInstance.id)
           .eq("step_id", parsed.data.workflowStepId)
           .in("status", ["ready", "in_progress"])
@@ -584,13 +592,15 @@ export async function assignWorkflowStepResponsibleAction(
             assigned_user_id: string | null;
             assigned_role_id: string | null;
             responsible_user_id: string | null;
-            workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
+            workflow_steps: { name_ar: string; name_en?: string | null } | { name_ar: string; name_en?: string | null }[] | null;
           }>()
       : { data: null };
 
     if (liveStep) {
       const stepRel = liveStep.workflow_steps;
       const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
+      const nameEnRaw = Array.isArray(stepRel) ? stepRel[0]?.name_en : stepRel?.name_en;
+      const nameEn = nameEnRaw?.trim() || name;
       const notifications = createNotificationService(supabase);
       await notifications.notify({
         organizationId: ctx.organization.id,
@@ -598,6 +608,8 @@ export async function assignWorkflowStepResponsibleAction(
         type: "workflow.step.activated",
         title: "تم إسناد مرحلة إليك",
         message: name ? `المرحلة: ${name}` : "تم تعيينك مسؤولاً عن مرحلة جاهزة.",
+        titleEn: "A stage has been assigned to you",
+        messageEn: nameEn ? `Stage: ${nameEn}` : "You were made responsible for a ready stage.",
         entityType: "project",
         entityId: parsed.data.projectId,
         href: workflowStageHref(parsed.data.projectId, liveStep.id),
@@ -801,6 +813,7 @@ export async function createApprovalAction(
   const ctx = authorize(await getAuthContext(), "approval.create");
   const parsed = createApprovalSchema.safeParse({
     title: formData.get("title"),
+    titleEn: String(formData.get("title_en") ?? "").trim() || undefined,
     entityType: formData.get("entityType"),
     entityId: formData.get("entityId"),
     approverProfileId: formData.get("approverProfileId"),
@@ -906,6 +919,7 @@ export async function createApprovalAction(
     .select("id")
     .single<{ id: string }>();
   if (error || !request) throw new DatabaseError(error);
+  await setApprovalRequestTitleEn(supabase, request.id, parsed.data.titleEn, (m, d) => logger.warn(m, d));
 
   const { error: stepError } = await supabase.from("approval_steps").insert({
     organization_id: ctx.organization.id,
@@ -925,6 +939,8 @@ export async function createApprovalAction(
     type: "approval.created",
     title: "طلب موافقة جديد",
     message: parsed.data.title,
+    titleEn: "New approval request",
+    messageEn: parsed.data.titleEn ?? parsed.data.title,
     entityType: "approval_request",
     entityId: request.id,
     priority: "high",
@@ -951,6 +967,7 @@ export async function createCurrentWorkflowGateApprovalAction(
       projectId: parsedForm.projectId,
       approverProfileId: parsedForm.approverProfileId,
       title: parsedForm.title,
+      titleEn: parsedForm.titleEn,
       documentVersionIds: parsedForm.documentVersionIds,
     });
     if (!parsed.success) {
@@ -977,6 +994,7 @@ export async function createCurrentWorkflowGateApprovalAction(
     if (error) throwMappedWorkflowRpc(error);
 
     const createdId = String(requestId);
+    await setApprovalRequestTitleEn(supabase, createdId, parsed.data.titleEn, (m, d) => logger.warn(m, d));
     const { data: linked } = await supabase
       .from("approval_request_documents")
       .select("revision, documents(title)")
@@ -989,6 +1007,13 @@ export async function createCurrentWorkflowGateApprovalAction(
         return `${title ?? "مستند"} (مراجعة ${row.revision as string})`;
       })
       .join("، ");
+    const docSummaryEn = (linked ?? [])
+      .map((row) => {
+        const docs = row.documents as { title?: string } | { title?: string }[] | null;
+        const title = Array.isArray(docs) ? docs[0]?.title : docs?.title;
+        return `${title ?? "Document"} (revision ${row.revision as string})`;
+      })
+      .join(", ");
 
     const { data: gateRequest } = await supabase
       .from("approval_requests")
@@ -998,12 +1023,20 @@ export async function createCurrentWorkflowGateApprovalAction(
     const { data: wfStep } = gateRequest
       ? await supabase
           .from("workflow_instance_steps")
-          .select("step_key, workflow_steps(name_ar)")
+          .select("step_key, workflow_steps(name_ar, name_en)")
           .eq("id", gateRequest.entity_id)
-          .maybeSingle<{ step_key: string; workflow_steps: { name_ar: string } | { name_ar: string }[] | null }>()
+          .maybeSingle<{
+            step_key: string;
+            workflow_steps:
+              | { name_ar: string; name_en?: string | null }
+              | { name_ar: string; name_en?: string | null }[]
+              | null;
+          }>()
       : { data: null };
     const stepNameRaw = wfStep?.workflow_steps;
-    const stepName = Array.isArray(stepNameRaw) ? stepNameRaw[0]?.name_ar : stepNameRaw?.name_ar;
+    const stepDef = Array.isArray(stepNameRaw) ? stepNameRaw[0] : stepNameRaw;
+    const stepName = stepDef?.name_ar;
+    const stepNameEn = stepDef?.name_en?.trim() || stepName;
 
     const notifications = createNotificationService(supabase);
     await notifications.notify({
@@ -1012,6 +1045,8 @@ export async function createCurrentWorkflowGateApprovalAction(
       type: "approval.created",
       title: "طلب اعتماد مرحلة",
       message: `${project.project_code} — ${stepName ?? "المرحلة الحالية"}${docSummary ? ` — ${docSummary}` : ""}`,
+      titleEn: "Stage approval request",
+      messageEn: `${project.project_code} — ${stepNameEn ?? "Current stage"}${docSummaryEn ? ` — ${docSummaryEn}` : ""}`,
       entityType: "approval_request",
       entityId: createdId,
       priority: "high",
@@ -1113,12 +1148,21 @@ export async function decideApprovalAction(
         : parsed.data.officialCode === "D"
           ? "رُفض طلب الاعتماد"
           : "تم تسجيل قرار اعتماد";
+    const decidedTitleEn =
+      parsed.data.officialCode === "C"
+        ? "Changes were requested on the approval"
+        : parsed.data.officialCode === "D"
+          ? "The approval request was rejected"
+          : "An approval decision was recorded";
     await notifications.notify({
       organizationId: ctx.organization.id,
       recipientProfileId: request.requested_by,
       type: "approval.decided",
       title: decidedTitle,
       message: parsed.data.comment || decidedTitle,
+      titleEn: decidedTitleEn,
+      // The approver's comment is free text and stays as written.
+      messageEn: parsed.data.comment || decidedTitleEn,
       entityType: "approval_request",
       entityId: approvalStep?.request_id ?? parsed.data.stepId,
       href: projectId ? `/projects/${projectId}?tab=stages` : "/approvals",

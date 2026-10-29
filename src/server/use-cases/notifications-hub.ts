@@ -100,6 +100,8 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       type: ev.eventType,
       title: ev.eventType === "ESCALATION_CREATED" ? "تصعيد موافقة" : "تذكير موافقة",
       message: "هناك طلب موافقة يحتاج متابعة داخل النظام.",
+      titleEn: ev.eventType === "ESCALATION_CREATED" ? "Approval escalation" : "Approval reminder",
+      messageEn: "An approval request needs follow-up in the system.",
       entityType: "approval_request",
       entityId: ev.entityId,
       priority: "high",
@@ -132,6 +134,8 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       type: ev.eventType,
       title: ev.eventType === "PROJECT_OVERDUE" ? "مشروع متأخر" : "اقتراب موعد مشروع",
       message: "راجع جدول المشروع داخل النظام.",
+      titleEn: ev.eventType === "PROJECT_OVERDUE" ? "Project overdue" : "Project deadline approaching",
+      messageEn: "Review the project schedule in the system.",
       entityType: "project",
       entityId: ev.entityId,
       priority: "high",
@@ -144,7 +148,7 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
   const { data: wfSteps } = await admin
     .from("workflow_instance_steps")
     .select(
-      "id, organization_id, instance_id, status, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar, warning_hours)",
+      "id, organization_id, instance_id, status, due_at, assigned_user_id, assigned_role_id, responsible_user_id, workflow_steps(name_ar, name_en, warning_hours)",
     )
     .in("status", ["ready", "in_progress"])
     .not("due_at", "is", null)
@@ -215,13 +219,18 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
   }
 
   const nowIso = now.toISOString();
+  const stepNameEnById = new Map<string, string>();
   const wfEvents = buildWorkflowDeadlineEvents(
     (wfSteps ?? []).flatMap((s) => {
       const row = instanceById.get(s.instance_id as string);
       if (row?.status === "completed" || row?.status === "cancelled") return [];
       const projectId = row?.entity_type === "project" ? row.entity_id : null;
-      const def = s.workflow_steps as { name_ar?: string; warning_hours?: number | null } | { name_ar?: string; warning_hours?: number | null }[] | null;
+      const def = s.workflow_steps as
+        | { name_ar?: string; name_en?: string | null; warning_hours?: number | null }
+        | { name_ar?: string; name_en?: string | null; warning_hours?: number | null }[]
+        | null;
       const defOne = Array.isArray(def) ? def[0] : def;
+      if (defOne?.name_en?.trim()) stepNameEnById.set(s.id as string, defOne.name_en.trim());
       const roleHolders = s.assigned_role_id ? (holdersByRole.get(s.assigned_role_id as string) ?? []) : [];
       return [
         {
@@ -249,6 +258,10 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
     const remaining = formatRemainingAr(ev.dueAt, nowIso);
     const late = formatOverdueSinceAr(ev.dueAt, nowIso);
     const warning = ev.eventType === "workflow.step.deadline_warning";
+    const nameEn = stepNameEnById.get(ev.entityId) ?? ev.nameAr;
+    const dueLabelEn = formatRiyadhDateTimeAr(ev.dueAt, "en");
+    const remainingEn = formatRemainingAr(ev.dueAt, nowIso, "en");
+    const lateEn = formatOverdueSinceAr(ev.dueAt, nowIso, "en");
     await notify.notify({
       organizationId: ev.organizationId,
       recipientProfileId: ev.recipientId,
@@ -257,6 +270,10 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       message: warning
         ? `المرحلة: ${ev.nameAr} — موعد الإغلاق: ${dueLabel}${remaining ? ` — متبقي ${remaining}` : ""}`
         : `المرحلة: ${ev.nameAr} — كان موعد الإغلاق: ${dueLabel}${late ? ` — متأخرة منذ ${late}` : ""}`,
+      titleEn: warning ? "Alert: a stage deadline is approaching" : "Stage overdue alert",
+      messageEn: warning
+        ? `Stage: ${nameEn} — due: ${dueLabelEn}${remainingEn ? ` — ${remainingEn} left` : ""}`
+        : `Stage: ${nameEn} — was due: ${dueLabelEn}${lateEn ? ` — overdue by ${lateEn}` : ""}`,
       entityType: ev.projectId ? "project" : "workflow_instance_step",
       entityId: ev.projectId ?? ev.entityId,
       href: ev.projectId ? `/projects/${ev.projectId}?tab=stages` : null,
@@ -276,6 +293,8 @@ export async function runNotificationJobs(options?: { digestFacts?: DigestFacts 
       type: "workflow.step.overdue.management",
       title: "تنبيه تأخير مرحلة",
       message: `المرحلة: ${sample.nameAr} — كان موعد الإغلاق: ${formatRiyadhDateTimeAr(sample.dueAt)}`,
+      titleEn: "Stage overdue alert",
+      messageEn: `Stage: ${stepNameEnById.get(sample.entityId) ?? sample.nameAr} — was due: ${formatRiyadhDateTimeAr(sample.dueAt, "en")}`,
       entityType: sample.projectId ? "project" : "workflow_instance_step",
       entityId: sample.projectId ?? sample.entityId,
       href: sample.projectId ? `/projects/${sample.projectId}?tab=stages` : null,

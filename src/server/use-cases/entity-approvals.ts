@@ -11,6 +11,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createNotificationService } from "@/server/services/notification.service";
+import { approvalTitleColumns, selectWithOptionalTitleEn } from "@/lib/approvals/title-en";
 
 const decideEntityApprovalSchema = z.object({
   approvalRequestId: z.string().uuid(),
@@ -104,17 +105,20 @@ export async function decideEntityApprovalAction(
   const ctx = authorize(await getAuthContext(), approvalPermission);
 
   const supabase = await createServerSupabaseClient();
-  const { data: request, error: requestError } = await supabase
-    .from("approval_requests")
-    .select("id, entity_type, entity_id, title, requested_by")
-    .eq("id", parsed.data.approvalRequestId)
-    .maybeSingle<{
-      id: string;
-      entity_type: string;
-      entity_id: string;
-      title: string;
-      requested_by: string;
-    }>();
+  const { data: request, error: requestError } = await selectWithOptionalTitleEn((withTitleEn) =>
+    supabase
+      .from("approval_requests")
+      .select(approvalTitleColumns("id, entity_type, entity_id, title, requested_by", withTitleEn))
+      .eq("id", parsed.data.approvalRequestId)
+      .maybeSingle<{
+        id: string;
+        entity_type: string;
+        entity_id: string;
+        title: string;
+        title_en?: string | null;
+        requested_by: string;
+      }>(),
+  );
   if (requestError) throw new DatabaseError(requestError);
   if (!request) throw new NotFoundError("طلب الموافقة", "Approval request");
   if (!isEntityApprovalTypeSupported(request.entity_type)) {
@@ -172,6 +176,12 @@ export async function decideEntityApprovalAction(
       : result.official_outcome === "resubmit"
         ? "إعادة تقديم"
         : "معتمد";
+  const outcomeLabelEn =
+    result.official_outcome === "rejected"
+      ? "rejected"
+      : result.official_outcome === "resubmit"
+        ? "resubmission requested"
+        : "approved";
 
   if (request.requested_by && request.requested_by !== ctx.userId) {
     await notifications.notify({
@@ -180,6 +190,8 @@ export async function decideEntityApprovalAction(
       type: "approval.decided",
       title: request.title,
       message: `تم تحديث طلب الموافقة: ${outcomeLabel}`,
+      titleEn: request.title_en ?? null,
+      messageEn: `Approval request updated: ${outcomeLabelEn}`,
       entityType: request.entity_type,
       entityId: request.entity_id,
       priority: "high",
@@ -193,6 +205,8 @@ export async function decideEntityApprovalAction(
       type: "approval.required",
       title: request.title,
       message: "مطلوب إجراء موافقة",
+      titleEn: request.title_en ?? null,
+      messageEn: "Your approval is required.",
       entityType: request.entity_type,
       entityId: request.entity_id,
       priority: "high",

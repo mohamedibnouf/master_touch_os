@@ -140,7 +140,7 @@ export function HorizontalBarList({
                 aria-valuemax={100}
                 aria-label={row.label}
               >
-                <div className="h-full rounded-full bg-primary" style={{ width: `${safe}%` }} />
+                <div className="mt-progress-fill h-full rounded-full bg-primary" style={{ width: `${safe}%` }} />
               </div>
             </>
           );

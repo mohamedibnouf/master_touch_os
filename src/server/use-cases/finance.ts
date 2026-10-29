@@ -143,6 +143,8 @@ export async function approveSupplierInvoiceForPaymentAction(
       type: "approval.required",
       title: `اعتماد فاتورة مورد ${invoice.invoice_number}`,
       message: "مطلوب إجراء موافقة",
+      titleEn: `Approve supplier invoice ${invoice.invoice_number}`,
+      messageEn: "Your approval is required.",
       entityType: "supplier_invoice",
       entityId: invoiceId,
       priority: "high",

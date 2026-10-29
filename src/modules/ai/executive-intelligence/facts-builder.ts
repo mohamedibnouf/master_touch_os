@@ -1,5 +1,6 @@
 import { daysBetweenYmd } from "@/modules/management/risk/date-utils";
 import type { ManagementInsightFacts } from "../schemas";
+import type { Locale } from "@/lib/i18n/config";
 import type {
   ExecutiveIntelligenceFacts,
   ExecutiveMetric,
@@ -10,6 +11,14 @@ import type {
 export const EXECUTIVE_DELAYED_PROJECT_LIMIT = 8;
 /** Display/allowlist cap only. Never use a capped sample as an organization-wide percentage denominator. */
 export const EXECUTIVE_PROJECT_SAMPLE_CAP = 400;
+
+const ALLOWED_ROLES_AR = ["مدير عام", "مدير مشروع", "مراجع اعتمادات", "مدير عمليات"];
+const ALLOWED_ROLES_EN = ["General Manager", "Project Manager", "Approvals Reviewer", "Operations Manager"];
+
+/** Owner roles the model may suggest (grounding drops any other value), in the requested locale. */
+export function allowedRoles(locale: Locale = "ar"): string[] {
+  return [...(locale === "en" ? ALLOWED_ROLES_EN : ALLOWED_ROLES_AR)];
+}
 
 export type ProjectPortfolioRow = {
   id: string;
@@ -50,7 +59,11 @@ function censusComplete(census: ProjectCensus | null | undefined): census is {
   );
 }
 
-export function coerceExecutiveFacts(facts: ManagementInsightFacts | ExecutiveIntelligenceFacts): ExecutiveIntelligenceFacts {
+export function coerceExecutiveFacts(
+  facts: ManagementInsightFacts | ExecutiveIntelligenceFacts,
+  locale: Locale = "ar",
+): ExecutiveIntelligenceFacts {
+  const en = locale === "en";
   if ("metrics" in facts && Array.isArray(facts.metrics)) return facts;
   return {
     ...facts,
@@ -60,10 +73,12 @@ export function coerceExecutiveFacts(facts: ManagementInsightFacts | ExecutiveIn
     pendingApprovalRows: [],
     allowedProjectIds: facts.projectNotes.map((p) => p.id),
     allowedHrefs: facts.projectNotes.map((p) => p.href),
-    allowedRolesAr: ["مدير عام", "مدير مشروع", "مراجع اعتمادات", "مدير عمليات"],
+    allowedRolesAr: allowedRoles(locale),
     knownNumbers: [facts.followUpProjects, facts.overdueStages, facts.pendingApprovals],
-    limitationsAr: ["عينة محدودة للتوافق مع المسار السابق."],
-    operationalSummaryAr: "المقاييس الحتمية غير مكتملة في هذا المسار المختصر.",
+    limitationsAr: [en ? "Limited sample for compatibility with the previous path." : "عينة محدودة للتوافق مع المسار السابق."],
+    operationalSummaryAr: en
+      ? "Deterministic metrics are incomplete in this shortened path."
+      : "المقاييس الحتمية غير مكتملة في هذا المسار المختصر.",
     sections: { projects: true, approvals: true, people: false, finance: false },
   };
 }
@@ -95,7 +110,12 @@ export function buildExecutiveIntelligenceFacts(input: {
   pendingApprovalRows: Array<{ id: string; title: string | null }>;
   progressSample: ExecutiveProgressRow[];
   activeEmployeeCount: number | null;
+  /** Language of deterministic labels/limitations (Arabic by default). `*Ar` fields hold this language. */
+  locale?: Locale;
 }): ExecutiveIntelligenceFacts {
+  const locale = input.locale ?? "ar";
+  const en = locale === "en";
+  const L = (ar: string, enText: string) => (en ? enText : ar);
   const asOf = input.asOf;
   const unique = uniqueProjectsById(input.projects);
   const tracked = unique.filter((p) => p.status === "active" || p.status === "on_hold");
@@ -136,35 +156,35 @@ export function buildExecutiveIntelligenceFacts(input: {
     metrics.push(
       metric({
         key: "projects.total_loaded",
-        labelAr: "مشاريع في قائمة العرض",
+        labelAr: L("مشاريع في قائمة العرض", "Projects in the display list"),
         value: unique.length,
         unit: "count",
         source: "projects",
-        definitionAr: "عدد المشاريع الفريدة في قائمة العرض بعد إزالة التكرار. ليست حصراً للمنظمة.",
+        definitionAr: L("عدد المشاريع الفريدة في قائمة العرض بعد إزالة التكرار. ليست حصراً للمنظمة.", "Unique projects in the display list after de-duplication. Not an organization-wide count."),
         asOf,
-        scopeAr: "عينة عرض",
+        scopeAr: L("عينة عرض", "Display sample"),
         denominator: completeCensus ? census.tracked : null,
         availability: "PARTIAL",
       }),
       metric({
         key: "projects.active",
-        labelAr: "مشاريع نشطة",
+        labelAr: L("مشاريع نشطة", "Active projects"),
         value: orgActive,
         unit: "count",
         source: "projects.status",
-        definitionAr: "عدد المشاريع ذات الحالة active ضمن نطاق المنظمة والصلاحية (حصر exact، ليس عينة).",
+        definitionAr: L("عدد المشاريع ذات الحالة active ضمن نطاق المنظمة والصلاحية (حصر exact، ليس عينة).", "Projects with status active within the organization and your permissions (exact count, not a sample)."),
         asOf,
-        scopeAr: "المنظمة الحالية",
+        scopeAr: L("المنظمة الحالية", "Current organization"),
         denominator: null,
         availability: countAvailability,
       }),
       metric({
         key: "projects.overdue_planned_end",
-        labelAr: "تجاوزت التاريخ المخطط",
+        labelAr: L("تجاوزت التاريخ المخطط", "Past planned end date"),
         value: orgOverdue,
         unit: "count",
         source: "projects.planned_end_date",
-        definitionAr: "مشاريع نشطة أو معلّقة تاريخها المخطط قبل يوم الرياض الحالي. النسبة العالمية لا تُحسب من عينة العرض.",
+        definitionAr: L("مشاريع نشطة أو معلّقة تاريخها المخطط قبل يوم الرياض الحالي. النسبة العالمية لا تُحسب من عينة العرض.", "Active or on-hold projects whose planned end date is before today (Riyadh). The organization-wide percentage is not computed from the display sample."),
         asOf,
         scopeAr: "active + on_hold",
         denominator: orgTracked,
@@ -172,23 +192,23 @@ export function buildExecutiveIntelligenceFacts(input: {
       }),
       metric({
         key: "projects.overdue_percent",
-        labelAr: "نسبة التجاوز المخطط",
+        labelAr: L("نسبة التجاوز المخطط", "Planned-end overrun rate"),
         value: percentAvailability === "NOT_AVAILABLE" ? null : orgPercent,
         unit: "percent",
         source: "projects.planned_end_date",
-        definitionAr: "حصر المتجاوزة ÷ حصر (النشطة + المعلّقة). لا تُستخدم عينة العرض كمقام. القيمة فارغة إذا المقام صفر أو الحصر غير مكتمل.",
+        definitionAr: L("حصر المتجاوزة ÷ حصر (النشطة + المعلّقة). لا تُستخدم عينة العرض كمقام. القيمة فارغة إذا المقام صفر أو الحصر غير مكتمل.", "Overdue count ÷ (active + on-hold) count. The display sample is never used as the denominator. Empty when the denominator is zero or the count is incomplete."),
         asOf,
-        scopeAr: "active + on_hold (حصر المنظمة)",
+        scopeAr: L("active + on_hold (حصر المنظمة)", "active + on_hold (organization count)"),
         denominator: orgTracked,
         availability: percentAvailability,
       }),
       metric({
         key: "projects.declared_high_risk",
-        labelAr: "مخاطر معلنة عالية",
+        labelAr: L("مخاطر معلنة عالية", "Declared high risks"),
         value: highRisk.length,
         unit: "count",
         source: "projects.risk_level",
-        definitionAr: "حقل risk_level يساوي high أو critical.",
+        definitionAr: L("حقل risk_level يساوي high أو critical.", "risk_level field equals high or critical."),
         asOf,
         scopeAr: "active + on_hold",
         denominator: null,
@@ -196,25 +216,25 @@ export function buildExecutiveIntelligenceFacts(input: {
       }),
       metric({
         key: "workflow.overdue_stages",
-        labelAr: "مراحل متأخرة",
+        labelAr: L("مراحل متأخرة", "Overdue stages"),
         value: input.overdueStageCount,
         unit: "count",
         source: "workflow_instance_steps.due_at",
-        definitionAr: "خطوات ready/in_progress تجاوز due_at وقت الطلب.",
+        definitionAr: L("خطوات ready/in_progress تجاوز due_at وقت الطلب.", "ready/in_progress steps whose due_at has passed at request time."),
         asOf,
-        scopeAr: "المنظمة الحالية",
+        scopeAr: L("المنظمة الحالية", "Current organization"),
         denominator: null,
         availability: input.overdueStageCount == null ? "NOT_AVAILABLE" : "AVAILABLE_AND_RELIABLE",
       }),
       metric({
         key: "workflow.avg_progress_sample",
-        labelAr: "متوسط تقدم العينة",
+        labelAr: L("متوسط تقدم العينة", "Sample average progress"),
         value: avgProgress,
         unit: "percent",
         source: "workflow_instance_steps",
-        definitionAr: "متوسط نسبة الخطوات المكتملة لمثيلات العمل الجارية في العينة فقط.",
+        definitionAr: L("متوسط نسبة الخطوات المكتملة لمثيلات العمل الجارية في العينة فقط.", "Average share of completed steps for in-progress workflow instances in the sample only."),
         asOf,
-        scopeAr: "workflow in_progress (عينة)",
+        scopeAr: L("workflow in_progress (عينة)", "workflow in_progress (sample)"),
         denominator: progressWithTotal.length,
         availability: avgProgress == null ? "NOT_AVAILABLE" : "PARTIAL",
       }),
@@ -225,13 +245,13 @@ export function buildExecutiveIntelligenceFacts(input: {
     metrics.push(
       metric({
         key: "approvals.pending",
-        labelAr: "موافقات معلّقة",
+        labelAr: L("موافقات معلّقة", "Pending approvals"),
         value: input.pendingApprovalCount,
         unit: "count",
         source: "approval_requests.status",
-        definitionAr: "طلبات بحالة pending أو in_progress.",
+        definitionAr: L("طلبات بحالة pending أو in_progress.", "Requests with status pending or in_progress."),
         asOf,
-        scopeAr: "المنظمة الحالية",
+        scopeAr: L("المنظمة الحالية", "Current organization"),
         denominator: null,
         availability: input.pendingApprovalCount == null ? "NOT_AVAILABLE" : "AVAILABLE_AND_RELIABLE",
       }),
@@ -242,13 +262,13 @@ export function buildExecutiveIntelligenceFacts(input: {
     metrics.push(
       metric({
         key: "people.active_employees",
-        labelAr: "موظفون نشطون",
+        labelAr: L("موظفون نشطون", "Active employees"),
         value: input.activeEmployeeCount,
         unit: "count",
         source: "employees.is_active",
-        definitionAr: "عدد الموظفين النشطين. لا يشمل تقييم أداء.",
+        definitionAr: L("عدد الموظفين النشطين. لا يشمل تقييم أداء.", "Number of active employees. Does not include performance evaluation."),
         asOf,
-        scopeAr: "المنظمة الحالية",
+        scopeAr: L("المنظمة الحالية", "Current organization"),
         denominator: null,
         availability: input.activeEmployeeCount == null ? "NOT_AVAILABLE" : "AVAILABLE_AND_RELIABLE",
       }),
@@ -258,31 +278,31 @@ export function buildExecutiveIntelligenceFacts(input: {
   metrics.push(
     metric({
       key: "finance.portfolio_variance",
-      labelAr: "انحراف مالي للمحفظة",
+      labelAr: L("انحراف مالي للمحفظة", "Portfolio financial variance"),
       value: null,
       unit: "percent",
       source: "none",
-      definitionAr: "لا يوجد مقياس محفظة معتمد للميزانية مقابل الصرف على لوحة الإدارة.",
+      definitionAr: L("لا يوجد مقياس محفظة معتمد للميزانية مقابل الصرف على لوحة الإدارة.", "There is no approved portfolio budget-vs-spend metric on the management dashboard."),
       asOf,
-      scopeAr: "غير محسوب",
+      scopeAr: L("غير محسوب", "Not computed"),
       denominator: null,
       availability: "NOT_AVAILABLE",
     }),
   );
 
   const limitationsAr = [
-    "الأرقام المعروضة حتمية من قاعدة البيانات ضمن صلاحياتك.",
-    "نسب المحفظة تُحسب من حصر المنظمة وليس من قائمة العرض المحدودة.",
-    "متوسط التقدم جزئي: يعتمد على مثيلات سير العمل الجارية في العينة فقط.",
-    "حقل المخاطر المعلنة لا يغني عن محرك المخاطر في مركز القيادة.",
-    "لا تُحسب ميزانيات أو انحرافات مالية على هذه البطاقة.",
+    L("الأرقام المعروضة حتمية من قاعدة البيانات ضمن صلاحياتك.", "Displayed numbers are deterministic from the database within your permissions."),
+    L("نسب المحفظة تُحسب من حصر المنظمة وليس من قائمة العرض المحدودة.", "Portfolio percentages are computed from the organization count, not the limited display list."),
+    L("متوسط التقدم جزئي: يعتمد على مثيلات سير العمل الجارية في العينة فقط.", "Average progress is partial: it relies only on in-progress workflow instances in the sample."),
+    L("حقل المخاطر المعلنة لا يغني عن محرك المخاطر في مركز القيادة.", "The declared-risk field does not replace the risk engine in the command center."),
+    L("لا تُحسب ميزانيات أو انحرافات مالية على هذه البطاقة.", "No budgets or financial variances are computed on this card."),
   ];
-  if (!input.canProjects) limitationsAr.push("لا صلاحية قراءة المشاريع؛ أخفيت مقاييس المحفظة.");
-  if (!input.canApprovals) limitationsAr.push("لا صلاحية الموافقات.");
-  if (!input.canFinance) limitationsAr.push("لا تُعرض مبالغ مالية.");
+  if (!input.canProjects) limitationsAr.push(L("لا صلاحية قراءة المشاريع؛ أخفيت مقاييس المحفظة.", "No project read permission; portfolio metrics are hidden."));
+  if (!input.canApprovals) limitationsAr.push(L("لا صلاحية الموافقات.", "No approvals permission."));
+  if (!input.canFinance) limitationsAr.push(L("لا تُعرض مبالغ مالية.", "No financial amounts are shown."));
 
   if (input.portfolioCapped) {
-    limitationsAr.push("قائمة المشاريع المتأخرة عينة مرتّبة للتاريخ المخطط وليست حصراً كاملاً للصفوف.");
+    limitationsAr.push(L("قائمة المشاريع المتأخرة عينة مرتّبة للتاريخ المخطط وليست حصراً كاملاً للصفوف.", "The delayed-projects list is a sample ordered by planned end date, not a complete list of rows."));
   }
 
   const delayedTop = overdueProjects.slice(0, EXECUTIVE_DELAYED_PROJECT_LIMIT);
@@ -290,13 +310,15 @@ export function buildExecutiveIntelligenceFacts(input: {
     ? delayedTop.map((p) => ({
         id: p.id,
         nameAr: p.nameAr,
-        reasonAr: `تجاوز التاريخ المخطط بـ ${p.overdueDays ?? 0} يوماً`,
+        reasonAr: en
+          ? `Past planned end date by ${p.overdueDays ?? 0} days`
+          : `تجاوز التاريخ المخطط بـ ${p.overdueDays ?? 0} يوماً`,
         href: p.href,
       }))
     : active.slice(0, 5).map((p) => ({
         id: p.id,
         nameAr: p.name_ar,
-        reasonAr: "مشروع نشط مصرّح بعرضه",
+        reasonAr: L("مشروع نشط مصرّح بعرضه", "Active project you are authorized to view"),
         href: hrefForProject(p.id),
       }));
 
@@ -310,28 +332,28 @@ export function buildExecutiveIntelligenceFacts(input: {
   ];
 
   const pick = (key: string) => metrics.find((m) => m.key === key);
-  const summaryParts: string[] = [`حتى ${asOf} (آسيا/الرياض)`];
+  const summaryParts: string[] = [en ? `As of ${asOf} (Asia/Riyadh)` : `حتى ${asOf} (آسيا/الرياض)`];
   const activeM = pick("projects.active");
   const overdueM = pick("projects.overdue_planned_end");
   const pctM = pick("projects.overdue_percent");
   const stagesM = pick("workflow.overdue_stages");
   const pendingM = pick("approvals.pending");
   if (activeM?.value != null && activeM.availability === "AVAILABLE_AND_RELIABLE") {
-    summaryParts.push(`${activeM.value} مشروع نشط`);
+    summaryParts.push(en ? `${activeM.value} active projects` : `${activeM.value} مشروع نشط`);
   }
   if (overdueM?.value != null && overdueM.availability === "AVAILABLE_AND_RELIABLE") {
-    summaryParts.push(`${overdueM.value} تجاوزت التاريخ المخطط`);
+    summaryParts.push(en ? `${overdueM.value} past planned end date` : `${overdueM.value} تجاوزت التاريخ المخطط`);
   }
   if (pctM?.value != null && pctM.availability === "AVAILABLE_AND_RELIABLE") {
-    summaryParts.push(`نسبة التجاوز ${pctM.value}%`);
+    summaryParts.push(en ? `overrun rate ${pctM.value}%` : `نسبة التجاوز ${pctM.value}%`);
   }
   if (stagesM?.value != null && stagesM.availability !== "NOT_AVAILABLE") {
-    summaryParts.push(`${stagesM.value} مرحلة متأخرة`);
+    summaryParts.push(en ? `${stagesM.value} overdue stages` : `${stagesM.value} مرحلة متأخرة`);
   }
   if (pendingM?.value != null && pendingM.availability !== "NOT_AVAILABLE") {
-    summaryParts.push(`${pendingM.value} موافقة معلّقة`);
+    summaryParts.push(en ? `${pendingM.value} pending approvals` : `${pendingM.value} موافقة معلّقة`);
   }
-  const operationalSummaryAr = `${summaryParts.join(" — ")}. الأرقام من النظام وليست تقديراً من النموذج.`;
+  const operationalSummaryAr = `${summaryParts.join(" — ")}. ${L("الأرقام من النظام وليست تقديراً من النموذج.", "Numbers come from the system, not model estimates.")}`;
 
   const knownNumbers = metrics
     .map((m) => m.value)
@@ -350,12 +372,12 @@ export function buildExecutiveIntelligenceFacts(input: {
     progressSample: input.progressSample.slice(0, 8),
     pendingApprovalRows: input.pendingApprovalRows.slice(0, 8).map((row) => ({
       id: row.id,
-      titleAr: row.title?.trim() || "طلب موافقة",
+      titleAr: row.title?.trim() || L("طلب موافقة", "Approval request"),
       href: "/approvals",
     })),
     allowedProjectIds: unique.map((p) => p.id),
     allowedHrefs: [...new Set(allowedHrefs)],
-    allowedRolesAr: ["مدير عام", "مدير مشروع", "مراجع اعتمادات", "مدير عمليات"],
+    allowedRolesAr: allowedRoles(locale),
     knownNumbers: [...new Set(knownNumbers)],
     limitationsAr,
     operationalSummaryAr,

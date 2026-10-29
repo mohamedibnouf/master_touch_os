@@ -9,6 +9,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
 import { getI18n } from "@/lib/i18n/server";
+import { pickLocalized } from "@/lib/i18n/config";
+import { approvalTitleColumns, selectWithOptionalTitleEn } from "@/lib/approvals/title-en";
 
 const navLinkClass =
   "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
@@ -47,13 +49,18 @@ export default async function FinancePage() {
           .order("due_date", { ascending: true, nullsFirst: false })
           .limit(20)
       : Promise.resolve({ data: [] }),
-    supabase
-      .from("approval_requests")
-      .select("id, title, status, due_at, entity_type")
-      .eq("organization_id", ctx.organization.id)
-      .in("status", ["pending", "in_progress"])
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .limit(20),
+    selectWithOptionalTitleEn((withTitleEn) =>
+      supabase
+        .from("approval_requests")
+        .select(approvalTitleColumns("id, title, status, due_at, entity_type", withTitleEn))
+        .eq("organization_id", ctx.organization.id)
+        .in("status", ["pending", "in_progress"])
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .limit(20)
+        .returns<
+          Array<{ id: string; title: string; title_en?: string | null; status: string; due_at: string | null; entity_type: string }>
+        >(),
+    ),
   ]);
 
   return (
@@ -216,7 +223,7 @@ export default async function FinancePage() {
             <ul className="space-y-2 text-sm">
               {(approvals.data ?? []).map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line pb-2">
-                  <span className="text-ink">{a.title}</span>
+                  <span className="text-ink">{pickLocalized(locale, a.title, a.title_en) || a.title}</span>
                   <Badge tone="warning">
                     {approvalStatusLabels[a.status] ?? commercialStatusLabel(a.status, locale)}
                   </Badge>

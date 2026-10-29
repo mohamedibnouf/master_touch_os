@@ -48,6 +48,8 @@ export type RiskProjectRow = {
 export type RiskApprovalRow = {
   id: string;
   title: string | null;
+  /** English title (migration 086); absent before 086 is applied. */
+  title_en?: string | null;
   status: string;
   due_at: string | null;
   created_at: string;

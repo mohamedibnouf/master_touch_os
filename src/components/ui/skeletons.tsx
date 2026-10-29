@@ -3,7 +3,7 @@
 import { useI18n } from "@/lib/i18n/client";
 
 export function SkeletonPulse({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-line/80 ${className ?? ""}`} />;
+  return <div className={`mt-skeleton rounded-md ${className ?? ""}`} aria-hidden />;
 }
 
 export function PageHeaderSkeleton() {

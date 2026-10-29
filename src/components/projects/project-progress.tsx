@@ -35,7 +35,7 @@ export async function ProjectProgress({
       >
         <div
           className={cn(
-            "h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500",
+            "mt-progress-fill h-full rounded-full",
             tone === "info" && "bg-primary",
             tone === "success" && "bg-success",
             tone === "warning" && "bg-warning",

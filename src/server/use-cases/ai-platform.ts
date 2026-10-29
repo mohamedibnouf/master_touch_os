@@ -36,6 +36,7 @@ import { estimateChars } from "@/modules/ai/security/sanitize";
 import { extractAuthorizedDocumentText } from "@/server/use-cases/document-ai-source";
 import { loadAuthorizedProjectAiFacts } from "@/server/use-cases/ai-project-context";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import { getLocale } from "@/lib/i18n/server";
 import { AI_DISCLAIMER_AR } from "@/modules/ai/limits";
 import type { ProjectIntelligenceView } from "@/modules/ai/schemas";
 import type { ExecutiveReport } from "@/modules/ai/schemas";
@@ -89,6 +90,7 @@ export async function analyzeProjectIntelligenceAction(input: unknown): Promise<
     }
 
     assertAiRateLimit(ctx.profile.id, "analysis");
+    const locale = await getLocale();
     const supabase = await createServerSupabaseClient();
 
     return await withAiInflight(`intel:${ctx.profile.id}:${parsed.data.projectId}`, async () => {
@@ -96,9 +98,10 @@ export async function analyzeProjectIntelligenceAction(input: unknown): Promise<
         supabase,
         ctx,
         projectId: parsed.data.projectId,
+        locale,
       });
       const forceRefresh = Boolean((input as { refresh?: boolean }).refresh);
-      const view = await buildProjectIntelligence({ provider, facts, actor: ctx, forceRefresh });
+      const view = await buildProjectIntelligence({ provider, facts, actor: ctx, forceRefresh, locale });
       await persistAiRun({
         supabase,
         organizationId: ctx.organization.id,
@@ -157,17 +160,20 @@ export async function askProjectAssistantAction(input: unknown): Promise<
     }
 
     assertAiRateLimit(ctx.profile.id, "assistant");
+    const locale = await getLocale();
     const supabase = await createServerSupabaseClient();
     const facts = await loadAuthorizedProjectAiFacts({
       supabase,
       ctx,
       projectId: parsed.data.projectId,
+      locale,
     });
     const answer = await answerProjectAssistant({
       provider,
       facts,
       question: parsed.data.question,
       history: parsed.data.history,
+      locale,
     });
     await new AuditService(supabase).log({
       organizationId: ctx.organization.id,
@@ -201,17 +207,20 @@ export async function generateExecutiveReportAction(input: unknown): Promise<
     }
 
     assertAiRateLimit(ctx.profile.id, "report");
+    const locale = await getLocale();
     const supabase = await createServerSupabaseClient();
     const facts = await loadAuthorizedProjectAiFacts({
       supabase,
       ctx,
       projectId: parsed.data.projectId,
+      locale,
     });
     const result = await buildExecutiveReportAi({
       provider,
       facts,
       organizationId: ctx.organization.id,
       forceRefresh: Boolean((input as { refresh?: boolean }).refresh),
+      locale,
     });
     await persistAiRun({
       supabase,
@@ -339,6 +348,7 @@ export async function analyzeDocumentAiAction(input: unknown): Promise<
       text: extracted.text,
       pageCount: extracted.pageCount ?? null,
       forceRefresh: Boolean((input as { refresh?: boolean }).refresh),
+      locale: await getLocale(),
     });
 
     await persistAiRun({
@@ -418,7 +428,8 @@ export async function refreshManagementInsightsAction(input?: {
     }
 
     assertAiRateLimit(ctx.profile.id, "analysis");
-    const facts = await loadExecutiveIntelligenceFacts(ctx);
+    const locale = await getLocale();
+    const facts = await loadExecutiveIntelligenceFacts(ctx, null, locale);
     if (!facts) throw new ForbiddenError();
 
     const explained = await explainManagementInsights({
@@ -426,6 +437,7 @@ export async function refreshManagementInsightsAction(input?: {
       organizationId: ctx.organization.id,
       facts,
       forceRefresh: Boolean(input?.refresh),
+      locale,
     });
     return { ok: true, data: explained };
   } catch (e) {
@@ -453,6 +465,7 @@ export async function getManagementInsightFactsAction(): Promise<
     const cfg = getAiPlatformConfig();
     const supabase = await createServerSupabaseClient();
     const orgId = ctx.organization.id;
+    const locale = await getLocale();
     const nowIso = new Date().toISOString();
     const canProjects = hasPermission(ctx, "project.read");
     const [overdueRes, pendingRes, projectsRes] = await Promise.all([
@@ -482,7 +495,7 @@ export async function getManagementInsightFactsAction(): Promise<
       projectNotes: (projectsRes.data ?? []).map((p) => ({
         id: p.id,
         nameAr: p.name_ar,
-        reasonAr: "مشروع نشط مصرّح بعرضه",
+        reasonAr: locale === "en" ? "Active project you are authorized to view" : "مشروع نشط مصرّح بعرضه",
         href: `/projects/${p.id}`,
       })),
       dataAsOf: riyadhTodayYmd(),

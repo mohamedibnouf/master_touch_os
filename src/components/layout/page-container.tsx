@@ -9,7 +9,7 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "min-w-0 w-full print:max-w-none",
+        "mt-page min-w-0 w-full print:max-w-none",
         variant === "wide" && "max-w-none",
         variant === "form" && "mx-auto max-w-3xl",
         className,

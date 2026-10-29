@@ -8,13 +8,19 @@ import { planDeliveryChannels } from "@/modules/notifications/policy";
 import type { PreferenceRow } from "@/modules/notifications/catalog";
 import { createEmailProvider, createPushProvider, createWhatsAppProvider } from "@/modules/notifications/providers";
 import { personalWhatsAppDestinationAllowed } from "@/modules/notifications/whatsapp-recipients";
+import { pickNotificationText, recipientLocale } from "@/modules/notifications/localize";
+import type { Locale } from "@/lib/i18n/config";
 
 export type NotificationPayload = {
   organizationId: string;
   recipientProfileId: string;
   type: string;
+  /** Arabic text (default). */
   title: string;
   message: string;
+  /** Optional English text, stored/sent instead when the recipient's locale is 'en'. */
+  titleEn?: string | null;
+  messageEn?: string | null;
   entityType?: string | null;
   entityId?: string | null;
   priority?: NotificationPriority;
@@ -68,10 +74,37 @@ export class PushChannel implements NotificationChannelAdapter {
   }
 }
 
+type RecipientProfileRow = {
+  is_active: boolean;
+  phone: string | null;
+  whatsapp_opt_in?: boolean;
+  locale?: string | null;
+};
+
+/** Newest columns first; older databases may lack `locale` / `whatsapp_opt_in`. */
+const RECIPIENT_PROFILE_SELECTS = [
+  "is_active, phone, whatsapp_opt_in, locale",
+  "is_active, phone, whatsapp_opt_in",
+  "is_active, phone",
+] as const;
+
+async function loadRecipientProfile(writer: SupabaseClient, profileId: string) {
+  let res = await writer
+    .from("profiles")
+    .select(RECIPIENT_PROFILE_SELECTS[0])
+    .eq("id", profileId)
+    .maybeSingle<RecipientProfileRow>();
+  for (const columns of RECIPIENT_PROFILE_SELECTS.slice(1)) {
+    if (!(res.error && /whatsapp_opt_in|locale|schema cache|column/i.test(res.error.message ?? ""))) break;
+    res = await writer.from("profiles").select(columns).eq("id", profileId).maybeSingle<RecipientProfileRow>();
+  }
+  return res;
+}
+
 async function resolveNotifyChannels(
   writer: SupabaseClient,
   payload: NotificationPayload,
-): Promise<Array<"in_app" | "email" | "whatsapp" | "push">> {
+): Promise<{ channels: Array<"in_app" | "email" | "whatsapp" | "push">; locale: Locale }> {
   const [memberRes, prefsRes] = await Promise.all([
     writer
       .from("organization_members")
@@ -86,18 +119,8 @@ async function resolveNotifyChannels(
       .eq("profile_id", payload.recipientProfileId),
   ]);
 
-  let profileRes = await writer
-    .from("profiles")
-    .select("is_active, phone, whatsapp_opt_in")
-    .eq("id", payload.recipientProfileId)
-    .maybeSingle<{ is_active: boolean; phone: string | null; whatsapp_opt_in?: boolean }>();
-  if (profileRes.error && /whatsapp_opt_in|schema cache|column/i.test(profileRes.error.message ?? "")) {
-    profileRes = await writer
-      .from("profiles")
-      .select("is_active, phone")
-      .eq("id", payload.recipientProfileId)
-      .maybeSingle<{ is_active: boolean; phone: string | null; whatsapp_opt_in?: boolean }>();
-  }
+  const profileRes = await loadRecipientProfile(writer, payload.recipientProfileId);
+  const locale = recipientLocale(profileRes.data?.locale);
 
   const preferences: PreferenceRow[] = ((prefsRes.data ?? []) as Array<{
     category: PreferenceRow["category"];
@@ -117,7 +140,7 @@ async function resolveNotifyChannels(
     memberActive: personalEmailAllowed,
   });
 
-  return planDeliveryChannels({
+  const channels = planDeliveryChannels({
     type: payload.type,
     recipientId: payload.recipientProfileId,
     preferences,
@@ -127,6 +150,7 @@ async function resolveNotifyChannels(
     pushAvailable: createPushProvider().enabled,
     whatsappAvailable: createWhatsAppProvider().enabled,
   });
+  return { channels, locale };
 }
 
 export class NotificationService {
@@ -157,8 +181,11 @@ export class NotificationService {
       (payload.entityId ? `${payload.type}:${payload.entityId}:${payload.recipientProfileId}` : null);
 
     let channels: Array<"in_app" | "email" | "whatsapp" | "push"> = ["in_app"];
+    let locale: Locale = "ar";
     try {
-      channels = await resolveNotifyChannels(writer, payload);
+      const plan = await resolveNotifyChannels(writer, payload);
+      channels = plan.channels;
+      locale = plan.locale;
       if (!channels.includes("in_app")) {
         channels = ["in_app", ...channels];
       }
@@ -169,13 +196,16 @@ export class NotificationService {
       channels = ["in_app"];
     }
 
+    // Store the text in the recipient's language (Arabic unless profiles.locale = 'en').
+    const text = pickNotificationText(locale, payload);
+
     const { data: hubId, error: hubError } = await writer.rpc("upsert_operational_notification", {
       p_organization_id: payload.organizationId,
       p_recipient_profile_id: payload.recipientProfileId,
       p_event_type: payload.type,
       p_type: payload.type,
-      p_title: payload.title,
-      p_message: payload.message,
+      p_title: text.title,
+      p_message: text.message,
       p_entity_type: payload.entityType ?? null,
       p_entity_id: payload.entityId ?? null,
       p_href: payload.href ?? null,
@@ -196,8 +226,8 @@ export class NotificationService {
         organization_id: payload.organizationId,
         recipient_profile_id: payload.recipientProfileId,
         type: payload.type,
-        title: payload.title,
-        message: payload.message,
+        title: text.title,
+        message: text.message,
         entity_type: payload.entityType ?? null,
         entity_id: payload.entityId ?? null,
         priority: payload.priority ?? "normal",

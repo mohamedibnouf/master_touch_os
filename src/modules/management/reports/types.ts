@@ -95,6 +95,7 @@ export type ManagementOperationsReport = {
   oldestApprovals: Array<{
     id: string;
     title: string;
+    titleEn?: string | null;
     status: string;
     openDays: number;
     href: string;

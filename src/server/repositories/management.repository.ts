@@ -3,7 +3,8 @@ import { addDaysYmd, riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { buildAttentionFromFindings } from "@/modules/management/attention";
 import { emptyRiskInput, evaluateRisks } from "@/modules/management/risk/engine";
 import { MANAGEMENT_RISK_THRESHOLDS } from "@/modules/management/risk/thresholds";
-import type { RiskFinding, RiskInputSnapshot } from "@/modules/management/risk/types";
+import type { RiskApprovalRow, RiskFinding, RiskInputSnapshot } from "@/modules/management/risk/types";
+import { approvalTitleColumns, selectWithOptionalTitleEn } from "@/lib/approvals/title-en";
 import type { ManagementSectionFlags, ManagementSnapshot } from "@/modules/management/types";
 
 const LIMIT = MANAGEMENT_RISK_THRESHOLDS.candidateLimit;
@@ -80,13 +81,16 @@ export class ManagementRepository {
 
     if (sections.approvals) {
       input.approvals = await selectRows("risk.approvals", () =>
-        this.supabase
-          .from("approval_requests")
-          .select("id, title, status, due_at, created_at, entity_type, entity_id")
-          .eq("organization_id", organizationId)
-          .in("status", ["pending", "in_progress"])
-          .order("created_at", { ascending: true })
-          .limit(LIMIT),
+        selectWithOptionalTitleEn((withTitleEn) =>
+          this.supabase
+            .from("approval_requests")
+            .select(approvalTitleColumns("id, title, status, due_at, created_at, entity_type, entity_id", withTitleEn))
+            .eq("organization_id", organizationId)
+            .in("status", ["pending", "in_progress"])
+            .order("created_at", { ascending: true })
+            .limit(LIMIT)
+            .returns<RiskApprovalRow[]>(),
+        ),
       );
     }
 

@@ -7,6 +7,7 @@ import { createEmailProvider, createPushProvider, createWhatsAppProvider } from 
 import { NotificationOrchestrator } from "@/modules/notifications/orchestrator";
 import { MemoryHubStore } from "@/modules/notifications/memory-store";
 import { nextRetryAt } from "@/modules/notifications/schedule";
+import { recipientLocale } from "@/modules/notifications/localize";
 import { logger } from "@/lib/logger";
 import { formatRiyadhDateTimeAr } from "@/modules/projects/deadline";
 import { workflowStepNotificationRecipients } from "@/modules/projects/workflow-responsibility";
@@ -14,6 +15,7 @@ import {
   WORKFLOW_ACTIVATION_FLUSH_LIMIT,
   workflowStepActivatedDedupKey,
   workflowStepActivatedMessage,
+  workflowStepActivatedMessageEn,
 } from "@/modules/projects/workflow-activation-notify";
 import { workflowStageHref } from "@/lib/notifications/href";
 
@@ -108,9 +110,25 @@ export async function processPendingNotificationDeliveries(
         attemptCount: row.attempt_count,
       },
     ];
+    type RecipientProfile = {
+      full_name_ar?: string | null;
+      phone?: string | null;
+      whatsapp_opt_in?: boolean;
+      locale?: string | null;
+    } | null;
+    // `locale` picks the e-mail chrome language; tolerate databases without the column.
     let profile = (
-      await admin.from("profiles").select("full_name_ar, phone, whatsapp_opt_in").eq("id", row.recipient_profile_id).maybeSingle()
-    ).data as { full_name_ar?: string | null; phone?: string | null; whatsapp_opt_in?: boolean } | null;
+      await admin
+        .from("profiles")
+        .select("full_name_ar, phone, whatsapp_opt_in, locale")
+        .eq("id", row.recipient_profile_id)
+        .maybeSingle()
+    ).data as RecipientProfile;
+    if (!profile) {
+      profile = (
+        await admin.from("profiles").select("full_name_ar, phone, whatsapp_opt_in").eq("id", row.recipient_profile_id).maybeSingle()
+      ).data as RecipientProfile;
+    }
     if (!profile) {
       const fallback = await admin
         .from("profiles")
@@ -124,6 +142,7 @@ export async function processPendingNotificationDeliveries(
       phone: profile?.phone ?? null,
       name: profile?.full_name_ar ?? null,
       whatsappOptIn: profile?.whatsapp_opt_in === true,
+      locale: recipientLocale(profile?.locale),
     });
     try {
       const user = await admin.auth.admin.getUserById(row.recipient_profile_id);
@@ -132,6 +151,7 @@ export async function processPendingNotificationDeliveries(
         phone: profile?.phone ?? null,
         name: profile?.full_name_ar ?? null,
         whatsappOptIn: profile?.whatsapp_opt_in === true,
+        locale: recipientLocale(profile?.locale),
       });
     } catch {
       /* email lookup is best-effort */
@@ -179,7 +199,7 @@ type ReadyStepRow = {
   assigned_role_id: string | null;
   responsible_user_id: string | null;
   due_at: string | null;
-  workflow_steps: { name_ar: string } | { name_ar: string }[] | null;
+  workflow_steps: { name_ar: string; name_en?: string | null } | { name_ar: string; name_en?: string | null }[] | null;
 };
 
 export async function notifyWorkflowReadyAssignees(input: {
@@ -191,14 +211,16 @@ export async function notifyWorkflowReadyAssignees(input: {
 }): Promise<void> {
   const { data: ready } = await input.supabase
     .from("workflow_instance_steps")
-    .select("id, assigned_user_id, assigned_role_id, responsible_user_id, due_at, workflow_steps(name_ar)")
+    .select("id, assigned_user_id, assigned_role_id, responsible_user_id, due_at, workflow_steps(name_ar, name_en)")
     .eq("instance_id", input.instanceId)
     .eq("status", "ready");
   const notifications = createNotificationService(input.supabase);
   for (const row of (ready ?? []) as ReadyStepRow[]) {
     const stepRel = row.workflow_steps;
-    const name = Array.isArray(stepRel) ? stepRel[0]?.name_ar : stepRel?.name_ar;
+    const step = Array.isArray(stepRel) ? stepRel[0] : stepRel;
+    const name = step?.name_ar;
     const dueLabel = row.due_at ? formatRiyadhDateTimeAr(row.due_at) : null;
+    const dueLabelEn = row.due_at ? formatRiyadhDateTimeAr(row.due_at, "en") : null;
     const recipients = workflowStepNotificationRecipients({
       responsibleUserId: row.responsible_user_id,
       assignedUserId: row.assigned_user_id,
@@ -211,6 +233,8 @@ export async function notifyWorkflowReadyAssignees(input: {
         type: "workflow.step.activated",
         title: "تم إسناد مرحلة جديدة إليك",
         message: workflowStepActivatedMessage({ nameAr: name ?? null, dueLabel }),
+        titleEn: "A new stage has been assigned to you",
+        messageEn: workflowStepActivatedMessageEn({ nameEn: step?.name_en ?? null, nameAr: name ?? null, dueLabel: dueLabelEn }),
         entityType: input.projectId ? "project" : "workflow_instance_step",
         entityId: input.projectId ?? row.id,
         href: input.projectId ? workflowStageHref(input.projectId, row.id) : null,

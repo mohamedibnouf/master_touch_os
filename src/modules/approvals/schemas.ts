@@ -6,6 +6,8 @@ const postgresUuid = z.string().refine(isPostgresUuid, { message: "Invalid uuid"
 
 export const createApprovalSchema = z.object({
   title: z.string().trim().min(2).max(240),
+  /** Optional English title (form field `title_en`); stored via migration 086. */
+  titleEn: z.string().trim().min(2).max(240).optional(),
   entityType: z.string().min(2).max(60),
   entityId: z.string().uuid(),
   approverProfileId: z.string().uuid(),
@@ -16,6 +18,7 @@ export const createCurrentWorkflowGateApprovalSchema = z.object({
   projectId: z.string().uuid(),
   approverProfileId: z.string().uuid(),
   title: z.string().trim().min(2).max(240).optional(),
+  titleEn: z.string().trim().min(2).max(240).optional(),
   documentVersionIds: z.array(z.string().uuid()).min(1).max(20),
 });
 

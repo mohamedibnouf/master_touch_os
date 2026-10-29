@@ -18,6 +18,7 @@ import { buildOperationsReport } from "@/modules/management/reports/builders";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import { approvalStatusLabel, approvalStatusTone } from "@/lib/ui/operational-labels";
 import { getI18n } from "@/lib/i18n/server";
+import { pickLocalized } from "@/lib/i18n/config";
 
 export default async function OperationsReportPage() {
   const ctx = await getAuthContext();
@@ -69,7 +70,7 @@ export default async function OperationsReportPage() {
                 key: a.id,
                 href: a.href,
                 cells: [
-                  a.title,
+                  pickLocalized(locale, a.title, a.titleEn) || a.title,
                   <Badge key="status" tone={approvalStatusTone(a.status)}>
                     {approvalStatusLabel(a.status, locale)}
                   </Badge>,

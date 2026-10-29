@@ -310,6 +310,8 @@ export type PendingAction = {
     | "inspection"
     | "correspondence";
   title: string;
+  /** English title when available (approval_requests.title_en, migration 086). */
+  titleEn?: string | null;
   entityType: string;
   entityId: string;
   dueAt: string | null;

@@ -3,6 +3,7 @@ import type { ProjectWorkflowProjection } from "@/server/use-cases/project-workf
 import { AI_LIMITS } from "../limits";
 import { sanitizeRecord, truncateText } from "../security/sanitize";
 import type { ProjectAiFacts } from "../health";
+import { pickLocalized, type Locale } from "@/lib/i18n/config";
 
 export function buildProjectAiContext(input: {
   project: Pick<
@@ -16,19 +17,26 @@ export function buildProjectAiContext(input: {
     | "start_date"
     | "planned_end_date"
     | "location"
-  >;
+  > & { name_en?: string | null };
   workflow: ProjectWorkflowProjection;
   team: Array<{ label: string; role: string | null }>;
   documents: Array<{ id: string; title: string; category: string | null }>;
   activity: Array<{ action: string; at: string }>;
   now?: Date;
+  /** Language of deterministic labels and stage/project names (Arabic by default). */
+  locale?: Locale;
 }): ProjectAiFacts {
   const now = input.now ?? new Date();
+  const locale = input.locale ?? "ar";
+  const en = locale === "en";
+  const stageName = (n: { nameAr: string; nameEn?: string | null }) =>
+    en ? pickLocalized(locale, n.nameAr, n.nameEn) : n.nameAr;
   const current = input.workflow.nodes.find((n) => n.id === input.workflow.currentNodeId);
   const facts: ProjectAiFacts = {
     projectId: input.project.id,
     organizationId: input.project.organization_id,
-    project_name_ar: input.project.name_ar,
+    // `_ar` keys hold names in the requested locale (English names when locale is "en" and available).
+    project_name_ar: en ? pickLocalized(locale, input.project.name_ar, input.project.name_en) : input.project.name_ar,
     project_code: input.project.project_code,
     project_status: input.project.status,
     description: input.project.description
@@ -40,11 +48,11 @@ export function buildProjectAiContext(input: {
     completed_stages: input.workflow.progress.completed,
     total_stages: input.workflow.progress.total,
     progress_percent: input.workflow.progress.percent,
-    current_stage_name: current?.nameAr ?? null,
+    current_stage_name: current ? stageName(current) : null,
     current_stage_id: current?.id ?? null,
     stages: input.workflow.nodes.slice(0, 40).map((n) => ({
       id: n.id,
-      nameAr: n.nameAr,
+      nameAr: stageName(n),
       visual: n.visual,
       deadlineState: n.deadlineState,
       dueAt: n.dueAt,
@@ -52,7 +60,15 @@ export function buildProjectAiContext(input: {
       requiresApproval: n.requiresApproval,
       engineStatus: n.engineStatus,
       blockReason: n.blockReason,
-      openApprovalTitle: n.approverLabel ? `بانتظار ${n.approverLabel}` : n.requiresApproval ? "موافقة مطلوبة" : null,
+      openApprovalTitle: n.approverLabel
+        ? en
+          ? `Awaiting ${n.approverLabel}`
+          : `بانتظار ${n.approverLabel}`
+        : n.requiresApproval
+          ? en
+            ? "Approval required"
+            : "موافقة مطلوبة"
+          : null,
       openApprovalId: n.openApproval?.requestId ?? null,
       approvalStartedAt: n.startedAt,
     })),

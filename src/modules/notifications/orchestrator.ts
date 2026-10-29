@@ -7,7 +7,8 @@ import type { EmailProvider, PushProvider, WhatsAppProvider } from "./providers"
 import { isPermanentProviderError, MAX_DELIVERY_ATTEMPTS, nextRetryAt } from "./schedule";
 import { emailAudienceFor } from "./event-compat";
 import { buildNotificationEmailHref, resolveEmailAppBaseUrl } from "./app-url";
-import { renderOperationalEmail } from "./email-render";
+import { operationalEmailCtaLabel, renderOperationalEmail } from "./email-render";
+import type { Locale } from "@/lib/i18n/config";
 import { whatsappAudienceFor } from "./whatsapp-policy";
 import { resolveManagementWhatsAppE164, resolvePersonalWhatsAppE164 } from "./whatsapp-recipients";
 import { buildWhatsAppParameters, whatsappTemplateIdForEvent } from "./whatsapp-templates";
@@ -64,6 +65,8 @@ export type HubStore = {
     phone: string | null;
     name: string | null;
     whatsappOptIn?: boolean;
+    /** Recipient UI language (profiles.locale); Arabic when unknown. */
+    locale?: Locale | null;
   }>;
   getNotification(notificationId: string): Promise<HubNotification | null>;
   getManagementEmail(organizationId: string): Promise<string | null>;
@@ -179,7 +182,7 @@ export class NotificationOrchestrator {
     let result: { ok: true; providerMessageId?: string } | { ok: false; code: string; retry: boolean };
 
     if (delivery.channel === "email") {
-      result = await this.sendEmail(delivery, contact.email);
+      result = await this.sendEmail(delivery, contact.email, contact.locale ?? null);
     } else if (delivery.channel === "whatsapp") {
       result = await this.sendWhatsApp(delivery, contact);
     } else {
@@ -242,6 +245,7 @@ export class NotificationOrchestrator {
   private async sendEmail(
     delivery: HubDelivery,
     personalEmail: string | null,
+    locale: Locale | null = null,
   ): Promise<{ ok: true; providerMessageId?: string } | { ok: false; code: string; retry: boolean }> {
     if (!this.email.enabled) return { ok: false, code: "disabled", retry: false };
     const notification = await this.store.getNotification(delivery.notificationId);
@@ -259,11 +263,13 @@ export class NotificationOrchestrator {
     const base = resolveEmailAppBaseUrl(this.appBaseUrl, { requirePublicHttps: requireHttps });
     if (!base.ok) return { ok: false, code: base.code, retry: false };
     const href = buildNotificationEmailHref(base.url, notification?.href);
+    // Title/body are already stored in the recipient's language; the chrome follows it too.
     const rendered = renderOperationalEmail({
-      title: notification?.title ?? "تنبيه تشغيلي",
-      body: notification?.body ?? "يوجد تنبيه يحتاج متابعتك داخل النظام.",
+      title: notification?.title ?? "",
+      body: notification?.body ?? "",
       href,
-      ctaLabel: type.startsWith("approval") ? "عرض طلب الموافقة" : "عرض المشروع",
+      ctaLabel: operationalEmailCtaLabel(type, locale),
+      locale,
     });
     const replyTo = process.env.NOTIFICATION_EMAIL_REPLY_TO?.trim() || null;
     return this.email.send({

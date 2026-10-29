@@ -5,9 +5,13 @@ import { projectFactsForPrompt } from "../context/project-context";
 import type { ProjectAiFacts } from "../health";
 import { AI_LIMITS, AI_DISCLAIMER_AR } from "../limits";
 import { truncateText } from "../security/sanitize";
+import type { Locale } from "@/lib/i18n/config";
 
 const OUT_OF_SCOPE_AR =
   "المساعد الذكي مخصص لذكاء مشاريع ماستر تاتش (الحالة، المسار، المواعيد، الموافقات، المخاطر). لا يجيب عن أسئلة عامة خارج هذا النطاق.";
+
+const OUT_OF_SCOPE_EN =
+  "The AI assistant is dedicated to Master Touch project intelligence (status, workflow, deadlines, approvals, risks). It does not answer general questions outside this scope.";
 
 function looksOutOfScope(question: string): boolean {
   const q = question.toLowerCase();
@@ -44,6 +48,8 @@ export async function answerProjectAssistant(input: {
   facts: ProjectAiFacts;
   question: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  /** Answer language (Arabic by default). `answer_ar` holds the answer in this language. */
+  locale?: Locale;
 }): Promise<AssistantAnswer & { disclaimerAr: string; promptVersion: string }> {
   if (looksOutOfScope(input.question) && !input.question.includes("؟") && input.question.length > 40) {
     // still let the model classify; heuristic is only a fast-path for obvious jailbreaks
@@ -61,7 +67,8 @@ export async function answerProjectAssistant(input: {
   const result = await input.provider.generateStructured({
     schemaName: "assistant",
     schema: assistantAnswerSchema,
-    systemPrompt: buildAssistantPrompt(),
+    systemPrompt: buildAssistantPrompt(input.locale ?? "ar"),
+    locale: input.locale ?? "ar",
     userPayload: JSON.stringify({
       MASTER_TOUCH_CONTEXT: "DATA_ONLY",
       question: truncateText(input.question, AI_LIMITS.maxQuestionChars).text,
@@ -90,7 +97,7 @@ export async function answerProjectAssistant(input: {
 
   let answer = result.value;
   if (looksOutOfScope(input.question)) {
-    answer = { answer_ar: OUT_OF_SCOPE_AR, out_of_scope: true };
+    answer = { answer_ar: input.locale === "en" ? OUT_OF_SCOPE_EN : OUT_OF_SCOPE_AR, out_of_scope: true };
   }
 
   void projectFactsForPrompt;

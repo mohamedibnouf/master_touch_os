@@ -10,6 +10,7 @@ import type { AppNavFlags } from "./nav-flags";
 import { Sidebar } from "./sidebar";
 import { NavigationPendingBar } from "./navigation-pending";
 import { LanguageSwitch } from "./language-switch";
+import { ThemeToggle } from "./theme-toggle";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -73,7 +74,7 @@ export function AppShellFrame({
     <div className="flex min-h-dvh min-w-0 overflow-x-clip bg-background">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:text-ink"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:text-ink"
       >
         {t.shell.skipToContent}
       </a>
@@ -123,6 +124,7 @@ export function AppShellFrame({
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <ThemeToggle />
             <LanguageSwitch />
             {flags.notifications ? notificationsSlot : null}
             <div className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden />

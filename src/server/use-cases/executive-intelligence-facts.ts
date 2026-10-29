@@ -12,12 +12,17 @@ import {
 } from "@/modules/ai/executive-intelligence/facts-builder";
 import type { ExecutiveIntelligenceFacts, ExecutiveProgressRow } from "@/modules/ai/executive-intelligence/types";
 import type { DashboardViz } from "@/server/use-cases/dashboard-viz";
+import { getLocale } from "@/lib/i18n/server";
+import type { Locale } from "@/lib/i18n/config";
 
 export async function loadExecutiveIntelligenceFacts(
   ctx: AuthContext,
   viz?: DashboardViz | null,
+  locale?: Locale,
 ): Promise<ExecutiveIntelligenceFacts | null> {
   if (!canViewManagementAi(ctx)) return null;
+  // Deterministic labels/limitations follow the interface language (request cookie by default).
+  const outputLocale = locale ?? (await getLocale());
 
   const canProjects = hasPermission(ctx, "project.read") || hasPermission(ctx, "project.read_all");
   const canApprovals =
@@ -100,6 +105,7 @@ export async function loadExecutiveIntelligenceFacts(
   }));
 
   return buildExecutiveIntelligenceFacts({
+    locale: outputLocale,
     asOf,
     canProjects,
     canApprovals,
