@@ -24,7 +24,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("purchase_requests")
       .select(
-        "id, pr_number, status, priority, estimated_cost, currency, required_date, project_id, requested_by, created_at, projects(project_code, name_ar)",
+        "id, pr_number, status, priority, estimated_cost, currency, required_date, project_id, requested_by, created_at, projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -44,7 +44,7 @@ export class CommercialRepository {
   async getPurchaseRequest(id: string) {
     const { data, error } = await this.supabase
       .from("purchase_requests")
-      .select("*, projects(id, project_code, name_ar), purchase_request_items(*)")
+      .select("*, projects(id, project_code, name_ar, name_en), purchase_request_items(*)")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -57,7 +57,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("rfqs")
       .select(
-        "id, rfq_number, title, status, response_due_date, issue_date, project_id, projects(project_code, name_ar)",
+        "id, rfq_number, title, status, response_due_date, issue_date, project_id, projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -77,7 +77,7 @@ export class CommercialRepository {
     const { data, error } = await this.supabase
       .from("rfqs")
       .select(
-        "*, projects(id, project_code, name_ar), rfq_items(*), rfq_suppliers(*, suppliers(id, supplier_code, legal_name, trade_name)), purchase_requests(pr_number)",
+        "*, projects(id, project_code, name_ar, name_en), rfq_items(*), rfq_suppliers(*, suppliers(id, supplier_code, legal_name, trade_name)), purchase_requests(pr_number)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -91,7 +91,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("purchase_orders")
       .select(
-        "id, po_number, status, total, currency, required_delivery_date, project_id, supplier_id, suppliers(supplier_code, legal_name), projects(project_code, name_ar)",
+        "id, po_number, status, total, currency, required_delivery_date, project_id, supplier_id, suppliers(supplier_code, legal_name), projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -112,7 +112,7 @@ export class CommercialRepository {
     const { data, error } = await this.supabase
       .from("purchase_orders")
       .select(
-        "*, suppliers(id, supplier_code, legal_name, trade_name, email, phone), projects(id, project_code, name_ar), purchase_order_items(*)",
+        "*, suppliers(id, supplier_code, legal_name, trade_name, email, phone), projects(id, project_code, name_ar, name_en), purchase_order_items(*)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -126,7 +126,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("supplier_invoices")
       .select(
-        "id, invoice_number, status, total, currency, due_date, project_id, supplier_id, suppliers(supplier_code, legal_name), projects(project_code, name_ar)",
+        "id, invoice_number, status, total, currency, due_date, project_id, supplier_id, suppliers(supplier_code, legal_name), projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -147,7 +147,7 @@ export class CommercialRepository {
     const { data, error } = await this.supabase
       .from("supplier_invoices")
       .select(
-        "*, suppliers(id, supplier_code, legal_name), projects(id, project_code, name_ar), purchase_orders(po_number), supplier_payments(*), supplier_invoice_items(*)",
+        "*, suppliers(id, supplier_code, legal_name), projects(id, project_code, name_ar, name_en), purchase_orders(po_number), supplier_payments(*), supplier_invoice_items(*)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -196,7 +196,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("project_contracts")
       .select(
-        "id, contract_number, client_name, contract_value, currency, status, project_id, projects(project_code, name_ar)",
+        "id, contract_number, client_name, contract_value, currency, status, project_id, projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -213,7 +213,7 @@ export class CommercialRepository {
   async getProjectContract(id: string) {
     const { data, error } = await this.supabase
       .from("project_contracts")
-      .select("*, projects(id, project_code, name_ar)")
+      .select("*, projects(id, project_code, name_ar, name_en)")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -248,7 +248,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("client_valuations")
       .select(
-        "id, valuation_number, status, total_claim, certified_amount, project_id, projects(project_code, name_ar), project_contracts(contract_number, client_name)",
+        "id, valuation_number, status, total_claim, certified_amount, project_id, projects(project_code, name_ar, name_en), project_contracts(contract_number, client_name)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -266,7 +266,7 @@ export class CommercialRepository {
     const { data, error } = await this.supabase
       .from("client_valuations")
       .select(
-        "*, projects(id, project_code, name_ar), project_contracts(id, contract_number, client_name, retention_percent), contract_milestones(id, name, milestone_number)",
+        "*, projects(id, project_code, name_ar, name_en), project_contracts(id, contract_number, client_name, retention_percent), contract_milestones(id, name, milestone_number)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -280,7 +280,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("client_invoices")
       .select(
-        "id, invoice_number, status, total, currency, due_date, project_id, projects(project_code, name_ar), project_contracts(client_name)",
+        "id, invoice_number, status, total, currency, due_date, project_id, projects(project_code, name_ar, name_en), project_contracts(client_name)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -298,7 +298,7 @@ export class CommercialRepository {
     const { data, error } = await this.supabase
       .from("client_invoices")
       .select(
-        "*, projects(id, project_code, name_ar), project_contracts(contract_number, client_name), client_valuations(valuation_number, certified_amount), client_payments(*)",
+        "*, projects(id, project_code, name_ar, name_en), project_contracts(contract_number, client_name), client_valuations(valuation_number, certified_amount), client_payments(*)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -312,7 +312,7 @@ export class CommercialRepository {
     let q = this.supabase
       .from("variations")
       .select(
-        "id, vo_number, status, requested_amount, submitted_amount, approved_amount, source, project_id, projects(project_code, name_ar)",
+        "id, vo_number, status, requested_amount, submitted_amount, approved_amount, source, project_id, projects(project_code, name_ar, name_en)",
         { count: "exact" },
       )
       .eq("organization_id", params.organizationId)
@@ -329,7 +329,7 @@ export class CommercialRepository {
   async getVariation(id: string) {
     const { data, error } = await this.supabase
       .from("variations")
-      .select("*, projects(id, project_code, name_ar), project_contracts(contract_number, contract_value)")
+      .select("*, projects(id, project_code, name_ar, name_en), project_contracts(contract_number, contract_value)")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;

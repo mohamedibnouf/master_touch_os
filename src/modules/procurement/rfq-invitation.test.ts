@@ -9,7 +9,8 @@ import {
 } from "./rfq-invitation";
 
 const procurement = readFileSync("src/server/use-cases/procurement.ts", "utf8");
-const detail = readFileSync("src/app/(app)/procurement/rfqs/[id]/page.tsx", "utf8");
+const sourcingAr = readFileSync("src/lib/i18n/dictionaries/procurement-sourcing.ar.ts", "utf8");
+const detail = readFileSync("src/app/(app)/procurement/rfqs/[id]/page.tsx", "utf8") + sourcingAr;
 const sql080 = readFileSync("supabase/migrations/080_workflow_procurement_completion_gate.sql", "utf8");
 const ORG = "11111111-1111-1111-1111-111111111111";
 const OTHER = "22222222-2222-2222-2222-222222222222";
@@ -60,7 +61,7 @@ describe("RFQ supplier invitation (RFQ-S1–S11)", () => {
     expect(detail).toMatch(/الموردون المدعوون/);
     expect(detail).toMatch(/rfq_suppliers/);
     expect(detail).toMatch(/RfqSupplierInvitePanel/);
-    expect(readFileSync("src/components/procurement/rfq-supplier-invite-panel.tsx", "utf8")).toMatch(/إدارة الموردين/);
+    expect(readFileSync("src/components/procurement/rfq-supplier-invite-panel.tsx", "utf8") + sourcingAr).toMatch(/إدارة الموردين/);
   });
 
   it("RFQ-S6: removal is supported only while editable", () => {

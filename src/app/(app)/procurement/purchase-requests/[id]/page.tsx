@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button, Card, PageHeader } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
@@ -16,6 +16,11 @@ import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals"
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
 import { EntityAttachmentForm } from "@/components/commercial/entity-attachment-form";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+
+const backLinkClass =
+  "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
 
 export default async function PurchaseRequestDetailPage({
   params,
@@ -32,6 +37,10 @@ export default async function PurchaseRequestDetailPage({
   const pr = await repo.getPurchaseRequest(id);
   if (!pr) notFound();
 
+  const { t, locale } = await getI18n();
+  const td = t.procurementSourcing.requests.detail;
+  const common = t.procurementSourcing.common;
+
   const [approval, audit, users] = await Promise.all([
     repo.getApprovalForEntity("purchase_request", id),
     repo.getAuditForEntity("purchase_request", id),
@@ -44,7 +53,10 @@ export default async function PurchaseRequestDetailPage({
       .limit(200),
   ]);
 
-  const project = Array.isArray(pr.projects) ? pr.projects[0] : pr.projects;
+  const project = (Array.isArray(pr.projects) ? pr.projects[0] : pr.projects) as
+    | { project_code: string; name_ar: string | null; name_en?: string | null }
+    | null
+    | undefined;
   const items = (pr.purchase_request_items as Array<Record<string, unknown>>) ?? [];
   const canSubmit = pr.status === "draft" && hasPermission(ctx, "purchase_request.create");
   const canApprove =
@@ -63,153 +75,158 @@ export default async function PurchaseRequestDetailPage({
     <PageContainer data-testid="pr-detail-page" className="space-y-5">
       <PageHeader
         title={pr.pr_number}
-        description={project ? `${(project as Record<string, string>).project_code} — ${(project as Record<string, string>).name_ar}` : ""}
+        description={
+          project
+            ? format(common.codeName, {
+                code: project.project_code,
+                name: pickLocalized(locale, project.name_ar, project.name_en),
+              })
+            : ""
+        }
         actions={
-          <Link href="/procurement/purchase-requests" className="text-sm underline">
-            العودة للسجل
+          <Link href="/procurement/purchase-requests" className={backLinkClass}>
+            {common.backToRegister}
           </Link>
         }
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <Card>
-          <p className="text-sm text-muted">الحالة</p>
+          <p className="text-xs font-medium text-muted">{td.status}</p>
           <div className="mt-2">
-            <CommercialStatusBadge status={pr.status} />
+            <CommercialStatusBadge status={pr.status} locale={locale} />
           </div>
         </Card>
         <Card>
-          <p className="text-sm text-muted">الأولوية</p>
-          <p className="mt-2 font-semibold">{commercialStatusLabel(pr.priority)}</p>
+          <p className="text-xs font-medium text-muted">{td.priority}</p>
+          <p className="mt-2 font-semibold text-ink">{commercialStatusLabel(pr.priority, locale)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">التكلفة التقديرية</p>
-          <p className="mt-2 font-semibold">
-            <MoneyDisplay amount={pr.estimated_cost} currency={pr.currency} />
+          <p className="text-xs font-medium text-muted">{td.estimatedCost}</p>
+          <p className="mt-2 text-lg font-semibold text-primary">
+            <MoneyDisplay amount={pr.estimated_cost} currency={pr.currency} locale={locale} />
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">تاريخ الحاجة</p>
-          <p className="mt-2 font-semibold">{pr.required_date ?? "—"}</p>
+          <p className="text-xs font-medium text-muted">{td.requiredDate}</p>
+          <p className="mt-2 font-semibold tabular-nums text-ink">{pr.required_date ?? common.none}</p>
         </Card>
       </div>
 
       {pr.justification ? (
-        <Card className="mb-6">
-          <p className="text-sm text-muted mb-1">المبرر</p>
-          <p className="text-sm">{pr.justification}</p>
+        <Card>
+          <p className="mb-1 text-xs font-medium text-muted">{td.justification}</p>
+          <p className="text-sm text-ink">{pr.justification}</p>
         </Card>
       ) : null}
 
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">البنود</h2>
+      <Card>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{td.itemsTitle}</h2>
         {items.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد بنود.</p>
+          <p className="text-sm text-muted">{common.noItems}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full text-sm">
-              <thead className="text-muted">
+              <thead className="bg-surface-muted text-xs text-muted">
                 <tr>
-                  <th className="py-2 text-start">#</th>
-                  <th className="py-2 text-start">الوصف</th>
-                  <th className="py-2 text-start">الكمية</th>
-                  <th className="py-2 text-start">التقدير</th>
+                  <th className="px-3 py-2 text-start font-medium">{td.columns.line}</th>
+                  <th className="px-3 py-2 text-start font-medium">{td.columns.description}</th>
+                  <th className="px-3 py-2 text-start font-medium">{td.columns.quantity}</th>
+                  <th className="px-3 py-2 text-end font-medium">{td.columns.estimate}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={String(item.id)} className="border-t border-line">
-                    <td className="py-2">{String(item.line_no)}</td>
-                    <td className="py-2">{String(item.description)}</td>
-                    <td className="py-2">
+                    <td className="px-3 py-2 tabular-nums text-muted">{String(item.line_no)}</td>
+                    <td className="px-3 py-2 text-ink">{String(item.description)}</td>
+                    <td className="px-3 py-2 tabular-nums">
                       {String(item.quantity)} {String(item.unit ?? "")}
                     </td>
-                    <td className="py-2">
-                      <MoneyDisplay amount={item.estimated_total as number} currency={pr.currency} />
+                    <td className="px-3 py-2 text-end tabular-nums">
+                      <MoneyDisplay amount={item.estimated_total as number} currency={pr.currency} locale={locale} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 
       {canSubmit ? (
-        <Card className="mb-6" data-testid="pr-submit-approval-card">
-          <h2 className="mb-3 font-semibold text-navy">تقديم للاعتماد</h2>
-          <ServerActionForm action={submitPurchaseRequestForApprovalAction} className="flex flex-wrap gap-3" data-testid="pr-submit-approval-form">
+        <Card data-testid="pr-submit-approval-card">
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.submitTitle}</h2>
+          <ServerActionForm action={submitPurchaseRequestForApprovalAction} className="flex flex-wrap items-end gap-3" data-testid="pr-submit-approval-form">
             <input type="hidden" name="prId" value={pr.id} />
-            <select name="approverProfileId" required className="h-10 rounded-md border px-3 text-sm" data-testid="pr-approver">
-              <option value="">اختر المعتمد</option>
+            <Select name="approverProfileId" required className="w-auto min-w-56 flex-1" data-testid="pr-approver">
+              <option value="">{common.selectApprover}</option>
               {(users.data ?? []).map((row) => {
-                const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+                const profile = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as
+                  | { full_name_ar: string | null; full_name_en: string | null }
+                  | null;
                 return (
                   <option key={row.profile_id} value={row.profile_id}>
-                    {(profile as Record<string, string> | null)?.full_name_ar ??
-                      (profile as Record<string, string> | null)?.full_name_en ??
-                      row.profile_id}
+                    {pickLocalized(locale, profile?.full_name_ar, profile?.full_name_en) || row.profile_id}
                   </option>
                 );
               })}
-            </select>
-            <Button type="submit" data-testid="pr-submit-approval">تقديم للاعتماد</Button>
+            </Select>
+            <Button type="submit" data-testid="pr-submit-approval">{td.submit}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {canApprove && pendingStep ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">قرار الاعتماد</h2>
-          <div className="flex gap-3">
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.decisionTitle}</h2>
+          <div className="flex flex-wrap gap-3">
             <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="A" />
-              <Button type="submit">اعتماد ✓</Button>
+              <Button type="submit">{common.approve}</Button>
             </ServerActionForm>
             <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="D" />
-              <Button type="submit" variant="danger">رفض</Button>
+              <Button type="submit" variant="danger">{common.reject}</Button>
             </ServerActionForm>
           </div>
         </Card>
       ) : null}
 
       {canConvert ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">تحويل إلى طلب عرض أسعار (RFQ)</h2>
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.convertTitle}</h2>
           <ServerActionForm action={createRfqFromPrAction} className="grid gap-3 md:grid-cols-2">
             <input type="hidden" name="prId" value={pr.id} />
-            <div>
-              <label className="mb-1 block text-sm font-medium">عنوان RFQ</label>
-              <input name="title" placeholder={`RFQ — ${pr.pr_number}`} className="h-10 w-full rounded-md border px-3 text-sm" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">موعد الرد</label>
-              <input name="responseDueDate" type="date" className="h-10 w-full rounded-md border px-3 text-sm" />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <Button type="submit">إنشاء RFQ →</Button>
+            <Field label={td.rfqTitle}>
+              <Input name="title" placeholder={format(td.rfqTitlePlaceholder, { number: pr.pr_number })} />
+            </Field>
+            <Field label={td.responseDueDate}>
+              <Input name="responseDueDate" type="date" />
+            </Field>
+            <div className="flex justify-end md:col-span-2">
+              <Button type="submit">{td.createRfq}</Button>
             </div>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {pr.approval_request_id && approval ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">حالة الاعتماد</h2>
-          <p className="text-sm">
-            <span className="text-muted">حالة الطلب:</span>{" "}
-            <CommercialStatusBadge status={approval.status ?? "pending"} />
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.approvalTitle}</h2>
+          <p className="flex items-center gap-2 text-sm">
+            <span className="text-muted">{td.approvalStatus}</span>
+            <CommercialStatusBadge status={approval.status ?? "pending"} locale={locale} />
           </p>
         </Card>
       ) : null}
 
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">مرفقات الطلب</h2>
+      <Card>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{td.attachmentsTitle}</h2>
         {hasPermission(ctx, "document.upload") ? (
           <EntityAttachmentForm
             entityType="purchase_request"
@@ -217,21 +234,23 @@ export default async function PurchaseRequestDetailPage({
             projectId={String(pr.project_id)}
             revalidatePath={`/procurement/purchase-requests/${id}`}
             testId="pr-attachment-form"
+            locale={locale}
           />
         ) : (
-          <p className="text-sm text-muted">لا توجد صلاحية رفع مرفقات.</p>
+          <p className="text-sm text-muted">{td.noUploadPermission}</p>
         )}
       </Card>
 
       <Card>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{common.activityTitle}</h2>
         {audit.length === 0 ? (
-          <p className="text-sm text-muted">لا يوجد نشاط مسجّل.</p>
+          <p className="text-sm text-muted">{common.noActivity}</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {audit.map((a) => (
-              <li key={a.id} className="flex justify-between border-b border-line pb-2">
+              <li key={a.id} className="flex justify-between gap-3 py-2">
                 <span className="text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="text-muted">{new Date(a.created_at).toLocaleString("ar-SA")}</span>
+                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
               </li>
             ))}
           </ul>

@@ -7,6 +7,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClientValuationAction } from "@/server/use-cases/commercial";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NewClientValuationPage({
   searchParams,
@@ -16,6 +17,10 @@ export default async function NewClientValuationPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!hasPermission(ctx, "client_valuation.create")) redirect("/finance/client-valuations");
+
+  const { t } = await getI18n();
+  const tf = t.financeClient.valuationForm;
+  const tc = t.financeClient.common;
 
   const { projectId: preselectedProjectId } = await searchParams;
   const supabase = await createServerSupabaseClient();
@@ -62,20 +67,20 @@ export default async function NewClientValuationPage({
   return (
     <PageContainer className="mx-auto max-w-2xl" data-testid="valuation-create-page">
       <PageHeader
-        title="مستخلص عميل جديد"
-        description="يُعاد حساب المبالغ تلقائياً بعد الحفظ"
+        title={tf.title}
+        description={tf.description}
         actions={
-          <Link href="/finance/client-valuations" className="text-sm underline">
-            السجل
+          <Link href="/finance/client-valuations" className="text-sm font-medium text-primary hover:underline">
+            {tc.register}
           </Link>
         }
       />
       <Card>
         {contractRows.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد عقود مشاريع نشطة — أنشئ عقداً من صفحة المشروع أولاً.</p>
+          <p className="text-sm text-muted">{tf.noContracts}</p>
         ) : (
           <ServerActionForm action={action} className="grid gap-4" data-testid="valuation-create-form">
-            <Field label="العقد / المشروع">
+            <Field label={tf.contractProject}>
               <Select name="contractId" required defaultValue={selectedContract?.id ?? ""} data-testid="valuation-contract">
                 {contractRows.map((c) => {
                   const project = Array.isArray(c.projects) ? c.projects[0] : c.projects;
@@ -88,9 +93,9 @@ export default async function NewClientValuationPage({
               </Select>
             </Field>
             <input type="hidden" name="projectId" value={selectedContract?.project_id ?? ""} />
-            <Field label="مرحلة الدفع (اختياري)">
+            <Field label={tf.milestone}>
               <Select name="milestoneId" defaultValue="">
-                <option value="">بدون ربط بمرحلة</option>
+                <option value="">{tf.noMilestone}</option>
                 {(milestones ?? []).map((m) => (
                   <option key={m.id} value={m.id}>
                     #{m.milestone_number} — {m.description} ({m.amount})
@@ -99,43 +104,43 @@ export default async function NewClientValuationPage({
               </Select>
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="بداية الفترة">
+              <Field label={tf.periodStart}>
                 <Input name="periodStart" type="date" />
               </Field>
-              <Field label="نهاية الفترة">
+              <Field label={tf.periodEnd}>
                 <Input name="periodEnd" type="date" />
               </Field>
-              <Field label="نسبة الإنجاز (%)">
+              <Field label={tf.progress}>
                 <Input name="progressPercentage" type="number" step="0.001" min="0" max="100" />
               </Field>
-              <Field label="تاريخ الاستحقاق">
+              <Field label={tf.dueDate}>
                 <Input name="dueDate" type="date" />
               </Field>
-              <Field label="قيمة الأعمال (SAR)">
+              <Field label={tf.grossWorkValue}>
                 <Input name="grossWorkValue" type="number" step="0.01" min="0" required defaultValue="0" data-testid="valuation-gross" />
               </Field>
-              <Field label="أوامر التغيير (SAR)">
+              <Field label={tf.variations}>
                 <Input name="variationsAmount" type="number" step="0.01" min="0" defaultValue="0" />
               </Field>
-              <Field label="استرداد الدفعة المقدمة">
+              <Field label={tf.advanceRecovery}>
                 <Input name="advanceRecovery" type="number" step="0.01" min="0" defaultValue="0" />
               </Field>
-              <Field label="المعتمد سابقاً">
+              <Field label={tf.previousCertified}>
                 <Input name="previousCertifiedAmount" type="number" step="0.01" min="0" defaultValue="0" />
               </Field>
             </div>
-            <Field label="ملاحظات">
-              <Textarea name="notes" placeholder="ملاحظات إضافية..." />
+            <Field label={tf.notes}>
+              <Textarea name="notes" placeholder={tf.notesPlaceholder} />
             </Field>
             <div className="flex justify-end gap-3">
               <Link
                 href="/finance/client-valuations"
-                className="inline-flex items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-medium"
+                className="inline-flex items-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted"
               >
-                إلغاء
+                {tc.cancel}
               </Link>
               <Button type="submit" data-testid="valuation-submit">
-                حفظ المستخلص
+                {tf.submit}
               </Button>
             </div>
           </ServerActionForm>

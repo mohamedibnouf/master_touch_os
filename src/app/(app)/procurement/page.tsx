@@ -1,13 +1,24 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { parseScopedProjectId } from "@/modules/procurement/stage05-readiness";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+import { cn } from "@/lib/utils";
+
+const navLinkClass =
+  "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
+const primaryLinkClass =
+  "inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover";
+const outlineLinkClass =
+  "inline-flex items-center rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted";
+const listLinkClass = "font-medium text-primary hover:underline";
 
 export default async function ProcurementPage({
   searchParams,
@@ -25,6 +36,10 @@ export default async function ProcurementPage({
     redirect("/");
   }
 
+  const { t, locale } = await getI18n();
+  const td = t.procurementSourcing.dashboard;
+  const common = t.procurementSourcing.common;
+
   const params = await searchParams;
   const scopedProjectId = parseScopedProjectId(params.project);
   const supabase = await createServerSupabaseClient();
@@ -41,11 +56,14 @@ export default async function ProcurementPage({
   if (projectFilter) {
     const { data: projectRow } = await supabase
       .from("projects")
-      .select("project_code, name_ar")
+      .select("project_code, name_ar, name_en")
       .eq("id", projectFilter)
-      .maybeSingle<{ project_code: string; name_ar: string }>();
+      .maybeSingle<{ project_code: string; name_ar: string; name_en: string | null }>();
     if (projectRow) {
-      scopedProjectLabel = `${projectRow.project_code} — ${projectRow.name_ar}`;
+      scopedProjectLabel = format(common.codeName, {
+        code: projectRow.project_code,
+        name: pickLocalized(locale, projectRow.name_ar, projectRow.name_en),
+      });
     }
   }
   const repo = new CommercialRepository(supabase);
@@ -87,61 +105,71 @@ export default async function ProcurementPage({
 
   const kpiCards = [
     {
-      label: "طلبات شراء بانتظار مراجعة",
+      key: "prAwaitingReview",
+      label: td.kpi.prAwaitingReview,
       value: stats.prAwaitingReview,
       href: "/procurement/purchase-requests?status=under_review",
       warn: stats.prAwaitingReview > 0,
     },
     {
-      label: "RFQ بانتظار الإصدار",
+      key: "rfqAwaitingIssue",
+      label: td.kpi.rfqAwaitingIssue,
       value: stats.rfqAwaitingIssue,
       href: "/procurement/rfqs?status=draft",
       warn: false,
     },
     {
-      label: "RFQ بانتظار الردود",
+      key: "rfqAwaitingResponse",
+      label: td.kpi.rfqAwaitingResponse,
       value: stats.rfqAwaitingResponse,
       href: "/procurement/rfqs?status=issued",
       warn: false,
     },
     {
-      label: "أوامر شراء بانتظار اعتماد",
+      key: "poPendingApproval",
+      label: td.kpi.poPendingApproval,
       value: stats.poPendingApproval,
       href: "/procurement/purchase-orders?status=pending_approval",
       warn: stats.poPendingApproval > 0,
     },
     {
-      label: "أوامر شراء جاهزة للإصدار",
+      key: "poReadyToIssue",
+      label: td.kpi.poReadyToIssue,
       value: stats.poReadyToIssue,
       href: "/procurement/purchase-orders?status=approved",
       warn: false,
     },
     {
-      label: "تسليم متأخر",
+      key: "lateDeliveries",
+      label: td.kpi.lateDeliveries,
       value: stats.lateDeliveries,
       href: "/procurement/purchase-orders?status=issued",
       warn: stats.lateDeliveries > 0,
     },
     {
-      label: "تسليم جزئي",
+      key: "partialDeliveries",
+      label: td.kpi.partialDeliveries,
       value: stats.partialDeliveries,
       href: "/procurement/purchase-orders?status=partially_delivered",
       warn: false,
     },
     {
-      label: "فواتير باختلاف",
+      key: "invoiceDiscrepancies",
+      label: td.kpi.invoiceDiscrepancies,
       value: stats.invoiceDiscrepancies,
       href: "/finance/supplier-invoices?status=discrepancy",
       warn: stats.invoiceDiscrepancies > 0,
     },
     {
-      label: "فواتير بانتظار المراجعة",
+      key: "invoicesAwaitingReview",
+      label: td.kpi.invoicesAwaitingReview,
       value: stats.invoicesAwaitingReview,
       href: "/finance/supplier-invoices?status=received",
       warn: false,
     },
     {
-      label: "مقارنات مفتوحة",
+      key: "comparisonsOpen",
+      label: td.kpi.comparisonsOpen,
       value: stats.comparisonsOpen,
       href: "/procurement/rfqs?status=responses_received",
       warn: false,
@@ -151,58 +179,73 @@ export default async function ProcurementPage({
   return (
     <PageContainer className="space-y-5">
       {scopedProjectLabel ? (
-        <p className="text-sm text-navy" data-testid="procurement-project-scope">
-          نطاق المشروع: {scopedProjectLabel}
+        <p
+          className="inline-flex rounded-md bg-primary-soft px-3 py-1.5 text-sm font-medium text-primary"
+          data-testid="procurement-project-scope"
+        >
+          {format(td.projectScope, { project: scopedProjectLabel })}
         </p>
       ) : null}
       <PageHeader
-        title="المشتريات"
+        title={td.title}
         description={
           scopedProjectLabel
-            ? `لوحة المتابعة التشغيلية للمشتريات — ${scopedProjectLabel}`
+            ? format(td.descriptionScoped, { project: scopedProjectLabel })
             : scopedProjectId && !projectFilter
-              ? "لوحة المتابعة التشغيلية للمشتريات — لا يمكن عرض المشروع المطلوب"
-              : "لوحة المتابعة التشغيلية للمشتريات"
+              ? td.descriptionUnavailable
+              : td.description
         }
         actions={
-          <div className="flex gap-3">
-            <Link href="/procurement/suppliers" className="text-sm text-navy underline">الموردون</Link>
-            <Link href="/finance" className="text-sm text-navy underline">المالية</Link>
-          </div>
+          <nav className="flex flex-wrap gap-2">
+            <Link href="/procurement/suppliers" className={navLinkClass}>
+              {td.suppliersLink}
+            </Link>
+            <Link href="/finance" className={navLinkClass}>
+              {td.financeLink}
+            </Link>
+          </nav>
         }
       />
 
       {/* Quick Nav */}
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {hasPermission(ctx, "purchase_request.create") ? (
-          <Link href={projectFilter ? `/procurement/purchase-requests/new?project=${projectFilter}` : "/procurement/purchase-requests/new"} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
-            + طلب شراء
+          <Link
+            href={projectFilter ? `/procurement/purchase-requests/new?project=${projectFilter}` : "/procurement/purchase-requests/new"}
+            className={primaryLinkClass}
+          >
+            {td.newPr}
           </Link>
         ) : null}
         {hasPermission(ctx, "rfq.create") ? (
-          <Link href="/procurement/rfqs/new" className="rounded-md border border-primary px-3 py-1.5 text-sm font-medium text-navy hover:bg-primary/5">
-            + RFQ
+          <Link href="/procurement/rfqs/new" className={outlineLinkClass}>
+            {td.newRfq}
           </Link>
         ) : null}
         {hasPermission(ctx, "supplier.manage") ? (
-          <Link href="/procurement/suppliers/new" className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:bg-paper">
-            + مورد
+          <Link href="/procurement/suppliers/new" className={outlineLinkClass}>
+            {td.newSupplier}
           </Link>
         ) : null}
         {hasPermission(ctx, "goods_receipt.create") ? (
-          <Link href="/procurement/goods-receipts/new" className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:bg-paper">
-            + استلام بضاعة
+          <Link href="/procurement/goods-receipts/new" className={outlineLinkClass}>
+            {td.newGoodsReceipt}
           </Link>
         ) : null}
       </div>
 
       {/* KPI Grid */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpiCards.map((card) => (
-          <Link key={card.label} href={card.href}>
-            <Card className="transition hover:border-primary/30">
-              <p className="text-xs text-muted">{card.label}</p>
-              <p className={`mt-2 text-3xl font-semibold ${card.warn && card.value > 0 ? "text-danger" : "text-navy"}`}>
+          <Link key={card.key} href={card.href} className="group">
+            <Card className="h-full transition-colors group-hover:border-primary/30">
+              <p className="text-xs font-medium text-muted">{card.label}</p>
+              <p
+                className={cn(
+                  "mt-2 text-[1.75rem] font-semibold leading-none tabular-nums tracking-tight",
+                  card.warn && card.value > 0 ? "text-danger" : "text-ink",
+                )}
+              >
                 {card.value}
               </p>
             </Card>
@@ -210,26 +253,26 @@ export default async function ProcurementPage({
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         {/* PRs awaiting */}
         {hasPermission(ctx, "purchase_request.read") ? (
           <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-navy">طلبات شراء بانتظار إجراء</h2>
-              <Link href="/procurement/purchase-requests" className="text-xs text-navy underline">كل الطلبات</Link>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">{td.pendingPrsTitle}</h2>
+              <Link href="/procurement/purchase-requests" className="text-xs font-medium text-primary hover:underline">
+                {td.allRequests}
+              </Link>
             </div>
             {(pendingPrs ?? []).length === 0 ? (
-              <EmptyState title="لا توجد طلبات بانتظار إجراء." />
+              <EmptyState title={td.noPendingPrs} />
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {(pendingPrs ?? []).map((pr) => (
-                  <li key={pr.id} className="flex items-center justify-between border-b border-line pb-2">
-                    <Link href={`/procurement/purchase-requests/${pr.id}`} className="font-medium text-navy underline">
+                  <li key={pr.id} className="flex items-center justify-between gap-3 py-2">
+                    <Link href={`/procurement/purchase-requests/${pr.id}`} className={listLinkClass}>
                       {pr.pr_number}
                     </Link>
-                    <div className="flex items-center gap-2">
-                      <CommercialStatusBadge status={pr.status} />
-                    </div>
+                    <CommercialStatusBadge status={pr.status} locale={locale} />
                   </li>
                 ))}
               </ul>
@@ -240,23 +283,28 @@ export default async function ProcurementPage({
         {/* RFQs with deadlines */}
         {hasPermission(ctx, "rfq.read") ? (
           <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-navy">RFQ مواعيد الرد</h2>
-              <Link href="/procurement/rfqs?status=issued" className="text-xs text-navy underline">كل RFQ</Link>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">{td.rfqDeadlinesTitle}</h2>
+              <Link href="/procurement/rfqs?status=issued" className="text-xs font-medium text-primary hover:underline">
+                {td.allRfqs}
+              </Link>
             </div>
             {(rfqsDue ?? []).length === 0 ? (
-              <EmptyState title="لا توجد RFQ بانتظار ردود." />
+              <EmptyState title={td.noRfqsDue} />
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {(rfqsDue ?? []).map((rfq) => {
                   const isLate = rfq.response_due_date != null && rfq.response_due_date < today;
                   return (
-                    <li key={rfq.id} className="flex items-center justify-between border-b border-line pb-2">
-                      <Link href={`/procurement/rfqs/${rfq.id}`} className="font-medium text-navy underline">
+                    <li key={rfq.id} className="flex items-center justify-between gap-3 py-2">
+                      <Link href={`/procurement/rfqs/${rfq.id}`} className={listLinkClass}>
                         {rfq.rfq_number}
                       </Link>
-                      <span className={`text-xs ${isLate ? "text-danger font-medium" : "text-muted"}`}>
-                        {isLate ? "⚠️ متأخر — " : ""}{rfq.response_due_date ?? "—"}
+                      <span className="flex items-center gap-2">
+                        {isLate ? <Badge tone="danger">{common.late}</Badge> : null}
+                        <span className={cn("text-xs tabular-nums", isLate ? "font-medium text-danger" : "text-muted")}>
+                          {rfq.response_due_date ?? common.none}
+                        </span>
                       </span>
                     </li>
                   );
@@ -269,26 +317,32 @@ export default async function ProcurementPage({
         {/* POs awaiting action */}
         {hasPermission(ctx, "purchase_order.read") ? (
           <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-navy">أوامر شراء بانتظار إجراء</h2>
-              <Link href="/procurement/purchase-orders" className="text-xs text-navy underline">كل PO</Link>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">{td.pendingPosTitle}</h2>
+              <Link href="/procurement/purchase-orders" className="text-xs font-medium text-primary hover:underline">
+                {td.allPos}
+              </Link>
             </div>
             {(actionPOs ?? []).length === 0 ? (
-              <EmptyState title="لا توجد أوامر شراء بانتظار إجراء." />
+              <EmptyState title={td.noPendingPos} />
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {(actionPOs ?? []).map((po) => {
                   const sup = Array.isArray(po.suppliers) ? po.suppliers[0] : po.suppliers;
                   const isLateDelivery = po.required_delivery_date != null && po.required_delivery_date < today && po.status !== "delivered";
                   return (
-                    <li key={po.id} className="flex items-center justify-between border-b border-line pb-2">
-                      <Link href={`/procurement/purchase-orders/${po.id}`} className="font-medium text-navy underline">
+                    <li key={po.id} className="flex items-center justify-between gap-3 py-2">
+                      <Link href={`/procurement/purchase-orders/${po.id}`} className={listLinkClass}>
                         {po.po_number}
-                        {sup ? <span className="ml-1 text-xs text-muted font-normal">— {(sup as Record<string, string>).legal_name}</span> : null}
+                        {sup ? (
+                          <span className="ms-1 text-xs font-normal text-muted">
+                            — {(sup as Record<string, string>).legal_name}
+                          </span>
+                        ) : null}
                       </Link>
                       <div className="flex items-center gap-2">
-                        <CommercialStatusBadge status={po.status} />
-                        {isLateDelivery ? <span className="text-xs text-danger">متأخر</span> : null}
+                        <CommercialStatusBadge status={po.status} locale={locale} />
+                        {isLateDelivery ? <Badge tone="danger">{common.late}</Badge> : null}
                       </div>
                     </li>
                   );

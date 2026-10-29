@@ -7,6 +7,10 @@ import { hrPeopleEn } from "./hr-people.en";
 import { attendanceEn } from "./attendance.en";
 import { leaveEn } from "./leave.en";
 import { payrollEn } from "./payroll.en";
+import { procurementSourcingEn } from "./procurement-sourcing.en";
+import { procurementOrdersEn } from "./procurement-orders.en";
+import { financeClientEn } from "./finance-client.en";
+import { financePayablesEn } from "./finance-payables.en";
 
 export const en: Dictionary = {
   projectDetail: projectDetailEn,
@@ -17,6 +21,10 @@ export const en: Dictionary = {
   attendance: attendanceEn,
   leave: leaveEn,
   payroll: payrollEn,
+  procurementSourcing: procurementSourcingEn,
+  procurementOrders: procurementOrdersEn,
+  financeClient: financeClientEn,
+  financePayables: financePayablesEn,
   meta: {
     title: "Master Touch | Internal Operating System",
     description: "Business operating system for Master Touch",

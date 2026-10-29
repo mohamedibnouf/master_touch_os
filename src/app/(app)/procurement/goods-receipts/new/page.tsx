@@ -1,12 +1,13 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, PageHeader, Select, TableScroll, Textarea } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAndPostGoodsReceiptAction } from "@/server/use-cases/procurement";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NewGoodsReceiptPage({
   searchParams,
@@ -16,6 +17,9 @@ export default async function NewGoodsReceiptPage({
   const ctx = authorize(await getAuthContext(), "goods_receipt.create");
   const { poId: preselectedPoId } = await searchParams;
   const supabase = await createServerSupabaseClient();
+  const { t } = await getI18n();
+  const tc = t.procurementOrders.common;
+  const tf = t.procurementOrders.receiptForm;
 
   // Issued / partially delivered POs
   const { data: eligiblePos } = await supabase
@@ -34,11 +38,9 @@ export default async function NewGoodsReceiptPage({
   if (!poForForm) {
     return (
       <PageContainer className="mx-auto max-w-2xl">
-        <PageHeader title="استلام بضاعة جديد" description="GRN" />
+        <PageHeader title={tf.titleEmpty} description={tf.descriptionEmpty} />
         <Card>
-          <p className="text-sm text-warning">
-            لا توجد أوامر شراء صادرة أو جزئية بانتظار الاستلام. أصدر أمر الشراء أولاً.
-          </p>
+          <p className="text-sm text-warning">{tf.noEligible}</p>
         </Card>
       </PageContainer>
     );
@@ -56,12 +58,12 @@ export default async function NewGoodsReceiptPage({
 
   return (
     <PageContainer className="mx-auto max-w-4xl" data-testid="grn-create-page">
-      <PageHeader title="تسجيل استلام بضاعة" description="GRN — يُنشر فور الحفظ" />
+      <PageHeader title={tf.title} description={tf.description} />
       <Card>
         <ServerActionForm action={action} className="grid gap-5" data-testid="grn-create-form">
           {/* PO selector */}
           {(eligiblePos ?? []).length > 1 ? (
-            <Field label="أمر الشراء">
+            <Field label={tc.purchaseOrder}>
               <Select name="poId" required defaultValue={poForForm.id}>
                 {(eligiblePos ?? []).map((p) => {
                   const s = Array.isArray(p.suppliers) ? p.suppliers[0] : p.suppliers;
@@ -74,42 +76,42 @@ export default async function NewGoodsReceiptPage({
               </Select>
             </Field>
           ) : (
-            <div className="rounded-md border border-line bg-paper p-3 text-sm">
-              <span className="text-muted">أمر الشراء: </span>
-              <span className="font-medium">{poForForm.po_number}</span>
+            <div className="rounded-xl border border-line bg-surface-muted p-3 text-sm">
+              <span className="text-muted">{tc.purchaseOrder}: </span>
+              <span className="font-mono text-xs font-semibold text-ink" dir="ltr">{poForForm.po_number}</span>
               {supplier ? ` — ${(supplier as Record<string, string>).legal_name}` : ""}
               <input type="hidden" name="poId" value={poForForm.id} />
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="تاريخ التسليم">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label={tc.deliveryDate}>
               <Input name="deliveryDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} data-testid="grn-delivery-date" />
             </Field>
-            <Field label="رقم مذكرة التسليم">
-              <Input name="deliveryNoteNumber" placeholder="اختياري" />
+            <Field label={tf.deliveryNoteNumber}>
+              <Input name="deliveryNoteNumber" placeholder={tc.optional} dir="ltr" />
             </Field>
-            <Field label="الموقع / المستودع">
-              <Input name="location" placeholder="اختياري" />
+            <Field label={tf.location}>
+              <Input name="location" placeholder={tc.optional} />
             </Field>
           </div>
 
           {/* Line items */}
           <div>
-            <h3 className="mb-3 font-semibold text-navy">تفاصيل الاستلام</h3>
-            <div className="overflow-x-auto rounded-md border border-line">
-              <table className="w-full text-sm">
-                <thead className="bg-paper text-start text-muted">
+            <h3 className="mb-3 font-semibold text-ink">{tf.lines}</h3>
+            <TableScroll className="rounded-xl border border-line">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead className="bg-surface-muted text-muted">
                   <tr>
-                    <th className="px-3 py-2">#</th>
-                    <th className="px-3 py-2">الوصف</th>
-                    <th className="px-3 py-2">المأمور</th>
-                    <th className="px-3 py-2">استُلم سابقاً</th>
-                    <th className="px-3 py-2">المتبقي</th>
-                    <th className="px-3 py-2">المستلم الآن</th>
-                    <th className="px-3 py-2">المقبول</th>
-                    <th className="px-3 py-2">المرفوض</th>
-                    <th className="px-3 py-2">سبب الرفض</th>
+                    <th className="px-3 py-2 text-start font-semibold">#</th>
+                    <th className="px-3 py-2 text-start font-semibold">{tc.description}</th>
+                    <th className="px-3 py-2 text-end font-semibold">{tf.ordered}</th>
+                    <th className="px-3 py-2 text-end font-semibold">{tf.previouslyReceived}</th>
+                    <th className="px-3 py-2 text-end font-semibold">{tf.remaining}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{tf.receivedNow}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{tc.accepted}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{tc.rejected}</th>
+                    <th className="px-3 py-2 text-start font-semibold">{tc.rejectionReason}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -119,11 +121,11 @@ export default async function NewGoodsReceiptPage({
                     const remaining = Math.max(0, ordered - prevReceived);
                     return (
                       <tr key={String(item.id)} className="border-t border-line">
-                        <td className="px-3 py-2">{String(item.line_no)}</td>
-                        <td className="px-3 py-2">{String(item.description)}</td>
-                        <td className="px-3 py-2 tabular-nums">{ordered}</td>
-                        <td className="px-3 py-2 tabular-nums text-muted">{prevReceived}</td>
-                        <td className={`px-3 py-2 tabular-nums ${remaining > 0 ? "text-warning font-medium" : "text-muted"}`}>
+                        <td className="px-3 py-2 text-muted">{String(item.line_no)}</td>
+                        <td className="px-3 py-2 text-ink">{String(item.description)}</td>
+                        <td className="px-3 py-2 text-end tabular-nums">{ordered}</td>
+                        <td className="px-3 py-2 text-end tabular-nums text-muted">{prevReceived}</td>
+                        <td className={`px-3 py-2 text-end tabular-nums ${remaining > 0 ? "text-warning font-medium" : "text-muted"}`}>
                           {remaining}
                         </td>
                         <td className="px-3 py-2">
@@ -163,7 +165,7 @@ export default async function NewGoodsReceiptPage({
                         <td className="px-3 py-2">
                           <Input
                             name={`reason_${item.id}`}
-                            placeholder="سبب الرفض"
+                            placeholder={tc.rejectionReason}
                             className="w-32"
                             disabled={remaining <= 0}
                           />
@@ -173,18 +175,20 @@ export default async function NewGoodsReceiptPage({
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           </div>
 
-          <Field label="ملاحظات">
-            <Textarea name="notes" placeholder="أي ملاحظات إضافية..." />
+          <Field label={tc.notes}>
+            <Textarea name="notes" placeholder={tf.notesPlaceholder} />
           </Field>
 
           <div className="flex justify-end gap-3">
-            <Link href="/procurement/goods-receipts" className="inline-flex items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-paper">
-              إلغاء
+            <Link href="/procurement/goods-receipts">
+              <Button type="button" variant="secondary">
+                {tc.cancel}
+              </Button>
             </Link>
-            <Button type="submit" data-testid="grn-submit">حفظ ونشر الاستلام</Button>
+            <Button type="submit" data-testid="grn-submit">{tf.submit}</Button>
           </div>
         </ServerActionForm>
       </Card>

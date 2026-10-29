@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { EmptyState, PageHeader, Section, StatCard, TableScroll } from "@/components/ui/primitives";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
@@ -9,8 +9,12 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { remainingBalance, roundMoney } from "@/server/domain/commercial";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 type AgeBucket = "CURRENT" | "1-30" | "31-60" | "61-90" | "90+";
+
+const AGE_BUCKETS: AgeBucket[] = ["CURRENT", "1-30", "31-60", "61-90", "90+"];
 
 function ageBucket(dueDate: string | null, today: string): AgeBucket {
   if (!dueDate || dueDate >= today) return "CURRENT";
@@ -23,14 +27,6 @@ function ageBucket(dueDate: string | null, today: string): AgeBucket {
   return "90+";
 }
 
-const BUCKET_LABELS: Record<AgeBucket, string> = {
-  CURRENT: "جاري",
-  "1-30": "1–30 يوم",
-  "31-60": "31–60 يوم",
-  "61-90": "61–90 يوم",
-  "90+": "أكثر من 90 يوم",
-};
-
 export default async function ReceivablesPage({
   searchParams,
 }: {
@@ -41,6 +37,10 @@ export default async function ReceivablesPage({
   if (!hasPermission(ctx, "finance.read") && !hasPermission(ctx, "client_invoice.read")) {
     redirect("/finance");
   }
+
+  const { t, locale } = await getI18n();
+  const tr = t.financeClient.receivables;
+  const bucketLabels: Record<AgeBucket, string> = tr.buckets;
 
   const params = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
@@ -89,84 +89,89 @@ export default async function ReceivablesPage({
   return (
     <PageContainer data-testid="receivables-page" className="space-y-5">
       <PageHeader
-        title="ذمم العملاء"
-        description="تحليل أعمار الذمم المدينة حسب تاريخ الاستحقاق والمتبقي"
+        title={tr.title}
+        description={tr.description}
         actions={
-          <Link href="/finance" className="text-sm underline">
-            المالية
+          <Link href="/finance" className="text-sm font-medium text-primary hover:underline">
+            {tr.financeLink}
           </Link>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {(Object.keys(BUCKET_LABELS) as AgeBucket[]).map((bucket) => (
-          <Link key={bucket} href={`/finance/receivables?bucket=${bucket}`}>
-            <Card
-              className={`transition hover:border-primary/30 ${params.bucket === bucket ? "border-primary ring-1 ring-primary/20" : ""}`}
-              data-testid={`receivables-bucket-${bucket}`}
-            >
-              <p className="text-sm text-muted">{BUCKET_LABELS[bucket]}</p>
-              <p className="mt-2 text-2xl font-semibold text-navy">{bucketTotals[bucket].count}</p>
-              <p className="mt-1 text-sm font-medium text-danger">
-                <MoneyDisplay amount={bucketTotals[bucket].amount} currency="SAR" />
-              </p>
-            </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {AGE_BUCKETS.map((bucket) => (
+          <Link
+            key={bucket}
+            href={`/finance/receivables?bucket=${bucket}`}
+            className={`block rounded-xl transition hover:opacity-90 ${params.bucket === bucket ? "ring-2 ring-primary/40" : ""}`}
+          >
+            <div data-testid={`receivables-bucket-${bucket}`}>
+              <StatCard
+                label={bucketLabels[bucket]}
+                tone={bucket === "CURRENT" ? "info" : bucket === "1-30" ? "warning" : "danger"}
+                value={
+                  <span className="text-lg">
+                    <MoneyDisplay amount={bucketTotals[bucket].amount} currency="SAR" locale={locale} />
+                  </span>
+                }
+                hint={format(tr.invoiceCount, { count: bucketTotals[bucket].count })}
+              />
+            </div>
           </Link>
         ))}
       </div>
 
-      <Card>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-navy">
-            {params.bucket ? BUCKET_LABELS[params.bucket as AgeBucket] ?? "الكل" : "كل الذمم المفتوحة"}
-          </h2>
-          {params.bucket ? (
-            <Link href="/finance/receivables" className="text-sm underline">
-              إظهار الكل
+      <Section
+        title={params.bucket ? bucketLabels[params.bucket as AgeBucket] ?? tr.all : tr.allOpen}
+        actions={
+          params.bucket ? (
+            <Link href="/finance/receivables" className="text-sm font-medium text-primary hover:underline">
+              {tr.showAll}
             </Link>
-          ) : null}
-        </div>
+          ) : null
+        }
+      >
         {filtered.length === 0 ? (
-          <EmptyState title="لا توجد ذمم في هذا التصنيف." />
+          <EmptyState title={tr.empty} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm" data-testid="receivables-table">
-              <thead className="bg-paper text-start text-muted">
+          <TableScroll>
+            <table className="w-full text-sm" data-testid="receivables-table">
+              <thead className="bg-surface-muted text-xs text-muted">
                 <tr>
-                  <th className="px-3 py-2">الفاتورة</th>
-                  <th className="px-3 py-2">العميل</th>
-                  <th className="px-3 py-2">المشروع</th>
-                  <th className="px-3 py-2">الاستحقاق</th>
-                  <th className="px-3 py-2">المتبقي</th>
-                  <th className="px-3 py-2">التصنيف</th>
-                  <th className="px-3 py-2">الحالة</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colInvoice}</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colClient}</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colProject}</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colDue}</th>
+                  <th className="px-3 py-2.5 text-end font-medium">{tr.colOutstanding}</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colBucket}</th>
+                  <th className="px-3 py-2.5 text-start font-medium">{tr.colStatus}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id} className="border-t border-line">
-                    <td className="px-3 py-2">
-                      <Link href={`/finance/client-invoices/${item.id}`} className="font-medium text-navy underline">
+                    <td className="px-3 py-2.5">
+                      <Link href={`/finance/client-invoices/${item.id}`} className="font-medium text-primary hover:underline">
                         {item.invoiceNumber}
                       </Link>
                     </td>
-                    <td className="px-3 py-2">{item.client}</td>
-                    <td className="px-3 py-2">{item.project}</td>
-                    <td className="px-3 py-2">{item.dueDate ?? "—"}</td>
-                    <td className="px-3 py-2 font-medium text-danger">
-                      <MoneyDisplay amount={item.outstanding} currency={item.currency} />
+                    <td className="px-3 py-2.5 text-ink">{item.client}</td>
+                    <td className="px-3 py-2.5 text-muted">{item.project}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted">{item.dueDate ?? "—"}</td>
+                    <td className="px-3 py-2.5 text-end font-medium tabular-nums text-danger">
+                      <MoneyDisplay amount={item.outstanding} currency={item.currency} locale={locale} />
                     </td>
-                    <td className="px-3 py-2">{BUCKET_LABELS[item.bucket]}</td>
-                    <td className="px-3 py-2">
-                      <CommercialStatusBadge status={item.status} />
+                    <td className="px-3 py-2.5 text-muted">{bucketLabels[item.bucket]}</td>
+                    <td className="px-3 py-2.5">
+                      <CommercialStatusBadge status={item.status} locale={locale} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
-      </Card>
+      </Section>
     </PageContainer>
   );
 }

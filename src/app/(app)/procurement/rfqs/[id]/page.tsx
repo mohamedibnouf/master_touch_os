@@ -1,8 +1,9 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button, Card, PageHeader } from "@/components/ui/primitives";
+import { Button, Card, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
+import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -11,6 +12,12 @@ import { issueRfqAction, updateRfqSupplierResponseAction } from "@/server/use-ca
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { RfqSupplierInvitePanel, RfqSupplierRemoveButton } from "@/components/procurement/rfq-supplier-invite-panel";
 import { isRfqInvitationEditable } from "@/modules/procurement/rfq-invitation";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+
+const backLinkClass =
+  "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
+const thClass = "px-3 py-2 text-start font-medium";
 
 export default async function RfqDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getAuthContext();
@@ -23,8 +30,15 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
   const rfq = await repo.getRfq(id);
   if (!rfq) notFound();
 
+  const { t, locale } = await getI18n();
+  const td = t.procurementSourcing.rfqs.detail;
+  const common = t.procurementSourcing.common;
+
   const audit = await repo.getAuditForEntity("rfq", id);
-  const project = Array.isArray(rfq.projects) ? rfq.projects[0] : rfq.projects;
+  const project = (Array.isArray(rfq.projects) ? rfq.projects[0] : rfq.projects) as
+    | { project_code: string; name_ar: string | null; name_en?: string | null }
+    | null
+    | undefined;
   const items = (rfq.rfq_items as Array<Record<string, unknown>>) ?? [];
   const invitations = (rfq.rfq_suppliers as Array<Record<string, unknown>>) ?? [];
 
@@ -74,119 +88,122 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
         title={rfq.rfq_number}
         description={rfq.title}
         actions={
-          <Link href="/procurement/rfqs" className="text-sm underline">
-            العودة للسجل
+          <Link href="/procurement/rfqs" className={backLinkClass}>
+            {common.backToRegister}
           </Link>
         }
       />
 
       {/* Status row */}
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <Card>
-          <p className="text-sm text-muted">الحالة</p>
-          <div className="mt-2"><CommercialStatusBadge status={rfq.status} /></div>
+          <p className="text-xs font-medium text-muted">{td.status}</p>
+          <div className="mt-2"><CommercialStatusBadge status={rfq.status} locale={locale} /></div>
         </Card>
         <Card>
-          <p className="text-sm text-muted">المشروع</p>
-          <p className="mt-2 text-sm font-medium">
-            {project ? `${(project as Record<string, string>).project_code} — ${(project as Record<string, string>).name_ar}` : "—"}
+          <p className="text-xs font-medium text-muted">{td.project}</p>
+          <p className="mt-2 text-sm font-medium text-ink">
+            {project
+              ? format(common.codeName, {
+                  code: project.project_code,
+                  name: pickLocalized(locale, project.name_ar, project.name_en),
+                })
+              : common.none}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">موعد الرد</p>
-          <p className="mt-2 font-semibold">{rfq.response_due_date ?? "—"}</p>
+          <p className="text-xs font-medium text-muted">{td.responseDueDate}</p>
+          <p className="mt-2 font-semibold tabular-nums text-ink">{rfq.response_due_date ?? common.none}</p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">طلب الشراء الأصلي</p>
+          <p className="text-xs font-medium text-muted">{td.sourcePr}</p>
           {pr ? (
-            <p className="mt-2 text-sm text-navy font-medium">{(pr as Record<string, string>).pr_number}</p>
+            <p className="mt-2 text-sm font-medium text-primary">{(pr as Record<string, string>).pr_number}</p>
           ) : (
-            <p className="mt-2 text-sm text-muted">—</p>
+            <p className="mt-2 text-sm text-muted">{common.none}</p>
           )}
         </Card>
       </div>
 
       {/* Issue action */}
       {canIssue ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">إصدار طلب عروض الأسعار</h2>
-          <p className="mb-3 text-sm text-muted">
-            بعد الإصدار، لن يمكن تعديل البيانات التجارية.
-          </p>
+        <Card className="border-primary/30 bg-primary-soft/40">
+          <h2 className="mb-1 text-sm font-semibold text-ink">{td.issueTitle}</h2>
+          <p className="mb-3 text-sm text-muted">{td.issueHint}</p>
           <ServerActionForm action={issueRfqAction}>
             <input type="hidden" name="rfqId" value={rfq.id} />
-            <Button type="submit">إصدار RFQ</Button>
+            <Button type="submit">{td.issueSubmit}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {/* Actions after issue */}
       {isIssued ? (
-        <div className="mb-6 flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           {hasPermission(ctx, "quotation.create") ? (
             <Link
               href={`/procurement/rfqs/${id}/quotations/new`}
-              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
             >
-              + تسجيل عرض سعر
+              {td.recordQuotation}
             </Link>
           ) : null}
           {(quotations ?? []).length >= 1 && hasPermission(ctx, "quotation.compare") ? (
             <Link
               href={`/procurement/rfqs/${id}/comparison`}
-              className="inline-flex items-center rounded-md border border-primary px-4 py-2 text-sm font-medium text-navy hover:bg-primary/5"
+              className="inline-flex items-center rounded-md border border-primary/40 bg-surface px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-soft"
             >
-              مقارنة العروض →
+              {td.compareQuotations}
             </Link>
           ) : null}
         </div>
       ) : null}
 
       {/* Items */}
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">بنود الطلب</h2>
+      <Card>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{td.itemsTitle}</h2>
         {items.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد بنود.</p>
+          <p className="text-sm text-muted">{common.noItems}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full text-sm">
-              <thead className="text-muted">
+              <thead className="bg-surface-muted text-xs text-muted">
                 <tr>
-                  <th className="py-2 text-start">#</th>
-                  <th className="py-2 text-start">الوصف</th>
-                  <th className="py-2 text-start">الكمية</th>
-                  <th className="py-2 text-start">الوحدة</th>
+                  <th className={thClass}>{td.itemColumns.line}</th>
+                  <th className={thClass}>{td.itemColumns.description}</th>
+                  <th className={thClass}>{td.itemColumns.quantity}</th>
+                  <th className={thClass}>{td.itemColumns.unit}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={String(item.id)} className="border-t border-line">
-                    <td className="py-2">{String(item.line_no)}</td>
-                    <td className="py-2">{String(item.description)}</td>
-                    <td className="py-2">{String(item.quantity)}</td>
-                    <td className="py-2">{String(item.unit ?? "—")}</td>
+                    <td className="px-3 py-2 tabular-nums text-muted">{String(item.line_no)}</td>
+                    <td className="px-3 py-2 text-ink">{String(item.description)}</td>
+                    <td className="px-3 py-2 tabular-nums">{String(item.quantity)}</td>
+                    <td className="px-3 py-2">{String(item.unit ?? common.none)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 
       {/* Invitations */}
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">الموردون المدعوون</h2>
+      <Card>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{td.invitedTitle}</h2>
         {invitations.length === 0 ? (
-          <p className="text-sm text-muted">لم يتم دعوة أي موردين.</p>
+          <p className="text-sm text-muted">{td.noInvited}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full text-sm">
-              <thead className="text-muted">
+              <thead className="bg-surface-muted text-xs text-muted">
                 <tr>
-                  <th className="py-2 text-start">المورد</th>
-                  <th className="py-2 text-start">حالة الرد</th>
-                  {canManageResponse ? <th className="py-2 text-start">تحديث</th> : null}
-                  {canManageInvites ? <th className="py-2 text-start">إزالة</th> : null}
+                  <th className={thClass}>{td.invitationColumns.supplier}</th>
+                  <th className={thClass}>{td.invitationColumns.response}</th>
+                  {canManageResponse ? <th className={thClass}>{td.invitationColumns.update}</th> : null}
+                  {canManageInvites ? <th className={thClass}>{td.invitationColumns.remove}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -194,37 +211,40 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   const supplier = Array.isArray(inv.suppliers) ? inv.suppliers[0] : inv.suppliers;
                   return (
                     <tr key={String(inv.id)} className="border-t border-line">
-                      <td className="py-2">
+                      <td className="px-3 py-2 text-ink">
                         {supplier
-                          ? `${(supplier as Record<string, string>).supplier_code} — ${(supplier as Record<string, string>).legal_name}`
+                          ? format(common.codeName, {
+                              code: (supplier as Record<string, string>).supplier_code,
+                              name: (supplier as Record<string, string>).legal_name,
+                            })
                           : String(inv.supplier_id)}
                       </td>
-                      <td className="py-2">
-                        <CommercialStatusBadge status={String(inv.response_status)} />
+                      <td className="px-3 py-2">
+                        <CommercialStatusBadge status={String(inv.response_status)} locale={locale} />
                       </td>
                       {canManageResponse ? (
-                        <td className="py-2">
+                        <td className="px-3 py-2">
                           {String(inv.response_status) === "invited" ? (
                             <div className="flex gap-2">
                               <ServerActionForm action={updateRfqSupplierResponseAction}>
                                 <input type="hidden" name="invitationId" value={String(inv.id)} />
                                 <input type="hidden" name="responseStatus" value="acknowledged" />
-                                <Button type="submit" variant="secondary">أقرّ</Button>
+                                <Button type="submit" variant="secondary">{td.acknowledge}</Button>
                               </ServerActionForm>
                               <ServerActionForm action={updateRfqSupplierResponseAction}>
                                 <input type="hidden" name="invitationId" value={String(inv.id)} />
                                 <input type="hidden" name="responseStatus" value="declined" />
-                                <Button type="submit" variant="danger">رفض</Button>
+                                <Button type="submit" variant="danger">{td.decline}</Button>
                               </ServerActionForm>
                             </div>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="text-muted">{common.none}</span>
                           )}
                         </td>
                       ) : null}
                       {canManageInvites ? (
-                        <td className="py-2">
-                          <RfqSupplierRemoveButton rfqId={rfq.id} invitationId={String(inv.id)} />
+                        <td className="px-3 py-2">
+                          <RfqSupplierRemoveButton rfqId={rfq.id} invitationId={String(inv.id)} locale={locale} />
                         </td>
                       ) : null}
                     </tr>
@@ -232,28 +252,28 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
         {canManageInvites && canListSuppliers ? (
-          <RfqSupplierInvitePanel rfqId={rfq.id} candidates={inviteCandidates} />
+          <RfqSupplierInvitePanel rfqId={rfq.id} candidates={inviteCandidates} locale={locale} />
         ) : canManageInvites ? (
-          <p className="mt-3 text-sm text-muted">عرض سجل الموردين يتطلب صلاحية قراءة الموردين.</p>
+          <p className="mt-3 text-sm text-muted">{td.supplierReadRequired}</p>
         ) : null}
       </Card>
 
       {/* Quotations received */}
       {(quotations ?? []).length > 0 ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">عروض الأسعار المستلمة</h2>
-          <div className="overflow-x-auto">
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.quotationsTitle}</h2>
+          <TableScroll>
             <table className="w-full text-sm">
-              <thead className="text-muted">
+              <thead className="bg-surface-muted text-xs text-muted">
                 <tr>
-                  <th className="py-2 text-start">الرقم</th>
-                  <th className="py-2 text-start">المورد</th>
-                  <th className="py-2 text-start">التاريخ</th>
-                  <th className="py-2 text-start">الإجمالي</th>
-                  <th className="py-2 text-start">الحالة</th>
+                  <th className={thClass}>{td.quotationColumns.number}</th>
+                  <th className={thClass}>{td.quotationColumns.supplier}</th>
+                  <th className={thClass}>{td.quotationColumns.date}</th>
+                  <th className="px-3 py-2 text-end font-medium">{td.quotationColumns.total}</th>
+                  <th className={thClass}>{td.quotationColumns.status}</th>
                 </tr>
               </thead>
               <tbody>
@@ -261,46 +281,48 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
                   const sup = Array.isArray(q.suppliers) ? q.suppliers[0] : q.suppliers;
                   return (
                     <tr key={q.id} className="border-t border-line">
-                      <td className="py-2">
-                        <Link href={`/procurement/quotations/${q.id}`} className="font-medium text-navy underline">
+                      <td className="px-3 py-2">
+                        <Link href={`/procurement/quotations/${q.id}`} className="font-medium text-primary hover:underline">
                           {q.quotation_number}
                         </Link>
                       </td>
-                      <td className="py-2">{(sup as Record<string, string> | null)?.legal_name ?? "—"}</td>
-                      <td className="py-2">{q.quotation_date}</td>
-                      <td className="py-2 tabular-nums">{Number(q.total).toLocaleString("ar-SA", { minimumFractionDigits: 2 })} {q.currency}</td>
-                      <td className="py-2"><CommercialStatusBadge status={q.status} /></td>
+                      <td className="px-3 py-2 text-ink">{(sup as Record<string, string> | null)?.legal_name ?? common.none}</td>
+                      <td className="px-3 py-2 tabular-nums">{q.quotation_date}</td>
+                      <td className="px-3 py-2 text-end tabular-nums">
+                        <MoneyDisplay amount={q.total} currency={q.currency} locale={locale} />
+                      </td>
+                      <td className="px-3 py-2"><CommercialStatusBadge status={q.status} locale={locale} /></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       ) : null}
 
       {/* Comparison / award status */}
       {comparison ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">حالة المقارنة والترسية</h2>
-          <CommercialStatusBadge status={comparison.status} />
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.comparisonTitle}</h2>
+          <CommercialStatusBadge status={comparison.status} locale={locale} />
           {comparison.status === "awarded" ? (
-            <p className="mt-2 text-sm text-success font-medium">تمت الترسية بنجاح ✓</p>
+            <p className="mt-2 text-sm font-medium text-success">{td.awarded}</p>
           ) : null}
         </Card>
       ) : null}
 
       {/* Activity */}
       <Card>
-        <h2 className="mb-3 font-semibold text-navy">سجل النشاط</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{common.activityTitle}</h2>
         {audit.length === 0 ? (
-          <p className="text-sm text-muted">لا يوجد نشاط مسجّل.</p>
+          <p className="text-sm text-muted">{common.noActivity}</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {audit.map((a) => (
-              <li key={a.id} className="flex justify-between border-b border-line pb-2">
+              <li key={a.id} className="flex justify-between gap-3 py-2">
                 <span className="text-ink">{a.action.replaceAll(".", " · ")}</span>
-                <span className="text-muted">{new Date(a.created_at).toLocaleString("ar-SA")}</span>
+                <span className="tabular-nums text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
               </li>
             ))}
           </ul>

@@ -6,6 +6,10 @@ import { hrPeopleAr } from "./hr-people.ar";
 import { attendanceAr } from "./attendance.ar";
 import { leaveAr } from "./leave.ar";
 import { payrollAr } from "./payroll.ar";
+import { procurementSourcingAr } from "./procurement-sourcing.ar";
+import { procurementOrdersAr } from "./procurement-orders.ar";
+import { financeClientAr } from "./finance-client.ar";
+import { financePayablesAr } from "./finance-payables.ar";
 
 /**
  * Arabic is the source dictionary: its shape defines the Dictionary type, and en.ts
@@ -20,6 +24,10 @@ export const ar = {
   attendance: attendanceAr,
   leave: leaveAr,
   payroll: payrollAr,
+  procurementSourcing: procurementSourcingAr,
+  procurementOrders: procurementOrdersAr,
+  financeClient: financeClientAr,
+  financePayables: financePayablesAr,
   meta: {
     title: "ماستر تاتش | نظام التشغيل الداخلي",
     description: "نظام تشغيل الأعمال لماستر تاتش",

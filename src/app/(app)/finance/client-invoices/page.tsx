@@ -10,6 +10,9 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
+import { getI18n } from "@/lib/i18n/server";
+
+const INVOICE_STATUSES = ["draft", "issued", "partially_paid", "paid", "overdue", "cancelled"] as const;
 
 export default async function ClientInvoicesPage({
   searchParams,
@@ -19,6 +22,10 @@ export default async function ClientInvoicesPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!hasPermission(ctx, "client_invoice.read")) redirect("/finance");
+
+  const { t, locale } = await getI18n();
+  const ti = t.financeClient.invoices;
+  const tc = t.financeClient.common;
 
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
@@ -34,8 +41,8 @@ export default async function ClientInvoicesPage({
   return (
     <PageContainer data-testid="client-invoices-page" className="space-y-5">
       <PageHeader
-        title="فواتير العملاء"
-        description="سجل فواتير AR — إصدار وتحصيل"
+        title={ti.title}
+        description={ti.description}
         actions={
           hasPermission(ctx, "client_invoice.create") ? (
             <Link
@@ -43,42 +50,47 @@ export default async function ClientInvoicesPage({
               className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
               data-testid="client-invoice-create-link"
             >
-              + فاتورة جديدة
+              {ti.create}
             </Link>
           ) : null
         }
       />
-      <Card className="mb-4">
+      <Card>
         <form className="flex flex-wrap gap-3" data-testid="client-invoice-filter-form">
           <input
             name="q"
             defaultValue={params.q}
-            placeholder="رقم الفاتورة"
-            className="h-10 rounded-md border px-3 text-sm"
+            placeholder={ti.searchPlaceholder}
+            className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink"
           />
-          <select name="status" defaultValue={params.status ?? ""} className="h-10 rounded-md border px-3 text-sm">
-            <option value="">كل الحالات</option>
-            <option value="draft">مسودة</option>
-            <option value="issued">صادرة</option>
-            <option value="partially_paid">مدفوعة جزئياً</option>
-            <option value="paid">مدفوعة</option>
-            <option value="overdue">متأخرة</option>
-            <option value="cancelled">ملغاة</option>
+          <select
+            name="status"
+            defaultValue={params.status ?? ""}
+            className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink"
+          >
+            <option value="">{tc.allStatuses}</option>
+            {INVOICE_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {ti.statusOptions[status]}
+              </option>
+            ))}
           </select>
-          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
-            تصفية
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90">
+            {tc.filter}
           </button>
         </form>
       </Card>
-      <Card className="p-0">
+      <Card className="p-0 md:p-0">
         <RegisterTable
+          locale={locale}
+          emptyTitle={ti.empty}
           columns={[
-            { key: "number", header: "الفاتورة" },
-            { key: "client", header: "العميل" },
-            { key: "project", header: "المشروع" },
-            { key: "due", header: "الاستحقاق" },
-            { key: "total", header: "الإجمالي" },
-            { key: "status", header: "الحالة" },
+            { key: "number", header: ti.colInvoice },
+            { key: "client", header: ti.colClient },
+            { key: "project", header: ti.colProject },
+            { key: "due", header: ti.colDue },
+            { key: "total", header: ti.colTotal, className: "text-end!" },
+            { key: "status", header: ti.colStatus },
           ]}
           rows={rows.map((r) => {
             const project = Array.isArray(r.projects) ? r.projects[0] : r.projects;
@@ -88,9 +100,13 @@ export default async function ClientInvoicesPage({
               number: r.invoice_number,
               client: (contract as Record<string, string> | null)?.client_name ?? "—",
               project: (project as Record<string, string> | null)?.project_code ?? "—",
-              due: r.due_date ?? "—",
-              total: <MoneyDisplay amount={r.total} currency={r.currency} />,
-              status: <CommercialStatusBadge status={r.status} />,
+              due: <span className="tabular-nums">{r.due_date ?? "—"}</span>,
+              total: (
+                <span className="block text-end tabular-nums">
+                  <MoneyDisplay amount={r.total} currency={r.currency} locale={locale} />
+                </span>
+              ),
+              status: <CommercialStatusBadge status={r.status} locale={locale} />,
             };
           })}
           getRowHref={(row) => `/finance/client-invoices/${String(row.id)}`}
@@ -101,6 +117,7 @@ export default async function ClientInvoicesPage({
             page={page}
             totalPages={Math.max(1, Math.ceil(total / pageSize))}
             params={{ status: params.status, q: params.q }}
+            locale={locale}
           />
         </div>
       </Card>

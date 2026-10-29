@@ -2,13 +2,15 @@ import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createPoFromQuotationAction } from "@/server/use-cases/procurement";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NewPurchaseOrderPage({
   searchParams,
@@ -18,6 +20,9 @@ export default async function NewPurchaseOrderPage({
   const ctx = authorize(await getAuthContext(), "purchase_order.create");
   const { quotationId } = await searchParams;
   const supabase = await createServerSupabaseClient();
+  const { t, locale } = await getI18n();
+  const tc = t.procurementOrders.common;
+  const tf = t.procurementOrders.orderForm;
 
   // If quotationId provided, load it and pre-fill
   let quote: Record<string, unknown> | null = null;
@@ -25,7 +30,7 @@ export default async function NewPurchaseOrderPage({
     const { data } = await supabase
       .from("supplier_quotations")
       .select(
-        "*, suppliers(id, supplier_code, legal_name), projects(id, project_code, name_ar), rfqs(rfq_number), supplier_quotation_items(*)",
+        "*, suppliers(id, supplier_code, legal_name), projects(id, project_code, name_ar, name_en), rfqs(rfq_number), supplier_quotation_items(*)",
       )
       .eq("id", quotationId)
       .eq("organization_id", ctx.organization.id)
@@ -50,9 +55,9 @@ export default async function NewPurchaseOrderPage({
     if (!awardedQuotes.length) {
       return (
         <PageContainer className="mx-auto max-w-2xl">
-          <PageHeader title="أمر شراء جديد" description="إنشاء من عرض سعر مرسَّى" />
+          <PageHeader title={tf.title} description={tf.descriptionEmpty} />
           <Card>
-            <p className="text-sm text-warning">لا توجد عروض أسعار معتمدة للترسية. أكمل دورة المقارنة والاعتماد أولاً.</p>
+            <p className="text-sm text-warning">{tf.noAwarded}</p>
           </Card>
         </PageContainer>
       );
@@ -62,6 +67,8 @@ export default async function NewPurchaseOrderPage({
   const supplier = quote ? (Array.isArray(quote.suppliers) ? quote.suppliers[0] : quote.suppliers) : null;
   const project = quote ? (Array.isArray(quote.projects) ? quote.projects[0] : quote.projects) : null;
   const items = quote ? ((quote.supplier_quotation_items as Array<Record<string, unknown>>) ?? []) : [];
+  const s = supplier as Record<string, string> | null;
+  const prj = project as Record<string, string | null> | null;
 
   async function action(_prev: import("@/server/forms/form-state").FormActionState, formData: FormData): Promise<import("@/server/forms/form-state").FormActionState> {
     "use server";
@@ -72,21 +79,21 @@ export default async function NewPurchaseOrderPage({
 
   return (
     <PageContainer className="mx-auto max-w-3xl" data-testid="po-create-page">
-      <PageHeader title="أمر شراء جديد" description="ترث البيانات تلقائياً من العرض المرسَّى" />
+      <PageHeader title={tf.title} description={tf.description} />
       <Card>
         <ServerActionForm action={action} className="grid gap-5" data-testid="po-create-form">
           {quote ? (
             <input type="hidden" name="quotationId" value={String(quote.id)} />
           ) : (
-            <Field label="عرض السعر المرسَّى">
+            <Field label={tf.awardedQuotation}>
               <Select name="quotationId" required defaultValue="" data-testid="po-quotation">
-                <option value="" disabled>اختر العرض</option>
+                <option value="" disabled>{tf.chooseQuotation}</option>
                 {awardedQuotes.map((q) => {
-                  const s = Array.isArray(q.suppliers) ? q.suppliers[0] : q.suppliers;
+                  const qs = Array.isArray(q.suppliers) ? q.suppliers[0] : q.suppliers;
                   return (
                     <option key={String(q.id)} value={String(q.id)}>
-                      {String(q.quotation_number)} — {(s as Record<string, string> | null)?.legal_name ?? "—"} —{" "}
-                      {Number(q.total).toLocaleString("ar-SA", { minimumFractionDigits: 2 })} {String(q.currency)}
+                      {String(q.quotation_number)} — {(qs as Record<string, string> | null)?.legal_name ?? "—"} —{" "}
+                      {Number(q.total).toLocaleString(intlLocale(locale), { minimumFractionDigits: 2 })} {String(q.currency)}
                     </option>
                   );
                 })}
@@ -96,82 +103,85 @@ export default async function NewPurchaseOrderPage({
 
           {quote ? (
             <>
-              <div className="grid gap-4 rounded-md border border-line bg-paper p-4 text-sm md:grid-cols-2">
+              <dl className="grid gap-4 rounded-xl border border-line bg-surface-muted p-4 text-sm md:grid-cols-2">
                 <div>
-                  <p className="text-muted text-xs">المورد</p>
-                  <p className="font-medium">
-                    {(supplier as Record<string, string> | null)?.supplier_code} —{" "}
-                    {(supplier as Record<string, string> | null)?.legal_name}
-                  </p>
+                  <dt className="text-xs text-muted">{tc.supplier}</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    <span dir="ltr" className="font-mono text-xs">{s?.supplier_code}</span> — {s?.legal_name}
+                  </dd>
                 </div>
                 <div>
-                  <p className="text-muted text-xs">المشروع</p>
-                  <p className="font-medium">
-                    {(project as Record<string, string> | null)?.project_code} —{" "}
-                    {(project as Record<string, string> | null)?.name_ar}
-                  </p>
+                  <dt className="text-xs text-muted">{tc.project}</dt>
+                  <dd className="mt-0.5 font-medium text-ink">
+                    <span dir="ltr" className="font-mono text-xs">{prj?.project_code}</span> —{" "}
+                    {pickLocalized(locale, prj?.name_ar, prj?.name_en)}
+                  </dd>
                 </div>
                 <div>
-                  <p className="text-muted text-xs">العرض المرسَّى</p>
-                  <p className="font-medium">{String(quote.quotation_number)}</p>
+                  <dt className="text-xs text-muted">{tf.awardedQuotationShort}</dt>
+                  <dd className="mt-0.5 font-medium text-ink" dir="ltr">
+                    <span className="font-mono text-xs">{String(quote.quotation_number)}</span>
+                  </dd>
                 </div>
                 <div>
-                  <p className="text-muted text-xs">الإجمالي</p>
-                  <p className="font-bold text-navy">
-                    <MoneyDisplay amount={quote.total as number} currency={String(quote.currency)} />
-                  </p>
+                  <dt className="text-xs text-muted">{tc.total}</dt>
+                  <dd className="mt-0.5 font-bold text-ink">
+                    <MoneyDisplay amount={quote.total as number} currency={String(quote.currency)} locale={locale} />
+                  </dd>
                 </div>
                 {(quote.payment_terms as string | null) ? (
                   <div>
-                    <p className="text-muted text-xs">شروط الدفع</p>
-                    <p>{String(quote.payment_terms)}</p>
+                    <dt className="text-xs text-muted">{tc.paymentTerms}</dt>
+                    <dd className="mt-0.5 text-ink">{String(quote.payment_terms)}</dd>
                   </div>
                 ) : null}
-              </div>
+              </dl>
 
-              <div className="overflow-x-auto rounded-md border border-line">
+              <TableScroll className="rounded-xl border border-line">
                 <table className="w-full text-sm">
-                  <thead className="bg-paper text-start text-muted">
+                  <thead className="bg-surface-muted text-muted">
                     <tr>
-                      <th className="px-3 py-2">#</th>
-                      <th className="px-3 py-2">الوصف</th>
-                      <th className="px-3 py-2">الكمية</th>
-                      <th className="px-3 py-2">سعر الوحدة</th>
-                      <th className="px-3 py-2">الإجمالي</th>
+                      <th className="px-3 py-2 text-start font-semibold">#</th>
+                      <th className="px-3 py-2 text-start font-semibold">{tc.description}</th>
+                      <th className="px-3 py-2 text-end font-semibold">{tc.quantity}</th>
+                      <th className="px-3 py-2 text-end font-semibold">{tc.unitPrice}</th>
+                      <th className="px-3 py-2 text-end font-semibold">{tc.total}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item) => (
                       <tr key={String(item.id)} className="border-t border-line">
-                        <td className="px-3 py-2">{String(item.line_no)}</td>
-                        <td className="px-3 py-2">{String(item.description)}</td>
-                        <td className="px-3 py-2">{String(item.quantity)}</td>
-                        <td className="px-3 py-2 tabular-nums">
-                          <MoneyDisplay amount={item.unit_price as number} currency={String(quote.currency)} />
+                        <td className="px-3 py-2 text-muted">{String(item.line_no)}</td>
+                        <td className="px-3 py-2 text-ink">{String(item.description)}</td>
+                        <td className="px-3 py-2 text-end tabular-nums">{String(item.quantity)}</td>
+                        <td className="px-3 py-2 text-end tabular-nums">
+                          <MoneyDisplay amount={item.unit_price as number} currency={String(quote.currency)} locale={locale} />
                         </td>
-                        <td className="px-3 py-2 tabular-nums">
-                          <MoneyDisplay amount={item.total_price as number} currency={String(quote.currency)} />
+                        <td className="px-3 py-2 text-end tabular-nums">
+                          <MoneyDisplay amount={item.total_price as number} currency={String(quote.currency)} locale={locale} />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </>
           ) : null}
 
-          <Field label="موعد التسليم المطلوب">
+          <Field label={tf.requiredDeliveryDate}>
             <Input name="requiredDeliveryDate" type="date" data-testid="po-delivery-date" />
           </Field>
-          <Field label="عنوان التسليم">
-            <Input name="deliveryAddress" placeholder="موقع التسليم" data-testid="po-delivery-address" />
+          <Field label={tc.deliveryAddress}>
+            <Input name="deliveryAddress" placeholder={tf.deliveryAddressPlaceholder} data-testid="po-delivery-address" />
           </Field>
 
           <div className="flex justify-end gap-3">
-            <Link href="/procurement/purchase-orders" className="inline-flex items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-paper">
-              إلغاء
+            <Link href="/procurement/purchase-orders">
+              <Button type="button" variant="secondary">
+                {tc.cancel}
+              </Button>
             </Link>
-            <Button type="submit" data-testid="po-create-submit">إنشاء أمر الشراء</Button>
+            <Button type="submit" data-testid="po-create-submit">{tf.submit}</Button>
           </div>
         </ServerActionForm>
       </Card>

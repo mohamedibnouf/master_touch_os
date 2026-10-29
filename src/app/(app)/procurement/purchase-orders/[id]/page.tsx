@@ -1,7 +1,8 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Button, Card, PageHeader } from "@/components/ui/primitives";
+import { Check, PackagePlus, Printer, X } from "lucide-react";
+import { Button, Card, PageHeader, StatCard, TableScroll } from "@/components/ui/primitives";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
@@ -14,6 +15,11 @@ import {
 } from "@/server/use-cases/procurement";
 import { decideEntityApprovalAction } from "@/server/use-cases/entity-approvals";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+
+const navLinkClass =
+  "inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
 
 export default async function PurchaseOrderDetailPage({
   params,
@@ -30,6 +36,10 @@ export default async function PurchaseOrderDetailPage({
   const po = await repo.getPurchaseOrder(id);
   if (!po) notFound();
 
+  const { t, locale } = await getI18n();
+  const tc = t.procurementOrders.common;
+  const td = t.procurementOrders.orderDetail;
+
   const [approval, audit, users] = await Promise.all([
     repo.getApprovalForEntity("purchase_order", id),
     repo.getAuditForEntity("purchase_order", id),
@@ -43,6 +53,7 @@ export default async function PurchaseOrderDetailPage({
   ]);
 
   const supplier = Array.isArray(po.suppliers) ? po.suppliers[0] : po.suppliers;
+  const supplierName = (supplier as Record<string, string> | null)?.legal_name ?? "—";
   const items = (po.purchase_order_items as Array<Record<string, unknown>>) ?? [];
 
   const canSubmitApproval = po.status === "draft" && hasPermission(ctx, "purchase_order.create");
@@ -69,107 +80,103 @@ export default async function PurchaseOrderDetailPage({
     <PageContainer className="space-y-5">
       <PageHeader
         title={po.po_number}
-        description={`أمر شراء — ${(supplier as Record<string, string> | null)?.legal_name ?? "—"}`}
+        description={format(td.subtitle, { supplier: supplierName })}
         actions={
-          <div className="flex gap-3">
-            <Link href="/procurement/purchase-orders" className="text-sm underline">
-              السجل
+          <div className="flex flex-wrap gap-2">
+            <Link href="/procurement/purchase-orders" className={navLinkClass}>
+              {tc.backToRegister}
             </Link>
             {isIssued ? (
               <Link
                 href={`/procurement/purchase-orders/${id}/print`}
-                className="inline-flex items-center rounded-md border border-primary px-3 py-1.5 text-sm text-navy hover:bg-primary/5"
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary-soft"
                 target="_blank"
               >
-                طباعة PO
+                <Printer className="size-4" aria-hidden />
+                {td.print}
               </Link>
             ) : null}
           </div>
         }
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
-        <Card>
-          <p className="text-sm text-muted">الحالة</p>
-          <div className="mt-2"><CommercialStatusBadge status={po.status} /></div>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">المورد</p>
-          <p className="mt-2 text-sm font-medium">
-            {(supplier as Record<string, string> | null)?.legal_name ?? "—"}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">الإجمالي</p>
-          <p className="mt-2 font-bold text-navy">
-            <MoneyDisplay amount={po.total} currency={po.currency} />
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">موعد التسليم</p>
-          <p className="mt-2 font-semibold">{po.required_delivery_date ?? "—"}</p>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label={tc.status} value={<CommercialStatusBadge status={po.status} locale={locale} />} />
+        <StatCard label={tc.supplier} value={<span className="text-sm font-medium">{supplierName}</span>} />
+        <StatCard
+          label={tc.total}
+          value={
+            <span className="text-lg">
+              <MoneyDisplay amount={po.total} currency={po.currency} locale={locale} />
+            </span>
+          }
+          tone="info"
+        />
+        <StatCard
+          label={tc.requiredDelivery}
+          value={<span className="text-base font-semibold">{po.required_delivery_date ?? "—"}</span>}
+        />
       </div>
 
       {/* Financials */}
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">المبالغ التجارية</h2>
+      <Card>
+        <h2 className="mb-3 font-semibold text-ink">{td.financials}</h2>
         <dl className="grid gap-2 text-sm md:w-1/2">
           <div className="flex justify-between border-b border-line pb-1">
-            <dt className="text-muted">إجمالي قبل الخصم</dt>
-            <dd><MoneyDisplay amount={po.subtotal} currency={po.currency} /></dd>
+            <dt className="text-muted">{tc.subtotal}</dt>
+            <dd><MoneyDisplay amount={po.subtotal} currency={po.currency} locale={locale} /></dd>
           </div>
           <div className="flex justify-between border-b border-line pb-1">
-            <dt className="text-muted">الخصم</dt>
-            <dd><MoneyDisplay amount={po.discount} currency={po.currency} /></dd>
+            <dt className="text-muted">{tc.discount}</dt>
+            <dd><MoneyDisplay amount={po.discount} currency={po.currency} locale={locale} /></dd>
           </div>
           <div className="flex justify-between border-b border-line pb-1">
-            <dt className="text-muted">ضريبة القيمة المضافة ({po.vat_rate_percent}%)</dt>
-            <dd><MoneyDisplay amount={po.vat_amount} currency={po.currency} /></dd>
+            <dt className="text-muted">{format(tc.vatWithRate, { rate: po.vat_rate_percent })}</dt>
+            <dd><MoneyDisplay amount={po.vat_amount} currency={po.currency} locale={locale} /></dd>
           </div>
-          <div className="flex justify-between font-bold">
-            <dt>الإجمالي الكلي</dt>
-            <dd><MoneyDisplay amount={po.total} currency={po.currency} /></dd>
+          <div className="flex justify-between font-bold text-ink">
+            <dt>{tc.grandTotal}</dt>
+            <dd><MoneyDisplay amount={po.total} currency={po.currency} locale={locale} /></dd>
           </div>
           {po.payment_terms ? (
-            <div className="flex justify-between border-t border-line pt-1">
-              <dt className="text-muted">شروط الدفع</dt>
-              <dd>{po.payment_terms}</dd>
+            <div className="flex justify-between gap-4 border-t border-line pt-1">
+              <dt className="text-muted">{tc.paymentTerms}</dt>
+              <dd className="text-end">{po.payment_terms}</dd>
             </div>
           ) : null}
           {po.delivery_terms ? (
-            <div className="flex justify-between">
-              <dt className="text-muted">شروط التسليم</dt>
-              <dd>{po.delivery_terms}</dd>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{tc.deliveryTerms}</dt>
+              <dd className="text-end">{po.delivery_terms}</dd>
             </div>
           ) : null}
         </dl>
       </Card>
 
       {/* Items */}
-      <Card className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-navy">البنود</h2>
+      <Card>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-ink">{td.items}</h2>
           {isIssued ? (
-            <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs text-warning">
-              البيانات التجارية محمية — لا يمكن التعديل بعد الإصدار
+            <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-medium text-warning">
+              {td.locked}
             </span>
           ) : null}
         </div>
         {items.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد بنود.</p>
+          <p className="text-sm text-muted">{tc.noItems}</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-paper text-start text-muted">
+          <TableScroll className="rounded-xl border border-line">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="bg-surface-muted text-muted">
                 <tr>
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">الوصف</th>
-                  <th className="px-3 py-2">الكمية المأمورة</th>
-                  <th className="px-3 py-2">المستلمة</th>
-                  <th className="px-3 py-2">المتبقية</th>
-                  <th className="px-3 py-2">سعر الوحدة</th>
-                  <th className="px-3 py-2">الإجمالي</th>
+                  <th className="px-3 py-2 text-start font-semibold">#</th>
+                  <th className="px-3 py-2 text-start font-semibold">{tc.description}</th>
+                  <th className="px-3 py-2 text-end font-semibold">{td.orderedQty}</th>
+                  <th className="px-3 py-2 text-end font-semibold">{td.receivedQty}</th>
+                  <th className="px-3 py-2 text-end font-semibold">{td.remainingQty}</th>
+                  <th className="px-3 py-2 text-end font-semibold">{tc.unitPrice}</th>
+                  <th className="px-3 py-2 text-end font-semibold">{tc.total}</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,68 +186,76 @@ export default async function PurchaseOrderDetailPage({
                   const remaining = Math.max(0, ordered - received);
                   return (
                     <tr key={String(item.id)} className="border-t border-line">
-                      <td className="px-3 py-2">{String(item.line_no)}</td>
-                      <td className="px-3 py-2">{String(item.description)}</td>
-                      <td className="px-3 py-2 tabular-nums">{ordered}</td>
-                      <td className="px-3 py-2 tabular-nums text-success">{received}</td>
-                      <td className={`px-3 py-2 tabular-nums ${remaining > 0 ? "text-warning" : "text-success"}`}>
+                      <td className="px-3 py-2 text-muted">{String(item.line_no)}</td>
+                      <td className="px-3 py-2 text-ink">{String(item.description)}</td>
+                      <td className="px-3 py-2 text-end tabular-nums">{ordered}</td>
+                      <td className="px-3 py-2 text-end tabular-nums text-success">{received}</td>
+                      <td className={`px-3 py-2 text-end tabular-nums ${remaining > 0 ? "text-warning" : "text-success"}`}>
                         {remaining}
                       </td>
-                      <td className="px-3 py-2 tabular-nums">
-                        <MoneyDisplay amount={item.unit_price as number} currency={po.currency} />
+                      <td className="px-3 py-2 text-end tabular-nums">
+                        <MoneyDisplay amount={item.unit_price as number} currency={po.currency} locale={locale} />
                       </td>
-                      <td className="px-3 py-2 tabular-nums">
-                        <MoneyDisplay amount={item.line_total as number} currency={po.currency} />
+                      <td className="px-3 py-2 text-end tabular-nums">
+                        <MoneyDisplay amount={item.line_total as number} currency={po.currency} locale={locale} />
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 
       {/* Submit for approval */}
       {canSubmitApproval ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">تقديم للاعتماد</h2>
+        <Card>
+          <h2 className="mb-3 font-semibold text-ink">{td.submitForApproval}</h2>
           <ServerActionForm action={submitPurchaseOrderForApprovalAction} className="flex flex-wrap gap-3">
             <input type="hidden" name="poId" value={po.id} />
-            <select name="approverProfileId" required className="h-10 rounded-md border px-3 text-sm">
-              <option value="">اختر المعتمد</option>
+            <select
+              name="approverProfileId"
+              required
+              className="h-10 min-w-[14rem] rounded-md border border-line bg-surface px-3 text-sm text-ink"
+            >
+              <option value="">{td.chooseApprover}</option>
               {(users.data ?? []).map((u) => {
-                const p = Array.isArray(u.profiles) ? u.profiles[0] : u.profiles;
+                const p = (Array.isArray(u.profiles) ? u.profiles[0] : u.profiles) as Record<string, string | null> | null;
                 return (
                   <option key={u.profile_id} value={u.profile_id}>
-                    {(p as Record<string, string> | null)?.full_name_ar ??
-                      (p as Record<string, string> | null)?.full_name_en ??
-                      u.profile_id}
+                    {pickLocalized(locale, p?.full_name_ar, p?.full_name_en) || u.profile_id}
                   </option>
                 );
               })}
             </select>
-            <Button type="submit">تقديم للاعتماد</Button>
+            <Button type="submit">{td.submitForApproval}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {/* Approve / Reject */}
       {canApprove && pendingStep ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">قرار اعتماد أمر الشراء</h2>
+        <Card>
+          <h2 className="mb-3 font-semibold text-ink">{td.approvalDecision}</h2>
           <div className="flex gap-3">
             <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="A" />
-              <Button type="submit">اعتماد ✓</Button>
+              <Button type="submit" variant="success">
+                <Check className="size-4" aria-hidden />
+                {td.approve}
+              </Button>
             </ServerActionForm>
             <ServerActionForm action={decideEntityApprovalAction}>
               <input type="hidden" name="approvalRequestId" value={approval?.id ?? ""} />
               <input type="hidden" name="stepId" value={String(pendingStep.id)} />
               <input type="hidden" name="officialCode" value="D" />
-              <Button type="submit" variant="danger">رفض</Button>
+              <Button type="submit" variant="danger">
+                <X className="size-4" aria-hidden />
+                {td.reject}
+              </Button>
             </ServerActionForm>
           </div>
         </Card>
@@ -248,70 +263,74 @@ export default async function PurchaseOrderDetailPage({
 
       {/* Issue PO */}
       {canIssue ? (
-        <Card className="mb-6" data-testid="po-issue-card">
-          <h2 className="mb-3 font-semibold text-navy">إصدار أمر الشراء</h2>
-          <p className="mb-3 text-sm text-muted">بعد الإصدار، تُقفل البيانات التجارية بشكل نهائي.</p>
+        <Card data-testid="po-issue-card">
+          <h2 className="mb-3 font-semibold text-ink">{td.issueTitle}</h2>
+          <p className="mb-3 text-sm text-muted">{td.issueHint}</p>
           <ServerActionForm action={issuePurchaseOrderAction} data-testid="po-issue-form">
             <input type="hidden" name="poId" value={po.id} />
-            <Button type="submit" data-testid="po-issue-submit">إصدار PO</Button>
+            <Button type="submit" data-testid="po-issue-submit">{td.issue}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {/* GRN action */}
       {isIssued && hasPermission(ctx, "goods_receipt.create") ? (
-        <div className="mb-6">
-          <Link
-            href={`/procurement/goods-receipts/new?poId=${id}`}
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            + تسجيل استلام بضاعة
+        <div>
+          <Link href={`/procurement/goods-receipts/new?poId=${id}`}>
+            <Button type="button">
+              <PackagePlus className="size-4" aria-hidden />
+              {td.recordReceipt}
+            </Button>
           </Link>
         </div>
       ) : null}
 
       {/* Goods Receipts */}
       {(receipts ?? []).length > 0 ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 font-semibold text-navy">مستندات الاستلام</h2>
-          <div className="overflow-x-auto">
+        <Card>
+          <h2 className="mb-3 font-semibold text-ink">{td.receipts}</h2>
+          <TableScroll>
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-start">الرقم</th>
-                  <th className="py-2 text-start">تاريخ التسليم</th>
-                  <th className="py-2 text-start">الحالة</th>
+                  <th className="py-2 text-start font-semibold">{tc.number}</th>
+                  <th className="py-2 text-start font-semibold">{tc.deliveryDate}</th>
+                  <th className="py-2 text-start font-semibold">{tc.status}</th>
                 </tr>
               </thead>
               <tbody>
                 {(receipts ?? []).map((r) => (
                   <tr key={r.id} className="border-t border-line">
                     <td className="py-2">
-                      <Link href={`/procurement/goods-receipts/${r.id}`} className="font-medium text-navy underline">
+                      <Link
+                        href={`/procurement/goods-receipts/${r.id}`}
+                        className="font-mono text-xs font-semibold text-primary hover:underline"
+                        dir="ltr"
+                      >
                         {r.receipt_number}
                       </Link>
                     </td>
                     <td className="py-2">{r.delivery_date}</td>
-                    <td className="py-2"><CommercialStatusBadge status={r.status} /></td>
+                    <td className="py-2"><CommercialStatusBadge status={r.status} locale={locale} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       ) : null}
 
       {/* Activity */}
       <Card>
-        <h2 className="mb-3 font-semibold text-navy">سجل النشاط</h2>
+        <h2 className="mb-3 font-semibold text-ink">{td.activity}</h2>
         {audit.length === 0 ? (
-          <p className="text-sm text-muted">لا يوجد نشاط مسجّل.</p>
+          <p className="text-sm text-muted">{td.noActivity}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {audit.map((a) => (
-              <li key={a.id} className="flex justify-between border-b border-line pb-2">
-                <span>{a.action.replaceAll(".", " · ")}</span>
-                <span className="text-muted">{new Date(a.created_at).toLocaleString("ar-SA")}</span>
+              <li key={a.id} className="flex justify-between gap-4 border-b border-line pb-2">
+                <span dir="ltr" className="font-mono text-xs text-ink">{a.action.replaceAll(".", " · ")}</span>
+                <span className="text-muted">{new Date(a.created_at).toLocaleString(intlLocale(locale))}</span>
               </li>
             ))}
           </ul>

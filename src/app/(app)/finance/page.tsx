@@ -1,12 +1,17 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Card, EmptyState, PageHeader, Section, StatCard, TableScroll } from "@/components/ui/primitives";
 import { MoneyDisplay } from "@/components/commercial/money";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
+import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { getI18n } from "@/lib/i18n/server";
+
+const navLinkClass =
+  "rounded-md border border-line px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-surface-muted hover:text-ink";
 
 export default async function FinancePage() {
   const ctx = await getAuthContext();
@@ -15,6 +20,10 @@ export default async function FinancePage() {
   const canAr = hasPermission(ctx, "client_invoice.read") || hasPermission(ctx, "finance.read");
   const canPay = hasPermission(ctx, "client_payment.record");
   if (!canAp && !canAr && !canPay) redirect("/");
+
+  const { t, locale } = await getI18n();
+  const td = t.financeClient.dashboard;
+  const approvalStatusLabels: Record<string, string> = td.approvalStatus;
 
   const supabase = await createServerSupabaseClient();
   const repo = new CommercialRepository(supabase);
@@ -50,167 +59,172 @@ export default async function FinancePage() {
   return (
     <PageContainer data-testid="finance-dashboard-page" className="space-y-5">
       <PageHeader
-        title="المالية"
-        description="فواتير الموردين، مستخلصات العملاء، الذمم والتحصيل"
+        title={td.title}
+        description={td.description}
         actions={
-          <div className="flex flex-wrap gap-3 text-sm">
+          <nav className="flex flex-wrap gap-2">
             {canAp ? (
-              <Link href="/finance/supplier-invoices" className="text-navy underline">
-                فواتير الموردين
+              <Link href="/finance/supplier-invoices" className={navLinkClass}>
+                {td.navSupplierInvoices}
               </Link>
             ) : null}
             {hasPermission(ctx, "client_valuation.read") ? (
-              <Link href="/finance/client-valuations" className="text-navy underline" data-testid="nav-client-valuations">
-                مستخلصات العملاء
+              <Link href="/finance/client-valuations" className={navLinkClass} data-testid="nav-client-valuations">
+                {td.navClientValuations}
               </Link>
             ) : null}
             {canAr ? (
-              <Link href="/finance/client-invoices" className="text-navy underline" data-testid="nav-client-invoices">
-                فواتير العملاء
+              <Link href="/finance/client-invoices" className={navLinkClass} data-testid="nav-client-invoices">
+                {td.navClientInvoices}
               </Link>
             ) : null}
             {hasPermission(ctx, "variation.read") ? (
-              <Link href="/finance/variations" className="text-navy underline" data-testid="nav-variations">
-                أوامر التغيير
+              <Link href="/finance/variations" className={navLinkClass} data-testid="nav-variations">
+                {td.navVariations}
               </Link>
             ) : null}
             {canAr ? (
-              <Link href="/finance/receivables" className="text-navy underline" data-testid="nav-receivables">
-                ذمم العملاء
+              <Link href="/finance/receivables" className={navLinkClass} data-testid="nav-receivables">
+                {td.navReceivables}
               </Link>
             ) : null}
-            <Link href="/procurement" className="text-navy underline">
-              المشتريات
+            <Link href="/procurement" className={navLinkClass}>
+              {td.navProcurement}
             </Link>
-          </div>
+          </nav>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {canAp ? (
           <>
-            <Card data-testid="stat-due-in-7">
-              <p className="text-sm text-muted">AP مستحقة خلال 7 أيام</p>
-              <p className="mt-2 text-3xl font-semibold text-navy">{stats.dueIn7}</p>
-            </Card>
-            <Card data-testid="stat-overdue-ap">
-              <p className="text-sm text-muted">AP متأخرة</p>
-              <p className="mt-2 text-3xl font-semibold text-danger">{stats.overdueAp}</p>
-            </Card>
-            <Card data-testid="stat-approved-payment">
-              <p className="text-sm text-muted">معتمدة للصرف</p>
-              <p className="mt-2 text-3xl font-semibold text-warning">{stats.approvedForPayment}</p>
-            </Card>
+            <div data-testid="stat-due-in-7">
+              <StatCard label={td.statDueIn7} value={stats.dueIn7} />
+            </div>
+            <div data-testid="stat-overdue-ap">
+              <StatCard label={td.statOverdueAp} value={stats.overdueAp} tone="danger" />
+            </div>
+            <div data-testid="stat-approved-payment">
+              <StatCard label={td.statApprovedForPayment} value={stats.approvedForPayment} tone="warning" />
+            </div>
           </>
         ) : null}
         {canAr ? (
           <>
-            <Card data-testid="stat-outstanding-ar">
-              <p className="text-sm text-muted">فواتير AR مفتوحة</p>
-              <p className="mt-2 text-3xl font-semibold text-navy">{stats.outstandingAr}</p>
-            </Card>
-            <Card data-testid="stat-overdue-ar">
-              <p className="text-sm text-muted">AR متأخرة</p>
-              <p className="mt-2 text-3xl font-semibold text-danger">{stats.overdueAr}</p>
-            </Card>
+            <div data-testid="stat-outstanding-ar">
+              <StatCard label={td.statOutstandingAr} value={stats.outstandingAr} tone="info" />
+            </div>
+            <div data-testid="stat-overdue-ar">
+              <StatCard label={td.statOverdueAr} value={stats.overdueAr} tone="danger" />
+            </div>
             <Card>
-              <p className="text-sm text-muted">تحليل الذمم</p>
-              <Link href="/finance/receivables" className="mt-2 inline-block text-sm font-medium text-navy underline">
-                عرض أعمار الذمم →
+              <p className="text-xs font-medium text-muted">{td.statAging}</p>
+              <Link
+                href="/finance/receivables"
+                className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+              >
+                {td.viewAging}
               </Link>
             </Card>
           </>
         ) : null}
         {canAp ? (
-          <Card data-testid="stat-discrepancies">
-            <p className="text-sm text-muted">فواتير باختلاف مطابقة</p>
-            <p className="mt-2 text-3xl font-semibold text-warning">{stats.discrepancies}</p>
-          </Card>
+          <div data-testid="stat-discrepancies">
+            <StatCard label={td.statDiscrepancies} value={stats.discrepancies} tone="warning" />
+          </div>
         ) : null}
       </div>
 
       {canAp ? (
-        <Card className="mb-6">
-          <h2 className="mb-4 text-base font-semibold text-navy">فواتير الموردين المفتوحة</h2>
+        <Section title={td.openSupplierInvoices}>
           {(supplierInvoices.data ?? []).length === 0 ? (
-            <EmptyState title="لا توجد فواتير مفتوحة." />
+            <EmptyState title={td.noOpenInvoices} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-paper text-start text-muted">
+            <TableScroll>
+              <table className="w-full text-sm">
+                <thead className="bg-surface-muted text-xs text-muted">
                   <tr>
-                    <th className="px-3 py-2">رقم الفاتورة</th>
-                    <th className="px-3 py-2">المبلغ</th>
-                    <th className="px-3 py-2">الاستحقاق</th>
-                    <th className="px-3 py-2">الحالة</th>
+                    <th className="px-3 py-2.5 text-start font-medium">{td.colInvoiceNumber}</th>
+                    <th className="px-3 py-2.5 text-end font-medium">{td.colAmount}</th>
+                    <th className="px-3 py-2.5 text-start font-medium">{td.colDue}</th>
+                    <th className="px-3 py-2.5 text-start font-medium">{td.colStatus}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(supplierInvoices.data ?? []).map((inv) => (
                     <tr key={inv.id} className="border-t border-line">
-                      <td className="px-3 py-2">
-                        <Link href={`/finance/supplier-invoices/${inv.id}`} className="font-medium text-navy underline">
+                      <td className="px-3 py-2.5">
+                        <Link
+                          href={`/finance/supplier-invoices/${inv.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
                           {inv.invoice_number}
                         </Link>
                       </td>
-                      <td className="px-3 py-2">
-                        <MoneyDisplay amount={inv.total} currency={inv.currency} />
+                      <td className="px-3 py-2.5 text-end tabular-nums">
+                        <MoneyDisplay amount={inv.total} currency={inv.currency} locale={locale} />
                       </td>
-                      <td className="px-3 py-2">{inv.due_date ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <Badge tone="navy">{inv.status}</Badge>
+                      <td className="px-3 py-2.5 tabular-nums text-muted">{inv.due_date ?? "—"}</td>
+                      <td className="px-3 py-2.5">
+                        <Badge tone="navy">{commercialStatusLabel(inv.status, locale)}</Badge>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
-        </Card>
+        </Section>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         {canAr ? (
-          <Card>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-navy">فواتير العملاء المستحقة</h2>
-              <Link href="/finance/receivables" className="text-sm text-navy underline">
-                الذمم
+          <Section
+            title={td.dueClientInvoices}
+            actions={
+              <Link href="/finance/receivables" className="text-sm font-medium text-primary hover:underline">
+                {td.receivablesLink}
               </Link>
-            </div>
+            }
+          >
             {(clientInvoices.data ?? []).length === 0 ? (
-              <EmptyState title="لا توجد ذمم مدينة مفتوحة." />
+              <EmptyState title={td.noOpenReceivables} />
             ) : (
               <ul className="space-y-2 text-sm">
                 {(clientInvoices.data ?? []).map((inv) => (
-                  <li key={inv.id} className="flex justify-between border-b border-line pb-2">
-                    <Link href={`/finance/client-invoices/${inv.id}`} className="font-medium text-navy underline">
+                  <li key={inv.id} className="flex items-center justify-between gap-3 border-b border-line pb-2">
+                    <Link
+                      href={`/finance/client-invoices/${inv.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
                       {inv.invoice_number}
                     </Link>
-                    <span>
-                      <MoneyDisplay amount={inv.total} currency={inv.currency} /> · {inv.due_date ?? "—"}
+                    <span className="text-end tabular-nums">
+                      <MoneyDisplay amount={inv.total} currency={inv.currency} locale={locale} />
+                      <span className="text-muted"> · {inv.due_date ?? "—"}</span>
                     </span>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </Section>
         ) : null}
-        <Card>
-          <h2 className="mb-4 text-base font-semibold text-navy">موافقات مالية معلّقة</h2>
+        <Section title={td.pendingApprovals}>
           {(approvals.data ?? []).length === 0 ? (
-            <EmptyState title="لا توجد موافقات معلّقة." />
+            <EmptyState title={td.noPendingApprovals} />
           ) : (
             <ul className="space-y-2 text-sm">
               {(approvals.data ?? []).map((a) => (
-                <li key={a.id} className="flex justify-between border-b border-line pb-2">
-                  <span>{a.title}</span>
-                  <Badge tone="warning">{a.status}</Badge>
+                <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line pb-2">
+                  <span className="text-ink">{a.title}</span>
+                  <Badge tone="warning">
+                    {approvalStatusLabels[a.status] ?? commercialStatusLabel(a.status, locale)}
+                  </Badge>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </Section>
       </div>
     </PageContainer>
   );

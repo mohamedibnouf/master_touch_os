@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, PageHeader } from "@/components/ui/primitives";
+import { Button, Card, Input, PageHeader, Select } from "@/components/ui/primitives";
 import { RegisterPagination } from "@/components/commercial/pagination";
 import { RegisterTable } from "@/components/commercial/register-table";
 import { CommercialStatusBadge } from "@/components/commercial/status-badge";
@@ -11,6 +11,9 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { newPurchaseRequestHref, parseScopedProjectId } from "@/modules/procurement/stage05-readiness";
+import { commercialStatusLabel } from "@/lib/commercial/status-labels";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function PurchaseRequestsPage({
   searchParams,
@@ -20,6 +23,10 @@ export default async function PurchaseRequestsPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!hasPermission(ctx, "purchase_request.read")) redirect("/procurement");
+
+  const { t, locale } = await getI18n();
+  const tl = t.procurementSourcing.requests.list;
+  const common = t.procurementSourcing.common;
 
   const params = await searchParams;
   const page = Number(params.page ?? "1") || 1;
@@ -37,56 +44,69 @@ export default async function PurchaseRequestsPage({
   return (
     <PageContainer className="space-y-5">
       <PageHeader
-        title="طلبات الشراء"
-        description="سجل طلبات الشراء الداخلية"
+        title={tl.title}
+        description={tl.description}
         actions={
           hasPermission(ctx, "purchase_request.create") ? (
-            <Link href={newPurchaseRequestHref(scopedProjectId)} className="text-sm text-navy underline">
-              طلب جديد
+            <Link
+              href={newPurchaseRequestHref(scopedProjectId)}
+              className="inline-flex items-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              {tl.newRequest}
             </Link>
           ) : null
         }
       />
-      <Card className="mb-4">
+      <Card>
         <form className="grid gap-3 md:grid-cols-4">
-          <input name="q" defaultValue={params.q} placeholder="رقم PR" className="h-10 rounded-md border px-3 text-sm" />
-          <select name="status" defaultValue={params.status ?? ""} className="h-10 rounded-md border px-3 text-sm">
-            <option value="">كل الحالات</option>
-            <option value="draft">مسودة</option>
-            <option value="submitted">مقدّم</option>
-            <option value="under_review">قيد المراجعة</option>
-            <option value="approved">معتمد</option>
-            <option value="rejected">مرفوض</option>
-          </select>
-          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">
-            تصفية
-          </button>
+          <Input name="q" defaultValue={params.q} placeholder={tl.searchPlaceholder} />
+          <Select name="status" defaultValue={params.status ?? ""}>
+            <option value="">{common.allStatuses}</option>
+            <option value="draft">{tl.statuses.draft}</option>
+            <option value="submitted">{tl.statuses.submitted}</option>
+            <option value="under_review">{tl.statuses.under_review}</option>
+            <option value="approved">{tl.statuses.approved}</option>
+            <option value="rejected">{tl.statuses.rejected}</option>
+          </Select>
+          <Button type="submit" variant="secondary">
+            {common.filter}
+          </Button>
         </form>
       </Card>
       <Card className="p-0">
         <RegisterTable
+          locale={locale}
           columns={[
-            { key: "number", header: "الرقم" },
-            { key: "project", header: "المشروع" },
-            { key: "priority", header: "الأولوية" },
-            { key: "cost", header: "التكلفة" },
-            { key: "status", header: "الحالة" },
+            { key: "number", header: tl.columns.number },
+            { key: "project", header: tl.columns.project },
+            { key: "priority", header: tl.columns.priority },
+            { key: "cost", header: tl.columns.cost },
+            { key: "status", header: tl.columns.status },
           ]}
           rows={rows.map((r) => {
-            const project = Array.isArray(r.projects) ? r.projects[0] : r.projects;
+            const project = (Array.isArray(r.projects) ? r.projects[0] : r.projects) as
+              | { project_code: string; name_ar: string | null; name_en?: string | null }
+              | null
+              | undefined;
             return {
               id: r.id,
               number: r.pr_number,
-              project: project ? `${project.project_code} — ${project.name_ar}` : "—",
-              priority: r.priority,
-              cost: <MoneyDisplay amount={r.estimated_cost} currency={r.currency} />,
-              status: <CommercialStatusBadge status={r.status} />,
+              project: project
+                ? format(common.codeName, {
+                    code: project.project_code,
+                    name: pickLocalized(locale, project.name_ar, project.name_en),
+                  })
+                : common.none,
+              priority: r.priority ? commercialStatusLabel(r.priority, locale) : common.none,
+              cost: <MoneyDisplay amount={r.estimated_cost} currency={r.currency} locale={locale} />,
+              status: <CommercialStatusBadge status={r.status} locale={locale} />,
             };
           })}
           getRowHref={(row) => `/procurement/purchase-requests/${row.id}`}
         />
         <div className="p-4">
           <RegisterPagination
+            locale={locale}
             basePath="/procurement/purchase-requests"
             page={page}
             totalPages={Math.max(1, Math.ceil(total / pageSize))}

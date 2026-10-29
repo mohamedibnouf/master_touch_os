@@ -9,6 +9,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClientInvoiceAction } from "@/server/use-cases/commercial";
 import { grossWithVat } from "@/server/domain/commercial";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { intlLocale } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NewClientInvoicePage({
   searchParams,
@@ -18,6 +20,11 @@ export default async function NewClientInvoicePage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!hasPermission(ctx, "client_invoice.create")) redirect("/finance/client-invoices");
+
+  const { t, locale } = await getI18n();
+  const tf = t.financeClient.invoiceForm;
+  const tc = t.financeClient.common;
+  const numberLocale = intlLocale(locale);
 
   const { valuationId } = await searchParams;
   const supabase = await createServerSupabaseClient();
@@ -95,25 +102,25 @@ export default async function NewClientInvoicePage({
   return (
     <PageContainer className="mx-auto max-w-2xl" data-testid="client-invoice-create-page">
       <PageHeader
-        title="فاتورة عميل جديدة"
-        description={valuationId ? "من مستخلص معتمد" : "يُفضّل الربط بمستخلص معتمد من العميل"}
+        title={tf.title}
+        description={valuationId ? tf.descriptionFromValuation : tf.descriptionDefault}
         actions={
-          <Link href="/finance/client-invoices" className="text-sm underline">
-            السجل
+          <Link href="/finance/client-invoices" className="text-sm font-medium text-primary hover:underline">
+            {tc.register}
           </Link>
         }
       />
       <Card>
         <ServerActionForm action={action} className="grid gap-4" data-testid="client-invoice-create-form">
-          <Field label="المستخلص (مُفضّل)">
+          <Field label={tf.valuation}>
             <Select name="valuationId" defaultValue={selected ? String((selected as Record<string, unknown>).id) : ""} data-testid="invoice-valuation">
-              <option value="">بدون مستخلص</option>
+              <option value="">{tf.noValuation}</option>
               {certifiedValuations.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.valuation_number} —{" "}
                   {v.certified_amount != null
-                    ? `${Number(v.certified_amount).toLocaleString("ar-SA")} SAR`
-                    : `${Number(v.total_claim).toLocaleString("ar-SA")} SAR`}
+                    ? `${Number(v.certified_amount).toLocaleString(numberLocale)} SAR`
+                    : `${Number(v.total_claim).toLocaleString(numberLocale)} SAR`}
                 </option>
               ))}
             </Select>
@@ -121,10 +128,10 @@ export default async function NewClientInvoicePage({
 
           {!selected ? (
             <>
-              <Field label="العقد">
+              <Field label={tf.contract}>
                 <Select name="contractId" required data-testid="invoice-contract">
                   <option value="" disabled>
-                    اختر عقداً
+                    {tf.chooseContract}
                   </option>
                   {(activeContracts ?? []).map((c) => (
                     <option key={c.id} value={c.id}>
@@ -143,20 +150,20 @@ export default async function NewClientInvoicePage({
                 name="contractId"
                 value={String((selected as Record<string, unknown>).contract_id ?? "")}
               />
-              <div className="rounded-md bg-paper px-4 py-3 text-sm">
-                <p className="text-muted">المبلغ المعتمد للفوترة:</p>
-                <p className="mt-1 font-semibold text-navy">
-                  <MoneyDisplay amount={taxableDefault} currency="SAR" />
+              <div className="rounded-md border border-line bg-surface-muted px-4 py-3 text-sm">
+                <p className="text-muted">{tf.certifiedForBilling}</p>
+                <p className="mt-1 font-semibold tabular-nums text-ink">
+                  <MoneyDisplay amount={taxableDefault} currency="SAR" locale={locale} />
                 </p>
               </div>
             </>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="رقم الفاتورة">
+            <Field label={tf.invoiceNumber}>
               <Input name="invoiceNumber" required placeholder="INV-2025-001" data-testid="client-invoice-number" />
             </Field>
-            <Field label="تاريخ الفاتورة">
+            <Field label={tf.invoiceDate}>
               <Input
                 name="invoiceDate"
                 type="date"
@@ -165,10 +172,10 @@ export default async function NewClientInvoicePage({
                 data-testid="client-invoice-date"
               />
             </Field>
-            <Field label="تاريخ الاستحقاق">
+            <Field label={tf.dueDate}>
               <Input name="dueDate" type="date" />
             </Field>
-            <Field label="المبلغ الخاضع للضريبة (SAR)">
+            <Field label={tf.taxableAmount}>
               <Input
                 name="taxableAmount"
                 type="number"
@@ -179,10 +186,10 @@ export default async function NewClientInvoicePage({
                 data-testid="client-invoice-taxable"
               />
             </Field>
-            <Field label="نسبة ضريبة القيمة المضافة (%)">
+            <Field label={tf.vatRate}>
               <Input name="vatRate" type="number" step="0.001" min="0" defaultValue="15" />
             </Field>
-            <Field label="العملة">
+            <Field label={tf.currency}>
               <Select name="currency" defaultValue="SAR">
                 <option value="SAR">SAR</option>
                 <option value="USD">USD</option>
@@ -191,19 +198,21 @@ export default async function NewClientInvoicePage({
           </div>
 
           <p className="text-sm text-muted">
-            الإجمالي المتوقع (شامل الضريبة):{" "}
-            <MoneyDisplay amount={grossWithVat(taxableDefault, 15)} currency="SAR" />
+            {tf.expectedTotal}{" "}
+            <span className="tabular-nums text-ink">
+              <MoneyDisplay amount={grossWithVat(taxableDefault, 15)} currency="SAR" locale={locale} />
+            </span>
           </p>
 
           <div className="flex justify-end gap-3">
             <Link
               href="/finance/client-invoices"
-              className="inline-flex items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-medium"
+              className="inline-flex items-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted"
             >
-              إلغاء
+              {tc.cancel}
             </Link>
             <Button type="submit" data-testid="client-invoice-submit">
-              حفظ الفاتورة
+              {tf.submit}
             </Button>
           </div>
         </ServerActionForm>

@@ -7,6 +7,8 @@ import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createSupplierInvoiceAction } from "@/server/use-cases/finance";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NewSupplierInvoicePage({
   searchParams,
@@ -16,11 +18,14 @@ export default async function NewSupplierInvoicePage({
   const ctx = authorize(await getAuthContext(), "supplier_invoice.create");
   const { poId: preselectedPoId } = await searchParams;
   const supabase = await createServerSupabaseClient();
+  const { t, locale } = await getI18n();
+  const tf = t.financePayables.supplierInvoiceForm;
+  const common = t.financePayables.common;
 
   const [projectsResult, suppliersResult, posResult] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, project_code, name_ar")
+      .select("id, project_code, name_ar, name_en")
       .eq("organization_id", ctx.organization.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
@@ -59,57 +64,67 @@ export default async function NewSupplierInvoicePage({
 
   return (
     <PageContainer className="mx-auto max-w-2xl" data-testid="invoice-create-page">
-      <PageHeader title="فاتورة مورد جديدة" description="ستُنفَّذ المطابقة تلقائياً عند الحفظ" />
+      <PageHeader title={tf.title} description={tf.description} />
       <Card>
         <ServerActionForm action={action} className="grid gap-4" data-testid="invoice-create-form">
-          <Field label="المشروع">
+          <Field label={tf.project} required>
             <Select name="projectId" required defaultValue={prefilledPo ? "" : ""} data-testid="invoice-project">
-              <option value="" disabled>اختر مشروعاً</option>
+              <option value="" disabled>{tf.chooseProject}</option>
               {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.project_code} — {p.name_ar}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="المورد">
-            <Select name="supplierId" required defaultValue={prefilledPo?.supplier_id ?? ""} data-testid="invoice-supplier">
-              <option value="" disabled>اختر المورد</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.supplier_code} — {s.legal_name}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="أمر الشراء المرتبط (اختياري)">
-            <Select name="purchaseOrderId" defaultValue={preselectedPoId ?? ""} data-testid="invoice-po">
-              <option value="">بدون ربط بأمر شراء</option>
-              {pos.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.po_number} — {Number(p.total).toLocaleString("ar-SA", { minimumFractionDigits: 2 })} {p.currency}
+                  {format(common.projectOption, {
+                    code: p.project_code,
+                    name: pickLocalized(locale, p.name_ar, p.name_en),
+                  })}
                 </option>
               ))}
             </Select>
           </Field>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="رقم الفاتورة (المورد)">
-              <Input name="invoiceNumber" required placeholder="مثال: INV-2025-0042" data-testid="invoice-number" />
+          <Field label={tf.supplier} required>
+            <Select name="supplierId" required defaultValue={prefilledPo?.supplier_id ?? ""} data-testid="invoice-supplier">
+              <option value="" disabled>{tf.chooseSupplier}</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {format(tf.supplierOption, { code: s.supplier_code, name: s.legal_name })}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={tf.purchaseOrder}>
+            <Select name="purchaseOrderId" defaultValue={preselectedPoId ?? ""} data-testid="invoice-po">
+              <option value="">{tf.noPurchaseOrder}</option>
+              {pos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.po_number} — {Number(p.total).toLocaleString(intlLocale(locale), { minimumFractionDigits: 2 })} {p.currency}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={tf.invoiceNumber} required>
+              <Input name="invoiceNumber" required placeholder={tf.invoiceNumberPlaceholder} data-testid="invoice-number" />
             </Field>
-            <Field label="تاريخ الفاتورة">
+            <Field label={tf.invoiceDate} required>
               <Input name="invoiceDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} data-testid="invoice-date" />
             </Field>
-            <Field label="تاريخ الاستحقاق">
+            <Field label={tf.dueDate}>
               <Input name="dueDate" type="date" />
             </Field>
-            <Field label="المبلغ قبل الضريبة (SAR)">
-              <Input name="subtotal" type="number" step="0.01" min="0" required defaultValue="0" data-testid="invoice-subtotal" />
+            <Field label={tf.subtotal} required>
+              <Input name="subtotal" type="number" step="0.01" min="0" required defaultValue="0" className="tabular-nums" data-testid="invoice-subtotal" />
             </Field>
-            <Field label="نسبة ضريبة القيمة المضافة (%)">
-              <Input name="vatRate" type="number" step="0.001" min="0" defaultValue="15" />
+            <Field label={tf.vatRate}>
+              <Input name="vatRate" type="number" step="0.001" min="0" defaultValue="15" className="tabular-nums" />
             </Field>
           </div>
-          <div className="flex justify-end gap-3">
-            <Link href="/finance/supplier-invoices" className="inline-flex items-center rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-paper">
-              إلغاء
+          <div className="flex justify-end gap-3 border-t border-line pt-4">
+            <Link
+              href="/finance/supplier-invoices"
+              className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-9"
+            >
+              {common.cancel}
             </Link>
-            <Button type="submit" data-testid="invoice-submit">حفظ وتنفيذ المطابقة</Button>
+            <Button type="submit" data-testid="invoice-submit">{tf.submit}</Button>
           </div>
         </ServerActionForm>
       </Card>
