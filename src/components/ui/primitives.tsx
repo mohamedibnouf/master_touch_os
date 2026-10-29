@@ -7,6 +7,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/utils";
+import { PendingSubmit } from "@/components/ui/pending-submit";
 
 const controlFocus =
   "outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25";
@@ -18,8 +19,9 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "icon" | "success" | "warning";
 }) {
+  const Element = props.type === "submit" ? PendingSubmit : "button";
   return (
-    <button
+    <Element
       className={cn(
         "inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-medium duration-150 transition-[background-color,box-shadow,color,border-color] disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-50 md:min-h-9",
         variant === "primary" &&

@@ -28,9 +28,10 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims refreshes an expiring session (so cookies still rotate here) and verifies
+  // the JWT locally with asymmetric signing keys instead of calling the Auth server.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null;
 
   const pathname = request.nextUrl.pathname;
   const isPublic = !requiresInteractiveLogin(pathname);
@@ -50,11 +51,10 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   }
 
   if (user && !isPublic) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_active")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: profile }, { data: employee }] = await Promise.all([
+      supabase.from("profiles").select("is_active").eq("id", user.id).maybeSingle(),
+      supabase.from("employees").select("is_active").eq("profile_id", user.id).maybeSingle(),
+    ]);
 
     if (profile && profile.is_active === false) {
       await supabase.auth.signOut();
@@ -63,12 +63,6 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       url.searchParams.set("disabled", "1");
       return NextResponse.redirect(url);
     }
-
-    const { data: employee } = await supabase
-      .from("employees")
-      .select("is_active")
-      .eq("profile_id", user.id)
-      .maybeSingle();
 
     if (employee && employee.is_active === false) {
       await supabase.auth.signOut();

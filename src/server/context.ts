@@ -16,20 +16,23 @@ import {
 
 async function loadAuthContext(): Promise<AuthContext | null> {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally with asymmetric signing keys (no Auth round trip);
+  // with a legacy symmetric secret it falls back to a server check like getUser().
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!user) {
+  if (!userId) {
     return null;
   }
 
-  const [profileResult, membershipResult] = await Promise.all([
-    supabase.from("profiles").select(AUTH_PROFILE_COLUMNS).eq("id", user.id).maybeSingle<Profile>(),
+  // One parallel wave: employees and roles are fetched by profile and narrowed to the
+  // active organization in memory, instead of waiting for the membership first.
+  const [profileResult, membershipResult, employeeResult, roleResult] = await Promise.all([
+    supabase.from("profiles").select(AUTH_PROFILE_COLUMNS).eq("id", userId).maybeSingle<Profile>(),
     supabase
       .from("organization_members")
       .select(`organization_id, status, organizations(${AUTH_ORGANIZATION_COLUMNS})`)
-      .eq("profile_id", user.id)
+      .eq("profile_id", userId)
       .eq("status", "active")
       .order("joined_at", { ascending: true })
       .limit(1)
@@ -38,6 +41,16 @@ async function loadAuthContext(): Promise<AuthContext | null> {
         status: MembershipStatus;
         organizations: Organization | Organization[] | null;
       }>(),
+    supabase
+      .from("employees")
+      .select(AUTH_EMPLOYEE_COLUMNS)
+      .eq("profile_id", userId)
+      .limit(20)
+      .returns<Employee[]>(),
+    supabase
+      .from("user_roles")
+      .select("organization_id, scope_type, scope_id, roles(code, is_external, is_system, is_active, role_permissions(permission_key))")
+      .eq("profile_id", userId),
   ]);
 
   const profile = profileResult.data;
@@ -54,27 +67,15 @@ async function loadAuthContext(): Promise<AuthContext | null> {
     return null;
   }
 
-  const [employeeResult, roleResult] = await Promise.all([
-    supabase
-      .from("employees")
-      .select(AUTH_EMPLOYEE_COLUMNS)
-      .eq("organization_id", organization.id)
-      .eq("profile_id", user.id)
-      .limit(1)
-      .maybeSingle<Employee>(),
-    supabase
-      .from("user_roles")
-      .select("organization_id, scope_type, scope_id, roles(code, is_external, is_system, is_active, role_permissions(permission_key))")
-      .eq("profile_id", user.id)
-      .eq("organization_id", organization.id),
-  ]);
-
   if (roleResult.error) {
     logger.error("auth user_roles query failed", { code: roleResult.error.code ?? null });
   }
 
-  const employee = employeeResult.data ?? null;
-  const grants = mapUserRoleRowsToGrants(roleResult.data as AuthUserRoleRow[] | null);
+  const employee = employeeResult.data?.find((row) => row.organization_id === organization.id) ?? null;
+  const roleRows = (roleResult.data as AuthUserRoleRow[] | null)?.filter(
+    (row) => row.organization_id === organization.id,
+  );
+  const grants = mapUserRoleRowsToGrants(roleRows ?? null);
 
   if (profile.is_platform_admin) {
     const { ALL_INTERNAL_PERMISSIONS } = await import("@/lib/permissions/catalog");
@@ -93,7 +94,7 @@ async function loadAuthContext(): Promise<AuthContext | null> {
   }) as PermissionKey[];
 
   return {
-    userId: user.id,
+    userId,
     profile,
     organization,
     employee,
