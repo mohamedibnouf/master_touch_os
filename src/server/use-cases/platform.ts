@@ -1732,11 +1732,3 @@ export async function setUserActiveAction(
   revalidatePath("/employees");
   });
 }
-
-export async function bootstrapAdminIfNeeded(email: string): Promise<void> {
-  const admin = createAdminSupabaseClient();
-  const { error } = await admin.rpc("bootstrap_platform_admin", { p_email: email });
-  if (error && !error.message.includes("CONFLICT")) {
-    throw new DatabaseError(error);
-  }
-}

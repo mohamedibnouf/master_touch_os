@@ -26,7 +26,6 @@ import {
 import {
   SCHEMA_APPROVAL_ACTIONS,
   SCHEMA_APPROVAL_STEPS,
-  SCHEMA_BY_TABLE,
   assertSelectAgainstSchema,
 } from "@/lib/query-projections.schema";
 import { EMPLOYEE_DETAIL_COLUMNS, EMPLOYEE_DIRECTORY_COLUMNS } from "@/lib/hr/labels";

@@ -20,7 +20,7 @@ import {
   recordPayrollPaymentSchema,
   updatePayrollSettingsSchema,
 } from "@/modules/payroll/schemas";
-import type { PayrollEntry, PayrollPeriod } from "@/types/models";
+import type { PayrollPeriod } from "@/types/models";
 
 async function listRoleRecipientIds(
   organizationId: string,
@@ -142,7 +142,7 @@ export async function calculatePayrollPeriodAction(
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("calculate_payroll_period", {
+  const { error } = await supabase.rpc("calculate_payroll_period", {
     p_period_id: parsed.data.periodId,
   });
   if (error) throw new DatabaseError(error);
@@ -160,7 +160,7 @@ export async function submitPayrollForReviewAction(
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("submit_payroll_for_review", {
+  const { error } = await supabase.rpc("submit_payroll_for_review", {
     p_period_id: parsed.data.periodId,
   });
   if (error) throw new DatabaseError(error);
@@ -192,7 +192,7 @@ export async function markPayrollReviewedAction(
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("mark_payroll_reviewed", {
+  const { error } = await supabase.rpc("mark_payroll_reviewed", {
     p_period_id: parsed.data.periodId,
   });
   if (error) throw new DatabaseError(error);
@@ -224,7 +224,7 @@ export async function approvePayrollPeriodAction(
   const parsed = payrollPeriodIdSchema.safeParse({ periodId: formData.get("periodId") });
   if (!parsed.success) throw new ValidationError("معرف الفترة غير صالح.", "Invalid period id.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("approve_payroll_period", {
+  const { error } = await supabase.rpc("approve_payroll_period", {
     p_period_id: parsed.data.periodId,
   });
   if (error) throw new DatabaseError(error);
@@ -311,7 +311,7 @@ export async function cancelPayrollPeriodAction(
   });
   if (!parsed.success) throw new ValidationError("بيانات الإلغاء غير مكتملة.", "Cancel data incomplete.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("cancel_payroll_period", {
+  const { error } = await supabase.rpc("cancel_payroll_period", {
     p_period_id: parsed.data.periodId,
     p_reason: parsed.data.reason,
   });
@@ -434,7 +434,7 @@ export async function updatePayrollSettingsAction(
   });
   if (!parsed.success) throw new ValidationError("إعدادات الرواتب غير مكتملة.", "Payroll settings incomplete.");
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("update_payroll_settings", {
+  const { error } = await supabase.rpc("update_payroll_settings", {
     p_organization_id: ctx.organization.id,
     p_currency: parsed.data.currency,
     p_standard_payable_days: parsed.data.standardPayableDays,

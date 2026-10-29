@@ -268,7 +268,6 @@ describe.skipIf(!configured)("live Phase 5.7 attendance geofencing", () => {
   it("I–J. missing workplace rejected and NO_WORKPLACE persists", async () => {
     if (!geoReady) return;
     await admin.from("employee_workplace_assignments").delete().eq("employee_id", mgrEmployeeId);
-    const today = new Date().toISOString().slice(0, 10);
     const { data: primary } = await admin
       .from("workplace_locations")
       .select("id")

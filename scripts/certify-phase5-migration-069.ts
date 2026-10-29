@@ -3,7 +3,7 @@
  * 069 certification: rolled-back mutation tests + function inspection.
  * Does not persist custom roles or change admin accounts.
  */
-import { connect, identityOk, ORG, EIGHT } from "./phase5-db-gate";
+import { connect, identityOk, EIGHT } from "./phase5-db-gate";
 
 type Case = { id: string; status: "PASS" | "FAIL" | "NOT LIVE-CERTIFIED"; detail?: string };
 

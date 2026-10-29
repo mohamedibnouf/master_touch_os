@@ -19,7 +19,6 @@ export type Money = number;
 export function roundMoney(amount: number, precision = 2): Money {
   if (!Number.isFinite(amount)) throw new Error("INVALID_AMOUNT");
   // Avoid binary float artifacts (e.g. 1.005 * 100) before half-up rounding.
-  const factor = 10 ** precision;
   const shifted = Number(`${amount}e${precision}`);
   const rounded = Math.round(shifted);
   return Number(`${rounded}e-${precision}`);

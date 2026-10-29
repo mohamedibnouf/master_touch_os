@@ -134,7 +134,6 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
   let unpaidLeaveTypeId = "";
   let periodYear = 2090;
   let periodMonth = 4;
-  let periodHash = 0;
 
   const createdUserIds: string[] = [];
   const createdPeriodIds: string[] = [];
@@ -183,7 +182,6 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
     const period = await allocateFixturePeriodSlot(admin, fx.orgAId, runSuffix);
     periodYear = period.year;
     periodMonth = period.month;
-    periodHash = period.hash;
     if (periodYear < 2000 || periodYear > 2100) {
       throw new Error(`Fixture year ${periodYear} violates payroll_periods_year_check (2000..2100)`);
     }
@@ -254,7 +252,7 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
       "HR",
       fx.orgAId,
     );
-    const fin = await createWithRole(
+    await createWithRole(
       `mt-live-fin45-${runSuffix}@test.local`,
       `${prefix}fin45`,
       "finance_manager",

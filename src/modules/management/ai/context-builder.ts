@@ -127,7 +127,7 @@ export function buildManagementAIContext(input: BuildManagementAIContextInput): 
   let briefCount = 0;
   const brief = input.decisionBrief
     .map((sec) => {
-      const statements = sec.statements.slice(0, Math.max(0, L.maxBriefStatements - briefCount)).map((st, j) => {
+      const statements = sec.statements.slice(0, Math.max(0, L.maxBriefStatements - briefCount)).map((st) => {
         briefCount += 1;
         const id = `BRIEF_${pad(briefCount)}`;
         sources[id] = {

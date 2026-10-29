@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Read-only 067 preflight. Never logs secrets. Never writes. */
-import { connect, identityOk, ORG, FILE_065, FILE_066, FILE_067, EMPLOYEE_ROLE_ID, EIGHT } from "./phase5-db-gate";
+import { connect, identityOk, ORG, EMPLOYEE_ROLE_ID, EIGHT } from "./phase5-db-gate";
 
 async function main() {
   const client = await connect();
