@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export const ARCHIVE_RESTRICTION_AR = {
   register: "لا يمكن حذف هذا المستند لأنه مسجل كمستند رسمي خاضع للتحكم.",
   transmittal: "لا يمكن حذف هذا المستند لأنه مرتبط بإرسالية رسمية.",
@@ -10,6 +12,21 @@ export const ARCHIVE_RESTRICTION_AR = {
 } as const;
 
 export type ArchiveRestrictionCode = keyof typeof ARCHIVE_RESTRICTION_AR;
+
+export const ARCHIVE_RESTRICTION_EN: Record<ArchiveRestrictionCode, string> = {
+  register: "This document cannot be deleted because it is a controlled register document.",
+  transmittal: "This document cannot be deleted because it is linked to an official transmittal.",
+  engineering: "This document cannot be deleted because it is linked to an engineering record.",
+  workflow: "This document cannot be deleted while it is linked to an active workflow or approval request.",
+  employee: "This document cannot be deleted because it is linked to an employee file.",
+  businessCase: "This document cannot be deleted because it is used as the project business case.",
+  alreadyArchived: "This document is already archived.",
+  notArchived: "This document is not archived.",
+};
+
+export function archiveRestrictionMessage(code: ArchiveRestrictionCode, locale: Locale = "ar"): string {
+  return locale === "en" ? ARCHIVE_RESTRICTION_EN[code] : ARCHIVE_RESTRICTION_AR[code];
+}
 
 export type ArchiveRestrictionInput = {
   is_register_controlled: boolean;
@@ -73,3 +90,23 @@ export const ARCHIVE_CONFIRM_COPY = {
   restoreBody: "سيظهر المستند مجدداً في القوائم التشغيلية دون تغيير الحالة أو الملفات.",
   restoreConfirm: "استعادة المستند",
 } as const;
+
+export type ArchiveConfirmCopy = { [K in keyof typeof ARCHIVE_CONFIRM_COPY]: string };
+
+export const ARCHIVE_CONFIRM_COPY_EN: ArchiveConfirmCopy = {
+  driveTitle: "Delete the document from the system?",
+  driveBody:
+    "The document will be removed from Master Touch only; the original file in Google Drive will not be deleted. You can restore the document later from the archive.",
+  storageTitle: "Delete the document from the system?",
+  storageBody:
+    "The document will be hidden from the system while its file, history and revisions are kept for audit. You can restore it later.",
+  confirm: "Delete document",
+  cancel: "Cancel",
+  restoreTitle: "Restore the document?",
+  restoreBody: "The document will reappear in operational lists without changing its status or files.",
+  restoreConfirm: "Restore document",
+};
+
+export function archiveConfirmCopy(locale: Locale = "ar"): ArchiveConfirmCopy {
+  return locale === "en" ? ARCHIVE_CONFIRM_COPY_EN : ARCHIVE_CONFIRM_COPY;
+}

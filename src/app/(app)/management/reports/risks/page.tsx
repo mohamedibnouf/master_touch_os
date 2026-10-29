@@ -1,5 +1,6 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
+import { Badge } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
   DecisionBriefView,
@@ -7,6 +8,7 @@ import {
   ReportMetricGrid,
   ReportRiskSection,
 } from "@/components/management/report-chrome";
+import { categoryLabel } from "@/components/management/management-widgets";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { canViewManagement, resolveManagementSections } from "@/modules/management/access";
@@ -15,6 +17,9 @@ import { createReportContext } from "@/modules/management/reports/context";
 import { buildRiskReport } from "@/modules/management/reports/builders";
 import { filterFindings } from "@/modules/management/risk/engine";
 import type { ManagementRiskCategory, ManagementRiskSeverity } from "@/modules/management/types";
+import { ar } from "@/lib/i18n/dictionaries/ar";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { getI18n } from "@/lib/i18n/server";
 
 type SearchParams = Promise<{ severity?: string; category?: string }>;
 
@@ -22,6 +27,9 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!canViewManagement(ctx)) redirect("/");
+
+  const { t } = await getI18n();
+  const copy = t.management.reports.risks;
 
   const sp = searchParams ? await searchParams : {};
   const sections = resolveManagementSections(ctx);
@@ -40,12 +48,14 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
   const severityMetrics = (["CRITICAL", "HIGH", "MEDIUM", "LOW"] as ManagementRiskSeverity[]).map(
     (s) => ({
       key: `sev-${s}`,
-      labelAr: s,
-      labelEn: s,
+      labelAr: ar.management.severity[s],
+      labelEn: en.management.severity[s],
       value: report.bySeverity[s],
       href: `/management/reports/risks?severity=${s}`,
     }),
   );
+
+  const categoryEntries = Object.entries(report.byCategory) as Array<[ManagementRiskCategory, number]>;
 
   return (
     <PageContainer data-testid="management-report-risks" className="space-y-5">
@@ -53,7 +63,7 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
         <ManagementNav pathname="/management/reports" />
       </div>
       <ReportChrome
-        title="سجل المخاطر"
+        title={copy.title}
         context={report.context}
         csvHref="/management/reports/risks/export.csv"
       >
@@ -62,8 +72,8 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
             metrics={[
               {
                 key: "total",
-                labelAr: "إجمالي النتائج",
-                labelEn: "Total findings",
+                labelAr: ar.management.reports.risks.totalFindings,
+                labelEn: en.management.reports.risks.totalFindings,
                 value: report.total,
               },
               ...severityMetrics,
@@ -73,15 +83,17 @@ export default async function RisksReportPage({ searchParams }: { searchParams?:
         <div className="mb-6">
           <DecisionBriefView sections={report.decisionBrief} />
         </div>
-        {(Object.keys(report.byCategory) as ManagementRiskCategory[]).length > 0 ? (
-          <p className="mb-4 text-sm text-muted">
-            الفئات:{" "}
-            {Object.entries(report.byCategory)
-              .map(([k, v]) => `${k}=${v}`)
-              .join(" · ")}
-          </p>
+        {categoryEntries.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span className="font-medium">{copy.categories}</span>
+            {categoryEntries.map(([k, v]) => (
+              <Badge key={k} tone="neutral">
+                {categoryLabel(t, k)} <span className="tabular-nums">{v}</span>
+              </Badge>
+            ))}
+          </div>
         ) : null}
-        <ReportRiskSection findings={report.findings} title="النتائج" />
+        <ReportRiskSection findings={report.findings} title={copy.findings} />
       </ReportChrome>
     </PageContainer>
   );

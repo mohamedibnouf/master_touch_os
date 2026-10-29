@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { Badge, Button } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { openStorageDocumentAction } from "@/server/use-cases/platform";
-import { documentFileSourceLabelAr, driveOpenHref } from "@/modules/documents/file-source";
+import { documentFileSourceLabel, driveOpenHref } from "@/modules/documents/file-source";
+import { useI18n } from "@/lib/i18n/client";
 
 export type DocumentFileRef = {
   file_source: string | null;
@@ -21,6 +25,7 @@ export function DocumentOpenControl({
   canOpenStorage: boolean;
   versionId?: string;
 }) {
+  const { t } = useI18n();
   const driveHref = driveOpenHref(file);
   if (driveHref) {
     return (
@@ -28,10 +33,11 @@ export function DocumentOpenControl({
         href={driveHref}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-3 py-2 text-sm font-medium text-navy shadow-[var(--shadow-1)]"
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-medium text-ink shadow-card transition-colors hover:border-border-strong hover:bg-surface-muted md:min-h-9"
         data-testid={`document-open-drive-${versionId ?? documentId}`}
       >
-        فتح الملف
+        <ExternalLink className="size-3.5 text-muted" aria-hidden />
+        {t.documents.openControl.openFile}
       </a>
     );
   }
@@ -41,7 +47,7 @@ export function DocumentOpenControl({
         <input type="hidden" name="documentId" value={documentId} />
         {versionId ? <input type="hidden" name="versionId" value={versionId} /> : null}
         <Button type="submit" variant="secondary" data-testid={`document-open-storage-${versionId ?? documentId}`}>
-          فتح الملف
+          {t.documents.openControl.openFile}
         </Button>
       </ServerActionForm>
     );
@@ -50,19 +56,25 @@ export function DocumentOpenControl({
 }
 
 export function DocumentSourceBadge({ source }: { source: string | null | undefined }) {
+  const { locale } = useI18n();
   const value = source ?? "storage";
-  const tone = value === "google_drive" || value === "drive" ? "info" : value === "archived" ? "neutral" : "neutral";
+  const tone = value === "google_drive" || value === "drive" ? "info" : "neutral";
   return (
     <Badge tone={tone} data-testid="document-source-badge">
-      {documentFileSourceLabelAr(value)}
+      {documentFileSourceLabel(value, locale)}
     </Badge>
   );
 }
 
 export function DocumentDetailsLink({ documentId }: { documentId: string }) {
+  const { t } = useI18n();
   return (
-    <Link href={`/documents/${documentId}`} className="text-sm text-navy underline" data-testid={`document-details-${documentId}`}>
-      عرض التفاصيل
+    <Link
+      href={`/documents/${documentId}`}
+      className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+      data-testid={`document-details-${documentId}`}
+    >
+      {t.documents.openControl.details}
     </Link>
   );
 }

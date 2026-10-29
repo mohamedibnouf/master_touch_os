@@ -1,9 +1,15 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Card, PageHeader } from "@/components/ui/primitives";
+import { PageHeader, Section } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
-import { MetricGrid, RiskFindingsList } from "@/components/management/management-widgets";
+import {
+  MetricGrid,
+  RiskFindingsList,
+  categoryLabel,
+  severityLabel,
+  type ManagementMetric,
+} from "@/components/management/management-widgets";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { canViewManagement, resolveManagementSections } from "@/modules/management/access";
@@ -16,6 +22,9 @@ import {
 import type { ManagementRiskCategory, ManagementRiskSeverity } from "@/modules/management/types";
 import { loadGuardianFindingsForViewer } from "@/server/use-cases/guardian";
 import { GuardianFindingsPanel } from "@/components/management/guardian-findings";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+import { cn } from "@/lib/utils";
 
 const SEVERITIES: ManagementRiskSeverity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 const CATEGORIES: ManagementRiskCategory[] = [
@@ -30,7 +39,23 @@ const CATEGORIES: ManagementRiskCategory[] = [
   "COMPLIANCE",
 ];
 
+const SEVERITY_METRIC_TONE: Record<ManagementRiskSeverity, ManagementMetric["tone"]> = {
+  CRITICAL: "danger",
+  HIGH: "danger",
+  MEDIUM: "warning",
+  LOW: "neutral",
+};
+
 type SearchParams = Promise<{ severity?: string; category?: string }>;
+
+function chipClass(active: boolean) {
+  return cn(
+    "rounded-full border px-3 py-1 text-sm transition-colors",
+    active
+      ? "border-primary/30 bg-primary-soft font-medium text-primary"
+      : "border-line bg-surface text-ink hover:border-border-strong hover:bg-surface-muted",
+  );
+}
 
 export default async function ManagementRisksPage({
   searchParams,
@@ -40,6 +65,9 @@ export default async function ManagementRisksPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!canViewManagement(ctx)) redirect("/");
+
+  const { t } = await getI18n();
+  const copy = t.management.risks;
 
   const sp = searchParams ? await searchParams : {};
   const severityFilter =
@@ -72,11 +100,12 @@ export default async function ManagementRisksPage({
   const bySeverity = countBySeverity(risks);
   const byCategory = countByCategory(risks);
 
-  const severityMetrics = SEVERITIES.map((s) => ({
+  const severityMetrics: ManagementMetric[] = SEVERITIES.map((s) => ({
     key: `sev-${s}`,
-    label: s,
+    label: severityLabel(t, s),
     value: bySeverity[s],
     href: `/management/risks?severity=${s}`,
+    tone: bySeverity[s] > 0 ? SEVERITY_METRIC_TONE[s] : "neutral",
   }));
 
   function filterHref(next: { severity?: string | null; category?: string | null }) {
@@ -92,81 +121,88 @@ export default async function ManagementRisksPage({
   return (
     <PageContainer data-testid="management-risks" className="space-y-5">
       <PageHeader
-        title="محرك المخاطر"
-        description={`نتائج حتمية مبنية على قواعد صريحة — ${asOfDate} (آسيا/الرياض). ليست تنبؤات ذكاء اصطناعي.`}
+        title={copy.title}
+        description={format(copy.description, { date: asOfDate, tz: t.management.common.riyadhTz })}
       />
       <ManagementNav pathname="/management/risks" />
 
-      <div className="mb-4" data-testid="management-risks-totals">
+      <div data-testid="management-risks-totals">
         <MetricGrid
           metrics={[
             {
               key: "total-findings",
-              label: "إجمالي النتائج",
+              label: copy.totalFindings,
               value: risks.length,
               href: "/management/risks",
+              tone: "info",
             },
             ...severityMetrics,
           ]}
         />
       </div>
 
-      <Card className="mb-4" data-testid="management-risks-filters">
-        <h2 className="mb-3 font-semibold text-navy">تصفية</h2>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={filterHref({ severity: null })}
-            className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${!severityFilter ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
-            data-testid="filter-severity-all"
-          >
-            كل الشدّة
-          </Link>
-          {SEVERITIES.map((s) => (
+      <div data-testid="management-risks-filters">
+        <Section title={copy.filterTitle}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="me-1 text-xs font-medium text-muted">{copy.severityLabel}</span>
             <Link
-              key={s}
-              href={filterHref({ severity: s })}
-              className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${severityFilter === s ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
-              data-testid={`filter-severity-${s}`}
+              href={filterHref({ severity: null })}
+              className={chipClass(!severityFilter)}
+              data-testid="filter-severity-all"
             >
-              {s} ({bySeverity[s]})
+              {copy.allSeverities}
             </Link>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href={filterHref({ category: null })}
-            className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${!categoryFilter ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
-            data-testid="filter-category-all"
-          >
-            كل الفئات
-          </Link>
-          {CATEGORIES.filter((c) => (byCategory[c] ?? 0) > 0 || categoryFilter === c).map((c) => (
+            {SEVERITIES.map((s) => (
+              <Link
+                key={s}
+                href={filterHref({ severity: s })}
+                className={chipClass(severityFilter === s)}
+                data-testid={`filter-severity-${s}`}
+              >
+                {severityLabel(t, s)} <span className="tabular-nums text-muted">({bySeverity[s]})</span>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="me-1 text-xs font-medium text-muted">{copy.categoryLabel}</span>
             <Link
-              key={c}
-              href={filterHref({ category: c })}
-              className={`rounded-[var(--radius-control)] px-3 py-1.5 text-sm ${categoryFilter === c ? "bg-primary/10 font-medium text-primary" : "bg-surface-muted text-ink"}`}
-              data-testid={`filter-category-${c}`}
+              href={filterHref({ category: null })}
+              className={chipClass(!categoryFilter)}
+              data-testid="filter-category-all"
             >
-              {c} ({byCategory[c] ?? 0})
+              {copy.allCategories}
             </Link>
-          ))}
-        </div>
-      </Card>
+            {CATEGORIES.filter((c) => (byCategory[c] ?? 0) > 0 || categoryFilter === c).map((c) => (
+              <Link
+                key={c}
+                href={filterHref({ category: c })}
+                className={chipClass(categoryFilter === c)}
+                data-testid={`filter-category-${c}`}
+              >
+                {categoryLabel(t, c)} <span className="tabular-nums text-muted">({byCategory[c] ?? 0})</span>
+              </Link>
+            ))}
+          </div>
+        </Section>
+      </div>
 
       {guardian?.schemaReady ? (
-        <Card data-testid="guardian-register">
-          <h2 className="mb-3 font-semibold text-navy">سجل الحارس (نتائج دائمة)</h2>
-          <GuardianFindingsPanel findings={guardian.findings} lastScan={guardian.lastScan} alerts={guardian.alerts} />
-        </Card>
+        <div data-testid="guardian-register">
+          <Section title={copy.guardianTitle}>
+            <GuardianFindingsPanel findings={guardian.findings} lastScan={guardian.lastScan} alerts={guardian.alerts} />
+          </Section>
+        </div>
       ) : null}
 
-      <Card>
-        <h2 className="mb-3 font-semibold text-navy">
-          النتائج ({filtered.length}
-          {severityFilter || categoryFilter ? ` من ${risks.length}` : ""})
-        </h2>
+      <Section
+        title={
+          severityFilter || categoryFilter
+            ? format(copy.findingsTitleFiltered, { count: filtered.length, total: risks.length })
+            : format(copy.findingsTitle, { count: filtered.length })
+        }
+      >
         <RiskFindingsList findings={filtered} />
-      </Card>
+      </Section>
     </PageContainer>
   );
 }

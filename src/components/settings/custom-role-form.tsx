@@ -3,9 +3,10 @@
 import { Button, Field, Input, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertCustomRoleAction } from "@/server/use-cases/roles";
-import type { PermissionGroupId } from "@/lib/rbac/permission-groups";
+import { PERMISSION_GROUP_LABELS, type PermissionGroupId } from "@/lib/rbac/permission-groups";
+import { useI18n } from "@/lib/i18n/client";
 
-type Dept = { id: string; name_ar: string };
+type Dept = { id: string; name: string };
 
 export function CustomRoleForm({
   departments,
@@ -23,42 +24,48 @@ export function CustomRoleForm({
     permission_keys: string[];
   };
 }) {
+  const { t, locale } = useI18n();
+  const tf = t.workspace.roles.form;
+  const orderedGroups =
+    locale === "en"
+      ? [...groups].sort((a, b) => PERMISSION_GROUP_LABELS[a.id].en.localeCompare(PERMISSION_GROUP_LABELS[b.id].en, "en"))
+      : groups;
   const selected = new Set(role?.permission_keys ?? []);
   return (
     <ServerActionForm action={upsertCustomRoleAction} className="grid gap-3" testId={role ? `role-edit-${role.id}` : "role-create-form"}>
       {role ? <input type="hidden" name="roleId" value={role.id} /> : null}
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="اسم الدور بالعربية" required>
+        <Field label={tf.nameAr} required>
           <Input name="name_ar" required defaultValue={role?.name_ar ?? ""} data-testid="role-name-ar" />
         </Field>
-        <Field label="اسم الدور بالإنجليزية" required>
+        <Field label={tf.nameEn} required>
           <Input name="name_en" required defaultValue={role?.name_en ?? ""} data-testid="role-name-en" />
         </Field>
         {role ? (
-          <Field label="الرمز" hint="ثابت بعد الإنشاء">
+          <Field label={tf.code} hint={tf.codeFixed}>
             <Input name="code_display" value={role.code} disabled readOnly />
           </Field>
         ) : (
-          <Field label="الرمز (اختياري)" hint="إن تُرك فارغاً يُشتق من الاسم الإنجليزي">
+          <Field label={tf.codeOptional} hint={tf.codeHint}>
             <Input name="code" defaultValue="" data-testid="role-code" />
           </Field>
         )}
-        <Field label="الإدارة المرتبطة بالدور" hint="تصنيف تنظيمي فقط — لا يقيّد بيانات القسم.">
+        <Field label={tf.department} hint={tf.departmentHint}>
           <Select name="department_id" defaultValue={role?.department_id ?? ""} data-testid="role-department">
-            <option value="">بدون</option>
+            <option value="">{tf.none}</option>
             {departments.map((department) => (
               <option key={department.id} value={department.id}>
-                {department.name_ar}
+                {department.name}
               </option>
             ))}
           </Select>
         </Field>
       </div>
-      <p className="text-sm text-muted">بعض الصلاحيات الإدارية الحساسة متاحة فقط لأدوار النظام.</p>
+      <p className="text-sm text-muted">{tf.sensitiveNote}</p>
       <div className="grid gap-4" data-testid="role-permission-picker">
-        {groups.map((group) => (
+        {orderedGroups.map((group) => (
           <fieldset key={group.id} className="rounded-[var(--radius-control)] border border-line p-3">
-            <legend className="px-1 text-sm font-semibold text-navy">{group.labelAr}</legend>
+            <legend className="px-1 text-sm font-semibold text-ink">{PERMISSION_GROUP_LABELS[group.id]?.[locale] ?? group.labelAr}</legend>
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {group.keys.map((key) => (
                 <li key={key}>
@@ -78,7 +85,7 @@ export function CustomRoleForm({
           </fieldset>
         ))}
       </div>
-      <Button type="submit">{role ? "حفظ التعديلات" : "إنشاء الدور"}</Button>
+      <Button type="submit">{role ? tf.saveChanges : tf.create}</Button>
     </ServerActionForm>
   );
 }

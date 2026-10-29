@@ -318,3 +318,47 @@ describe("report builders", () => {
     expect(report.findings[0].href).toBeTruthy();
   });
 });
+
+describe("decision brief English text", () => {
+  it("uses singular/plural English and readable section titles", () => {
+    const brief = buildDecisionBrief({
+      snapshot: emptySnapshot({
+        risks: [risk({ ruleId: "R1", severity: "CRITICAL", category: "PROJECT_DELAY" })],
+        projects: { active: 1, atRisk: 0, onHold: 0, overduePlannedEnd: 1 },
+      }),
+      sections: {
+        projects: true,
+        approvals: false,
+        procurement: false,
+        finance: false,
+        people: false,
+        attendanceLeave: false,
+        payroll: false,
+      },
+    });
+    const attention = brief.find((b) => b.id === "attention-now");
+    expect(attention?.titleEn).toBe("Needs attention now");
+    expect(attention?.statements[0].textEn).toBe("1 critical risk requires review.");
+    const projects = brief.find((b) => b.id === "projects");
+    expect(projects?.titleEn).toBe("Projects");
+    expect(projects?.statements[0].textEn).toBe("1 project past planned end date.");
+  });
+
+  it("keeps English output free of Arabic and raw field names in the empty state", () => {
+    const brief = buildDecisionBrief({
+      snapshot: emptySnapshot(),
+      sections: {
+        projects: true,
+        approvals: true,
+        procurement: true,
+        finance: true,
+        people: true,
+        attendanceLeave: true,
+        payroll: true,
+      },
+    });
+    const text = brief.flatMap((b) => [b.titleEn, ...b.statements.map((s) => s.textEn)]).join(" ");
+    expect(text).not.toMatch(/[؀-ۿ]/);
+    expect(text).not.toMatch(/due_at|risk_level|planned_end_date/);
+  });
+});

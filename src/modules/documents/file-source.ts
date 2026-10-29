@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export type DocumentFileSource = "storage" | "google_drive";
 
 export type DocumentVersionFileShape = {
@@ -42,6 +44,21 @@ export function documentFileSourceLabelAr(source: DocumentFileSource | string | 
 
 export const DRIVE_INTELLIGENCE_UNAVAILABLE_AR =
   "تحليل مستندات Google Drive يتطلب ربط Drive في مرحلة لاحقة. التحليل متاح حالياً لملفات التخزين الداخلي.";
+
+export const DRIVE_INTELLIGENCE_UNAVAILABLE_EN =
+  "Analysing Google Drive documents requires connecting Drive in a later phase. Analysis is currently available for files in internal storage.";
+
+export function driveIntelligenceUnavailableMessage(locale: Locale = "ar"): string {
+  return locale === "en" ? DRIVE_INTELLIGENCE_UNAVAILABLE_EN : DRIVE_INTELLIGENCE_UNAVAILABLE_AR;
+}
+
+export function documentFileSourceLabel(
+  source: DocumentFileSource | string | null | undefined,
+  locale: Locale = "ar",
+): string {
+  if (source === "google_drive") return "Google Drive";
+  return locale === "en" ? "System storage" : "تخزين النظام";
+}
 
 export function isStorageIntelligenceEligible(version: {
   file_source?: string | null;

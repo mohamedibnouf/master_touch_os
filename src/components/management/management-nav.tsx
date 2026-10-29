@@ -1,25 +1,32 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { getI18n } from "@/lib/i18n/server";
+import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
 
-const links = [
-  { href: "/management", label: "نظرة تنفيذية", exact: true },
-  { href: "/management/reports", label: "التقارير" },
-  { href: "/management/analyst", label: "محلل AI" },
-  { href: "/management/projects", label: "المشاريع" },
-  { href: "/management/operations", label: "العمليات" },
-  { href: "/management/people", label: "الأفراد" },
-  { href: "/management/finance", label: "المالية" },
-  { href: "/management/digest", label: "الملخص اليومي" },
-  { href: "/management/performance", label: "حقائق الأداء" },
-  { href: "/management/activity", label: "النشاط" },
+type NavKey = Exclude<keyof Dictionary["management"]["nav"], "ariaLabel">;
+
+const links: Array<{ href: string; key: NavKey; exact?: boolean }> = [
+  { href: "/management", key: "overview", exact: true },
+  { href: "/management/risks", key: "risks" },
+  { href: "/management/reports", key: "reports" },
+  { href: "/management/analyst", key: "analyst" },
+  { href: "/management/projects", key: "projects" },
+  { href: "/management/operations", key: "operations" },
+  { href: "/management/people", key: "people" },
+  { href: "/management/finance", key: "finance" },
+  { href: "/management/digest", key: "digest" },
+  { href: "/management/performance", key: "performance" },
+  { href: "/management/activity", key: "activity" },
 ];
 
-export function ManagementNav({ pathname }: { pathname: string }) {
+export async function ManagementNav({ pathname }: { pathname: string }) {
+  const { t } = await getI18n();
+  const nav = t.management.nav;
   return (
     <nav
-      className="mb-6 flex flex-wrap gap-2 border-b border-line pb-3"
+      className="-mx-1 flex gap-1 overflow-x-auto border-b border-line px-1 pb-2 print:hidden"
       data-testid="management-nav"
-      aria-label="إدارة"
+      aria-label={nav.ariaLabel}
     >
       {links.map((link) => {
         const active = link.exact
@@ -29,12 +36,13 @@ export function ManagementNav({ pathname }: { pathname: string }) {
           <Link
             key={link.href}
             href={link.href}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-medium",
-              active ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted",
+              "shrink-0 whitespace-nowrap rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-medium transition-colors",
+              active ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-muted hover:text-ink",
             )}
           >
-            {link.label}
+            {nav[link.key]}
           </Link>
         );
       })}

@@ -10,6 +10,11 @@ import { procurementSourcingAr } from "./procurement-sourcing.ar";
 import { procurementOrdersAr } from "./procurement-orders.ar";
 import { financeClientAr } from "./finance-client.ar";
 import { financePayablesAr } from "./finance-payables.ar";
+import { workspaceAr } from "./workspace.ar";
+import { aiAr } from "./ai.ar";
+import { managementAr } from "./management.ar";
+import { documentsAr } from "./documents.ar";
+import { engineeringAr } from "./engineering.ar";
 
 /**
  * Arabic is the source dictionary: its shape defines the Dictionary type, and en.ts
@@ -28,6 +33,11 @@ export const ar = {
   procurementOrders: procurementOrdersAr,
   financeClient: financeClientAr,
   financePayables: financePayablesAr,
+  workspace: workspaceAr,
+  ai: aiAr,
+  management: managementAr,
+  documents: documentsAr,
+  engineering: engineeringAr,
   meta: {
     title: "ماستر تاتش | نظام التشغيل الداخلي",
     description: "نظام تشغيل الأعمال لماستر تاتش",
@@ -172,6 +182,60 @@ export const ar = {
     leave: "الإجازات",
     leavePending: "· {count} قيد المعالجة",
     myLeave: "إجازاتي",
+    ops: {
+      statusAwaitingMyDecision: "بانتظار قراري",
+      statusNeedsIssue: "يحتاج إصدار",
+      statusNeedsComparison: "يحتاج مقارنة",
+      statusReadyToIssue: "جاهز للإصدار",
+      statusDiscrepancy: "اختلاف",
+      statusNeedsReview: "يحتاج مراجعة",
+      statusAwaitingPayment: "بانتظار الصرف",
+      statusInternalReview: "مراجعة داخلية",
+      statusAwaitingClientSend: "بانتظار إرسال للعميل",
+      statusDraftReadyToIssue: "مسودة — جاهزة للإصدار",
+      statusOverdue: "متأخر",
+      statusAwaitingCollection: "بانتظار التحصيل",
+      statusAwaitingApproval: "بانتظار الاعتماد",
+      labelRfq: "RFQ {number} — {title}",
+      labelCompareQuotes: "مقارنة عروض {number}",
+      labelPurchaseOrder: "أمر شراء {number}",
+      labelInvoice: "فاتورة {number}",
+      labelPayInvoice: "دفع فاتورة {number}",
+      labelReviewValuation: "مراجعة مستخلص {number}",
+      labelSendValuation: "إرسال مستخلص {number} للعميل",
+      labelIssueInvoice: "إصدار فاتورة {number}",
+      labelCollect: "تحصيل {number}",
+      labelApproveVariation: "اعتماد أمر تغيير {number}",
+      kindApproval: "موافقة",
+      kindWorkflow: "مسار عمل",
+      kindRfi: "طلب استفسار",
+      kindNcr: "عدم مطابقة",
+      kindDocumentRevision: "مراجعة وثيقة",
+      kindInspection: "فحص",
+      kindAction: "إجراء",
+      attentionEyebrow: "يحتاج انتباهك",
+      attentionTitle: "بانتظار قرارك",
+      attentionHint: "موافقات وإجراءات تشغيلية مخصّصة لك",
+      openApprovalsInbox: "عرض صندوق الموافقات",
+      unreadNotifications: "تنبيهات غير مقروءة",
+      shortcutProjects: "المشاريع",
+      shortcutLeaveRequest: "طلب إجازة",
+      shortcutCommandCenter: "مركز القيادة",
+      shortcutAnalyst: "المحلل الذكي",
+      shortcutDocuments: "المستندات",
+      quickActions: "إجراءات سريعة",
+      myWorkToday: "عملي اليوم",
+      viewAll: "عرض الكل",
+      noPendingActions: "لا توجد إجراءات معلقة حالياً.",
+      financeProcurement: "مالي / توريد",
+      overdue: "متأخر",
+      withinDeadline: "ضمن المهلة",
+      recentNotifications: "تنبيهات أخيرة",
+      notificationsPermission: "عرض التنبيهات يتطلب صلاحية الإشعار.",
+      noNotifications: "لا توجد تنبيهات.",
+      recentActivity: "آخر النشاطات",
+      noActivity: "لا يوجد نشاط مسجّل بعد.",
+    },
   },
 };
 

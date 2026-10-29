@@ -9,19 +9,36 @@ import {
   Field,
   Input,
   PageHeader,
+  Section,
   Select,
+  StatCard,
   Textarea,
 } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { getI18n } from "@/lib/i18n/server";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import {
+  engineeringStatusTone,
+  officialDecisionLabel,
+  officialDecisionTone,
+  officialDecisionWithCode,
+  submissionStatusLabel,
+  transmittalPurposeLabel,
+  transmittalStatusLabel,
+} from "@/lib/ui/engineering-labels";
 import {
   applyDocumentDecisionAction,
   createTransmittalAction,
   issueTransmittalAction,
   reviseDocumentAction,
 } from "@/server/use-cases/engineering";
+
+const DOCUMENT_TYPES = ["RFI", "MAT", "SHD", "MS", "IR", "NCR"] as const;
+const TRANSMITTAL_PURPOSES = ["for_approval", "for_review", "for_information", "for_construction", "for_record"] as const;
+const DECISION_CODES = ["A", "B", "C", "D", "E"] as const;
 
 export default async function DocumentControlPage({
   searchParams,
@@ -34,9 +51,12 @@ export default async function DocumentControlPage({
     redirect("/");
   }
 
+  const { t, locale } = await getI18n();
+  const dc = t.engineering.documentControl;
   const { type, overdue, q } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const now = new Date().toISOString();
+  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" });
 
   let query = supabase
     .from("documents")
@@ -62,7 +82,7 @@ export default async function DocumentControlPage({
       .limit(20),
     supabase
       .from("projects")
-      .select("id, project_code, name_ar")
+      .select("id, project_code, name_ar, name_en")
       .eq("organization_id", ctx.organization.id)
       .is("archived_at", null)
       .limit(40),
@@ -84,7 +104,7 @@ export default async function DocumentControlPage({
   const rejectedD = (rows ?? []).filter((d) => d.official_decision === "D").length;
   const approved = (rows ?? []).filter((d) => d.official_decision === "A" || d.official_decision === "B")
     .length;
-  const draftTrn = (transmittals ?? []).filter((t) => t.status === "draft").length;
+  const draftTrn = (transmittals ?? []).filter((tr) => tr.status === "draft").length;
 
   const canApprove = hasPermission(ctx, "document.approve");
   const canRevise = hasPermission(ctx, "document_control.revise");
@@ -98,147 +118,130 @@ export default async function DocumentControlPage({
   return (
     <PageContainer className="space-y-5">
       <PageHeader
-        title="مراقبة الوثائق"
-        description="سجل الوثائق الرسمي — التسجيل، الإصدار، الاعتماد، والمراجعات"
+        title={dc.title}
+        description={dc.description}
         actions={
-          <div className="flex gap-3 text-sm">
-            <Link href="/document-control" className="text-navy underline">
-              الكل
+          <div className="flex flex-wrap gap-3 text-sm font-medium">
+            <Link href="/document-control" className="text-primary hover:underline">
+              {dc.all}
             </Link>
-            <Link href="/document-control?overdue=1" className="text-danger underline">
-              المتأخرة
+            <Link href="/document-control?overdue=1" className="text-danger hover:underline">
+              {dc.overdue}
             </Link>
-            <Link href="/search" className="text-navy underline">
-              بحث متقدم
+            <Link href="/search" className="text-primary hover:underline">
+              {dc.advancedSearch}
             </Link>
           </div>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <p className="text-sm text-muted">بانتظار إجراء</p>
-          <p className="mt-2 text-3xl font-semibold text-navy">{awaiting}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">معتمد A/B</p>
-          <p className="mt-2 text-3xl font-semibold text-success">{approved}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">إعادة تقديم C</p>
-          <p className="mt-2 text-3xl font-semibold text-warning">{returnedC}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">مرفوض D</p>
-          <p className="mt-2 text-3xl font-semibold text-danger">{rejectedD}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">إرساليات مسودة</p>
-          <p className="mt-2 text-3xl font-semibold text-navy">{draftTrn}</p>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label={dc.stats.awaitingAction} value={awaiting} tone="info" />
+        <StatCard label={dc.stats.approvedAB} value={approved} tone="success" />
+        <StatCard label={dc.stats.resubmitC} value={returnedC} tone="warning" />
+        <StatCard label={dc.stats.rejectedD} value={rejectedD} tone="danger" />
+        <StatCard label={dc.stats.draftTransmittals} value={draftTrn} />
       </div>
 
-      <Card className="mb-4">
-        <form className="flex flex-wrap gap-3">
-          <Field label="بحث">
-            <input
-              name="q"
-              defaultValue={q ?? ""}
-              placeholder="رقم الوثيقة أو العنوان"
-              className="h-10 rounded-md border border-line bg-white px-3 text-sm"
-            />
-          </Field>
-          <Field label="النوع">
+      <Card>
+        <form className="flex flex-wrap items-end gap-3">
+          <div className="min-w-56 flex-1">
+            <Field label={dc.filters.search}>
+              <Input name="q" defaultValue={q ?? ""} placeholder={dc.filters.searchPlaceholder} />
+            </Field>
+          </div>
+          <Field label={dc.filters.type}>
             <Select name="type" defaultValue={type ?? ""}>
-              <option value="">الكل</option>
-              <option value="RFI">RFI</option>
-              <option value="MAT">MAT</option>
-              <option value="SHD">SHD</option>
-              <option value="MS">MS</option>
-              <option value="IR">IR</option>
-              <option value="NCR">NCR</option>
+              <option value="">{dc.filters.allTypes}</option>
+              {DOCUMENT_TYPES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
             </Select>
           </Field>
-          <div className="flex items-end">
-            <Button type="submit" variant="secondary">
-              تصفية
-            </Button>
-          </div>
+          <Button type="submit" variant="secondary">
+            {dc.filters.apply}
+          </Button>
         </form>
       </Card>
 
       {canCreateTrn && defaultProject ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء إرسالية مستندات (Transmittal)</h2>
+        <Section title={dc.transmittal.createTitle}>
           <ServerActionForm action={createTransmittalAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
+            <Field label={dc.transmittal.project} required>
               <Select name="projectId" required defaultValue={defaultProject}>
                 {(projects ?? []).map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
+                    {p.project_code} — {pickLocalized(locale, p.name_ar, p.name_en)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="المستلم">
+            <Field label={dc.transmittal.recipient} required>
               <Input name="recipient" required />
             </Field>
-            <Field label="الموضوع">
+            <Field label={dc.transmittal.subject} required>
               <Input name="subject" required />
             </Field>
-            <Field label="الغرض">
+            <Field label={dc.transmittal.purpose}>
               <Select name="purpose" defaultValue="for_approval">
-                <option value="for_approval">للاعتماد</option>
-                <option value="for_review">للمراجعة</option>
-                <option value="for_information">للعلم</option>
-                <option value="for_construction">للتنفيذ</option>
-                <option value="for_record">للسجل</option>
+                {TRANSMITTAL_PURPOSES.map((p) => (
+                  <option key={p} value={p}>
+                    {transmittalPurposeLabel(p, locale)}
+                  </option>
+                ))}
               </Select>
             </Field>
-            <Field label="معرّفات الوثائق (مفصولة بفاصلة)">
+            <Field label={dc.transmittal.documentIds} required>
               <Input
                 name="documentIds"
                 required
+                dir="ltr"
                 placeholder={attachableDocs[0]?.id ?? "uuid,..."}
                 defaultValue={attachableDocs[0]?.id ?? ""}
               />
             </Field>
-            <Field label="الوصف">
+            <Field label={dc.transmittal.description}>
               <Input name="description" />
             </Field>
-            <Button type="submit">إنشاء مسودة إرسالية</Button>
+            <div>
+              <Button type="submit">{dc.transmittal.create}</Button>
+            </div>
           </ServerActionForm>
           {attachableDocs.length > 0 ? (
-            <p className="mt-2 text-xs text-muted">
-              وثائق حديثة:{" "}
-              {attachableDocs.map((d) => `${d.document_number} (${d.id.slice(0, 8)}…)`).join(" · ")}
+            <p className="mt-3 text-xs text-muted">
+              {dc.transmittal.recentDocuments}{" "}
+              <span dir="ltr" className="font-mono">
+                {attachableDocs.map((d) => `${d.document_number} (${d.id.slice(0, 8)}…)`).join(" · ")}
+              </span>
             </p>
           ) : null}
-        </Card>
+        </Section>
       ) : null}
 
       {(transmittals ?? []).length > 0 ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">الإرساليات الأخيرة</h2>
-          <ul className="space-y-3">
-            {(transmittals ?? []).map((t) => (
-              <li
-                key={t.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3"
-              >
-                <div>
-                  <p className="font-medium text-navy">{t.transmittal_number}</p>
-                  <p className="text-sm text-muted">
-                    {t.subject} · إلى {t.recipient}
+        <Section title={dc.transmittal.recentTitle}>
+          <ul className="divide-y divide-line">
+            {(transmittals ?? []).map((tr) => (
+              <li key={tr.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-semibold text-ink">
+                    <span dir="ltr">{tr.transmittal_number}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    <span dir="auto">{tr.subject}</span> · {format(dc.transmittal.to, { recipient: tr.recipient })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge tone={t.status === "issued" ? "success" : "navy"}>{t.status}</Badge>
-                  {t.status === "draft" && canIssueTrn ? (
+                  <Badge tone={tr.status === "issued" ? "success" : tr.status === "cancelled" ? "danger" : "info"}>
+                    {transmittalStatusLabel(tr.status, locale)}
+                  </Badge>
+                  {tr.status === "draft" && canIssueTrn ? (
                     <ServerActionForm action={issueTransmittalAction}>
-                      <input type="hidden" name="transmittalId" value={t.id} />
+                      <input type="hidden" name="transmittalId" value={tr.id} />
                       <Button type="submit" variant="secondary">
-                        إصدار (تجميد المحتوى)
+                        {dc.transmittal.issue}
                       </Button>
                     </ServerActionForm>
                   ) : null}
@@ -246,11 +249,11 @@ export default async function DocumentControlPage({
               </li>
             ))}
           </ul>
-        </Card>
+        </Section>
       ) : null}
 
       {filtered.length === 0 ? (
-        <EmptyState title="لا توجد وثائق مسجّلة في السجل الرسمي بعد." />
+        <EmptyState title={dc.register.empty} />
       ) : (
         <div className="space-y-4">
           {filtered.map((doc) => {
@@ -262,31 +265,35 @@ export default async function DocumentControlPage({
             return (
               <Card key={doc.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold tracking-wide text-muted">
-                      {doc.document_number}
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-semibold tracking-wide text-muted">
+                      <span dir="ltr">{doc.document_number}</span>
                     </p>
-                    <h2 className="mt-1 text-base font-semibold text-navy">{doc.title}</h2>
-                    <p className="text-xs text-muted">
-                      {doc.type_code} · {project?.project_code ?? "—"} · مراجعة {doc.current_revision}
+                    <h2 className="mt-1 text-base font-semibold text-ink" dir="auto">
+                      {doc.title}
+                    </h2>
+                    <p className="mt-1 text-xs text-muted">
+                      <span dir="ltr">{doc.type_code}</span> · <span dir="ltr">{project?.project_code ?? "—"}</span> ·{" "}
+                      {format(dc.register.revision, { revision: doc.current_revision ?? "—" })}
+                      {doc.response_due_at ? (
+                        <>
+                          {" · "}
+                          {format(dc.register.responseDue, { date: dateFmt.format(new Date(doc.response_due_at)) })}
+                        </>
+                      ) : null}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge tone="navy">{doc.submission_status}</Badge>
+                    <Badge tone={engineeringStatusTone(doc.submission_status)}>
+                      {submissionStatusLabel(doc.submission_status, locale)}
+                    </Badge>
                     {doc.official_decision ? (
-                      <Badge
-                        tone={
-                          doc.official_decision === "D"
-                            ? "danger"
-                            : doc.official_decision === "C"
-                              ? "warning"
-                              : "success"
-                        }
-                      >
-                        قرار {doc.official_decision}
+                      <Badge tone={officialDecisionTone(doc.official_decision)} title={officialDecisionLabel(doc.official_decision, locale)}>
+                        {format(dc.register.decision, { code: doc.official_decision })} ·{" "}
+                        {officialDecisionLabel(doc.official_decision, locale)}
                       </Badge>
                     ) : null}
-                    {isOverdue ? <Badge tone="danger">متأخر</Badge> : null}
+                    {isOverdue ? <Badge tone="danger">{dc.register.overdue}</Badge> : null}
                   </div>
                 </div>
 
@@ -295,29 +302,29 @@ export default async function DocumentControlPage({
                     {canApprove ? (
                       <ServerActionForm action={applyDocumentDecisionAction} className="space-y-2">
                         <input type="hidden" name="documentId" value={doc.id} />
-                        <Field label="قرار الاعتماد A–E">
+                        <Field label={dc.decisionForm.label}>
                           <Select name="officialCode" defaultValue="A">
-                            <option value="A">A — معتمد</option>
-                            <option value="B">B — معتمد بملاحظات</option>
-                            <option value="C">C — إعادة تقديم</option>
-                            <option value="D">D — مرفوض</option>
-                            <option value="E">E — للعلم</option>
+                            {DECISION_CODES.map((code) => (
+                              <option key={code} value={code}>
+                                {officialDecisionWithCode(code, locale)}
+                              </option>
+                            ))}
                           </Select>
                         </Field>
-                        <Field label="تعليق">
-                          <Textarea name="comments" placeholder="مطلوب عند الرفض D" />
+                        <Field label={dc.decisionForm.comments}>
+                          <Textarea name="comments" placeholder={dc.decisionForm.commentsPlaceholder} />
                         </Field>
-                        <Button type="submit">تسجيل القرار</Button>
+                        <Button type="submit">{dc.decisionForm.submit}</Button>
                       </ServerActionForm>
                     ) : null}
                     {canRevise && (doc.official_decision === "C" || doc.official_decision === "D") ? (
                       <ServerActionForm action={reviseDocumentAction} className="space-y-2">
                         <input type="hidden" name="documentId" value={doc.id} />
-                        <Field label="وصف التغيير للمراجعة التالية">
+                        <Field label={dc.reviseForm.changeDescription}>
                           <Textarea name="changeDescription" />
                         </Field>
                         <Button type="submit" variant="secondary">
-                          إنشاء مراجعة جديدة
+                          {dc.reviseForm.submit}
                         </Button>
                       </ServerActionForm>
                     ) : null}

@@ -7,7 +7,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "الملخص التنفيذي",
     titleEn: "Executive Summary",
     descriptionAr: "موجز قرار حتمي: مقاييس، مخاطر عليا، ونشاط حديث.",
-    descriptionEn: "Deterministic decision brief: metrics, top risks, recent activity.",
+    descriptionEn: "Rule-based decision brief: key metrics, top risks and recent activity.",
   },
   {
     kind: "projects",
@@ -15,7 +15,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "محفظة المشاريع",
     titleEn: "Project Portfolio",
     descriptionAr: "حالة المشاريع، التجاوزات المخططة، والمخاطر المرتبطة.",
-    descriptionEn: "Project status, planned-end overruns, and linked risks.",
+    descriptionEn: "Project status, planned end-date overruns and linked risks.",
   },
   {
     kind: "operations",
@@ -23,7 +23,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "العمليات والموافقات",
     titleEn: "Operations & Approvals",
     descriptionAr: "طوابير الموافقات والمشتريات مع أعمار الانتباه الإداري.",
-    descriptionEn: "Approval and procurement queues with management attention ages.",
+    descriptionEn: "Approval and procurement queues, aged against management attention thresholds.",
   },
   {
     kind: "finance",
@@ -31,7 +31,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "التجاري / المالي",
     titleEn: "Commercial / Financial",
     descriptionAr: "أعداد الذمم والمستخلصات — المبالغ حسب الصلاحيات التشغيلية.",
-    descriptionEn: "Receivable/payable counts — amounts only via operational permissions.",
+    descriptionEn: "Receivables and payables counts — amounts only with operational finance permissions.",
   },
   {
     kind: "people",
@@ -39,7 +39,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "الأفراد والحضور",
     titleEn: "People & Attendance",
     descriptionAr: "تجميعات الأفراد والامتثال والحضور دون بيانات رواتب.",
-    descriptionEn: "People, compliance, and attendance aggregates without pay data.",
+    descriptionEn: "Headcount, compliance and attendance totals — no pay data.",
   },
   {
     kind: "payroll",
@@ -47,7 +47,7 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "حالة المسير",
     titleEn: "Payroll Status",
     descriptionAr: "سير عمل فترات الرواتب — ليس تقرير رواتب فردية.",
-    descriptionEn: "Payroll period workflow — not an individual salary report.",
+    descriptionEn: "Payroll period workflow status — not an individual salary report.",
   },
   {
     kind: "risks",
@@ -55,6 +55,6 @@ export const MANAGEMENT_REPORT_CATALOG: ReportCatalogItem[] = [
     titleAr: "سجل المخاطر",
     titleEn: "Risk Register",
     descriptionAr: "نتائج محرك المخاطر الحتمي 5.2 مع الأدلة والروابط.",
-    descriptionEn: "Canonical Phase 5.2 risk findings with evidence and links.",
+    descriptionEn: "All rule-based risk findings with evidence and source links.",
   },
 ];

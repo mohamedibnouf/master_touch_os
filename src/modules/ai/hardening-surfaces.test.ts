@@ -23,7 +23,9 @@ describe("AI surface integrity", () => {
 
   it("keeps document analysis on the document page and business-case extract on intelligence", () => {
     const detail = readFileSync("src/app/(app)/documents/[id]/page.tsx", "utf8");
-    const intel = readFileSync("src/app/(app)/documents/[id]/intelligence/page.tsx", "utf8");
+    const intel =
+      readFileSync("src/app/(app)/documents/[id]/intelligence/page.tsx", "utf8") +
+      readFileSync("src/lib/i18n/dictionaries/documents.ar.ts", "utf8");
     expect(detail).toContain("DocumentAiAnalysisPanel");
     expect(intel).not.toContain("DocumentAiAnalysisPanel");
     expect(intel).toContain("DocumentIntelligenceActions");

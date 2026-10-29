@@ -18,7 +18,7 @@ export const EMPLOYEE_DIRECTORY_PROFILE_COLUMNS = "id, full_name_ar, full_name_e
 export const PROJECT_LIST_COLUMNS =
   "id, project_code, name_ar, name_en, status, risk_level, progress_percentage, project_manager_id, created_at" as const;
 
-export const PROJECT_PICKER_COLUMNS = "id, project_code, name_ar" as const;
+export const PROJECT_PICKER_COLUMNS = "id, project_code, name_ar, name_en" as const;
 
 export const DOCUMENT_LIST_COLUMNS =
   "id, title, category, current_revision, status, created_at, updated_at, project_id, document_number, uploaded_by, archived_at, archived_by" as const;

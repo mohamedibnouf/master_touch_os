@@ -1,10 +1,12 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Badge, Card, EmptyState, Field, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function SearchPage({
   searchParams,
@@ -14,6 +16,8 @@ export default async function SearchPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
+  const { t, locale } = await getI18n();
+  const ts = t.workspace.search;
   const { q = "" } = await searchParams;
   const term = q.trim();
   const supabase = await createServerSupabaseClient();
@@ -229,34 +233,34 @@ export default async function SearchPage({
       });
     }
     for (const p of (prs as { data: Array<{id: string; pr_number: string; status: string}> }).data ?? []) {
-      hits.push({ kind: "PR", number: p.pr_number, title: "طلب شراء", status: p.status, href: `/procurement/purchase-requests/${p.id}` });
+      hits.push({ kind: "PR", number: p.pr_number, title: ts.purchaseRequest, status: p.status, href: `/procurement/purchase-requests/${p.id}` });
     }
     for (const r of (rfqsSearch as { data: Array<{id: string; rfq_number: string; title: string; status: string}> }).data ?? []) {
       hits.push({ kind: "RFQ", number: r.rfq_number, title: r.title, status: r.status, href: `/procurement/rfqs/${r.id}` });
     }
     for (const p of (posSearch as { data: Array<{id: string; po_number: string; status: string}> }).data ?? []) {
-      hits.push({ kind: "PO", number: p.po_number, title: "أمر شراء", status: p.status, href: `/procurement/purchase-orders/${p.id}` });
+      hits.push({ kind: "PO", number: p.po_number, title: ts.purchaseOrder, status: p.status, href: `/procurement/purchase-orders/${p.id}` });
     }
     for (const s of (supplierSearch as { data: Array<{id: string; supplier_code: string; legal_name: string; status: string}> }).data ?? []) {
       hits.push({ kind: "SUP", number: s.supplier_code, title: s.legal_name, status: s.status, href: `/procurement/suppliers/${s.id}` });
     }
     for (const i of (invoiceSearch as { data: Array<{id: string; invoice_number: string; status: string}> }).data ?? []) {
-      hits.push({ kind: "INV", number: i.invoice_number, title: "فاتورة مورد", status: i.status, href: `/finance/supplier-invoices/${i.id}` });
+      hits.push({ kind: "INV", number: i.invoice_number, title: ts.supplierInvoice, status: i.status, href: `/finance/supplier-invoices/${i.id}` });
     }
     for (const c of (contractsSearch as { data: Array<{id: string; contract_number: string; client_name: string; status: string; project_id: string}> }).data ?? []) {
       hits.push({ kind: "CON", number: c.contract_number, title: c.client_name, status: c.status, href: `/projects/${c.project_id}/commercial/contract` });
     }
     for (const v of (valuationsSearch as { data: Array<{id: string; valuation_number: string; status: string}> }).data ?? []) {
-      hits.push({ kind: "VAL", number: v.valuation_number, title: "مستخلص عميل", status: v.status, href: `/finance/client-valuations/${v.id}` });
+      hits.push({ kind: "VAL", number: v.valuation_number, title: ts.clientValuation, status: v.status, href: `/finance/client-valuations/${v.id}` });
     }
     for (const ci of (clientInvSearch as { data: Array<{id: string; invoice_number: string; status: string}> }).data ?? []) {
-      hits.push({ kind: "CINV", number: ci.invoice_number, title: "فاتورة عميل", status: ci.status, href: `/finance/client-invoices/${ci.id}` });
+      hits.push({ kind: "CINV", number: ci.invoice_number, title: ts.clientInvoice, status: ci.status, href: `/finance/client-invoices/${ci.id}` });
     }
     for (const vo of (variationsSearch as { data: Array<{id: string; vo_number: string; description: string; status: string}> }).data ?? []) {
       hits.push({ kind: "VO", number: vo.vo_number, title: vo.description, status: vo.status, href: `/finance/variations/${vo.id}` });
     }
     for (const cp of (clientPaySearch as { data: Array<{id: string; reference: string; amount: number; client_invoice_id: string}> }).data ?? []) {
-      hits.push({ kind: "RCP", number: cp.reference, title: `تحصيل ${cp.amount}`, href: `/finance/client-invoices/${cp.client_invoice_id}` });
+      hits.push({ kind: "RCP", number: cp.reference, title: format(ts.clientPayment, { amount: Number(cp.amount).toLocaleString(intlLocale(locale)) }), href: `/finance/client-invoices/${cp.client_invoice_id}` });
     }
 
     if (hasPermission(ctx, "employee.read")) {
@@ -268,7 +272,8 @@ export default async function SearchPage({
         .limit(15);
       for (const e of empHits ?? []) {
         const p = Array.isArray(e.profiles) ? e.profiles[0] : e.profiles;
-        const name = (p as { full_name_ar?: string } | null)?.full_name_ar ?? e.employee_number ?? e.id;
+        const person = p as { full_name_ar?: string; full_name_en?: string } | null;
+        const name = pickLocalized(locale, person?.full_name_ar, person?.full_name_en) || e.employee_number || e.id;
         hits.push({
           kind: "EMP",
           number: e.employee_number ?? e.id.slice(0, 8),
@@ -299,39 +304,32 @@ export default async function SearchPage({
 
   return (
     <PageContainer className="space-y-5">
-      <PageHeader title="بحث موحّد" description="PR, RFQ, PO, مورد، فاتورة، وثائق هندسية — بحث من قاعدة البيانات" />
+      <PageHeader title={ts.title} description={ts.description} />
       <Card className="mb-6">
-        <form className="flex flex-wrap gap-3">
-          <Field label="رقم الوثيقة / العنوان">
-            <input
-              name="q"
-              defaultValue={term}
-              className="w-full min-w-[280px] rounded-md border border-line bg-white px-3 py-2 text-sm"
-              placeholder="مثال: RFI- أو MAT- أو عنوان..."
-            />
-          </Field>
-          <div className="flex items-end">
-            <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm text-white">
-              بحث
-            </button>
+        <form className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 sm:min-w-[280px]">
+            <Field label={ts.field}>
+              <Input name="q" defaultValue={term} placeholder={ts.placeholder} />
+            </Field>
           </div>
+          <Button type="submit">{ts.submit}</Button>
         </form>
       </Card>
 
       {term.length < 2 ? (
-        <EmptyState title="أدخل حرفين على الأقل للبحث." />
+        <EmptyState title={ts.tooShort} />
       ) : hits.length === 0 ? (
-        <EmptyState title="لا توجد نتائج ضمن نطاق صلاحياتك." />
+        <EmptyState title={ts.noResults} />
       ) : (
         <Card className="p-0">
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-paper text-muted">
+              <thead className="bg-surface-muted text-muted">
                 <tr>
-                  <th className="px-4 py-3 text-start">النوع</th>
-                  <th className="px-4 py-3 text-start">الرقم</th>
-                  <th className="px-4 py-3 text-start">العنوان</th>
-                  <th className="px-4 py-3 text-start">الحالة</th>
+                  <th className="px-4 py-3 text-start font-medium">{ts.colType}</th>
+                  <th className="px-4 py-3 text-start font-medium">{ts.colNumber}</th>
+                  <th className="px-4 py-3 text-start font-medium">{ts.colTitle}</th>
+                  <th className="px-4 py-3 text-start font-medium">{ts.colStatus}</th>
                 </tr>
               </thead>
               <tbody>
@@ -341,17 +339,17 @@ export default async function SearchPage({
                       <Badge tone="navy">{hit.kind}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={hit.href} className="font-medium text-navy underline">
+                      <Link href={hit.href} className="font-medium text-primary hover:underline">
                         {hit.number}
                       </Link>
                     </td>
-                    <td className="px-4 py-3">{hit.title}</td>
+                    <td className="px-4 py-3 text-ink">{hit.title}</td>
                     <td className="px-4 py-3 text-muted">{hit.status ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
     </PageContainer>

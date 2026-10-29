@@ -9,6 +9,9 @@ export const DRIVE_AI_ACCESS_MESSAGE_EN =
 export const DRIVE_AI_SAME_FILE_REQUIRED_AR =
   "يجب اختيار نفس ملف Google Drive الأصلي المرتبط بهذا المستند. لم يتم إنشاء إصدار جديد.";
 
+export const DRIVE_AI_SAME_FILE_REQUIRED_EN =
+  "Select the same original Google Drive file linked to this document. No new revision was created.";
+
 export type GisTokenPrompt = "" | "consent" | "select_account";
 
 export function planGisTokenRequest(input: {

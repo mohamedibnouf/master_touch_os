@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui/primitives";
-import { AiDisclaimer, AiSparkle } from "@/components/ai/ai-chrome";
+import { AiDisclaimer, AiHeading } from "@/components/ai/ai-chrome";
 import { analyzeProjectIntelligenceAction } from "@/server/use-cases/ai-platform";
-import { healthLabelAr } from "@/modules/ai/health";
+import { healthLabel } from "@/modules/ai/health";
+import { aiClientErrorMessage } from "@/modules/ai/errors";
 import type { ProjectIntelligenceView } from "@/modules/ai/schemas";
+import { useI18n } from "@/lib/i18n/client";
+import { format, intlLocale } from "@/lib/i18n/config";
+import { cn } from "@/lib/utils";
 
 function healthTone(health: string): "success" | "warning" | "danger" | "info" {
   if (health === "healthy") return "success";
@@ -21,6 +26,8 @@ export function ProjectAiCard({
   projectId: string;
   enabled: boolean;
 }) {
+  const { t, locale } = useI18n();
+  const c = t.ai.card;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ProjectIntelligenceView | null>(null);
@@ -32,7 +39,7 @@ export function ProjectAiCard({
       const res = await analyzeProjectIntelligenceAction({ projectId, refresh });
       if (!res.ok) {
         setView(null);
-        setError(res.error);
+        setError(locale === "en" ? (aiClientErrorMessage(res.code, locale) ?? res.error) : res.error);
         return;
       }
       setView(res.data);
@@ -40,38 +47,36 @@ export function ProjectAiCard({
   }
 
   return (
-    <Card className="border-primary/15 bg-[color-mix(in_srgb,var(--info-soft)_55%,white)]" data-testid="project-ai-card">
-      <div className="mb-2 flex items-center gap-2">
-        <AiSparkle />
-        <h2 className="text-sm font-semibold text-ink">رؤية ذكية</h2>
-      </div>
+    <Card className="border-primary/15 bg-[color-mix(in_srgb,var(--primary-soft)_45%,var(--surface))]" data-testid="project-ai-card">
+      <AiHeading title={c.title} className="mb-3" />
       {!enabled ? (
-        <p className="text-sm text-muted">خدمة التحليل الذكي غير مفعلة حالياً.</p>
+        <p className="text-sm text-muted">{t.ai.disabled}</p>
       ) : view ? (
         <>
-          <p className="text-sm text-ink">
-            حالة المشروع:{" "}
-            <Badge tone={healthTone(view.health)}>{healthLabelAr(view.health)}</Badge>
+          <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink">
+            {c.projectStatus} <Badge tone={healthTone(view.health)}>{healthLabel(view.health, locale)}</Badge>
           </p>
           <p className="mt-2 text-sm leading-6 text-muted">{view.intelligence.summary_ar}</p>
           <p className="mt-1 text-xs text-muted">
-            تم الإنشاء في: {new Date(view.generatedAt).toLocaleString("ar-SA")}
-            {view.cached ? " · نسخة محفوظة" : ""}
+            {format(t.ai.generatedAt, { date: new Date(view.generatedAt).toLocaleString(intlLocale(locale)) })}
+            {view.cached ? ` · ${t.ai.cachedCopy}` : ""}
           </p>
           <button
             type="button"
-            className="mt-2 text-xs text-primary underline"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            aria-expanded={whyOpen}
             onClick={() => setWhyOpen((v) => !v)}
           >
-            لماذا؟
+            {c.why}
+            <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", whyOpen && "rotate-180")} />
           </button>
           {whyOpen ? (
             <ul className="mt-2 space-y-2 text-xs text-muted" data-testid="project-ai-evidence">
-              {view.risks.length === 0 ? <li>لا توجد إشارات مخاطر محسوبة حالياً.</li> : null}
+              {view.risks.length === 0 ? <li>{c.noRisks}</li> : null}
               {view.risks.map((r) => (
-                <li key={`${r.type}-${r.title_ar}`}>
+                <li key={`${r.type}-${r.title_ar}`} className="rounded-lg border border-line bg-surface px-2.5 py-2">
                   <span className="font-medium text-ink">{r.title_ar}</span>
-                  <div className="mt-1">سبب التنبيه:</div>
+                  <div className="mt-1">{c.alertReason}</div>
                   {r.evidence.map((e) => (
                     <div key={e}>{e}</div>
                   ))}
@@ -81,19 +86,27 @@ export function ProjectAiCard({
           ) : null}
         </>
       ) : (
-        <p className="text-sm text-muted">اضغط عرض التحليل لقراءة حالة المشروع من بيانات النظام.</p>
+        <p className="text-sm text-muted">{c.idle}</p>
       )}
-      {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
-      {pending ? <p className="mt-2 text-sm text-muted">جاري تحليل المشروع...</p> : null}
+      {error ? (
+        <p className="mt-2 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {pending ? (
+        <p className="mt-2 text-sm text-muted" aria-live="polite">
+          {c.analyzing}
+        </p>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" disabled={!enabled || pending} onClick={() => run(false)}>
-          عرض التحليل
+          {c.show}
         </Button>
         <Button type="button" variant="outline" disabled={!enabled || pending} onClick={() => run(true)}>
-          تحديث
+          {c.refresh}
         </Button>
       </div>
-      <AiDisclaimer className="mt-3 text-xs text-muted" />
+      <AiDisclaimer className="mt-3" />
     </Card>
   );
 }

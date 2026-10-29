@@ -14,6 +14,8 @@ import { setCustomRoleActiveAction } from "@/server/use-cases/roles";
 import { delegablePermissionKeysForActor } from "@/lib/rbac/custom-roles";
 import { groupPermissionKeys } from "@/lib/rbac/permission-groups";
 import { Shield } from "lucide-react";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function RolesSettingsPage({
   searchParams,
@@ -27,6 +29,8 @@ export default async function RolesSettingsPage({
   const canManage = hasPermission(ctx, "role.manage");
   const params = await searchParams;
   const tab = params.tab === "system" ? "system" : "custom";
+  const { t, locale } = await getI18n();
+  const tr = t.workspace.roles;
 
   const supabase = await createServerSupabaseClient();
   const roles = new RoleRepository(supabase);
@@ -46,37 +50,37 @@ export default async function RolesSettingsPage({
     list.push(row.permission_key);
     keysByRole.set(row.role_id, list);
   }
-  const deptName = new Map(departments.filter((d) => d.is_active).map((d) => [d.id, d.name_ar]));
+  const deptName = new Map(departments.filter((d) => d.is_active).map((d) => [d.id, pickLocalized(locale, d.name_ar, d.name_en)]));
   const pickerGroups = groupPermissionKeys(delegablePermissionKeysForActor(ctx.permissions));
   const editing = customRoles.find((role) => role.id === params.edit);
 
   return (
     <PageContainer data-testid="roles-settings-page" className="space-y-5">
       <PageHeader
-        title="الأدوار والصلاحيات"
-        description="إدارة الأدوار المخصصة وصلاحيات الوصول داخل الشركة. المسمى الوظيفي مهنة مستقلة وليس صلاحية."
+        title={tr.title}
+        description={tr.description}
         actions={
           <Link
             href="/settings"
-            className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-4 text-sm font-medium text-navy md:min-h-10"
+            className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-10"
           >
-            الإعدادات
+            {tr.settingsLink}
           </Link>
         }
       />
 
-      <nav className="flex gap-1 border-b border-line pb-2" aria-label="أقسام الأدوار">
+      <nav className="flex gap-1 border-b border-line pb-2" aria-label={tr.tabsLabel}>
         <Link
           href="/settings/roles"
-          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "custom" ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"}`}
+          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "custom" ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-muted"}`}
         >
-          الأدوار المخصصة
+          {tr.customTab}
         </Link>
         <Link
           href="/settings/roles?tab=system"
-          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "system" ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"}`}
+          className={`rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium ${tab === "system" ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-muted"}`}
         >
-          أدوار النظام
+          {tr.systemTab}
         </Link>
       </nav>
 
@@ -87,11 +91,11 @@ export default async function RolesSettingsPage({
               <div className="mt-surface p-4 md:p-6">
                 <FormSection
                   icon={Shield}
-                  title={editing ? "تعديل دور مخصص" : "إنشاء دور مخصص"}
-                  description="الصلاحيات تُختار من الكتالوج المعتمد فقط، وبما تملكه حالياً."
+                  title={editing ? tr.editTitle : tr.createTitle}
+                  description={tr.formDescription}
                 >
                   <CustomRoleForm
-                    departments={departments.filter((d) => d.is_active).map((d) => ({ id: d.id, name_ar: d.name_ar }))}
+                    departments={departments.filter((d) => d.is_active).map((d) => ({ id: d.id, name: pickLocalized(locale, d.name_ar, d.name_en) }))}
                     groups={pickerGroups}
                     role={
                       editing
@@ -110,11 +114,11 @@ export default async function RolesSettingsPage({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted">عرض فقط — إدارة الأدوار المخصصة تتطلب صلاحية إدارة الأدوار.</p>
+            <p className="text-sm text-muted">{tr.readOnly}</p>
           )}
 
           {customRoles.length === 0 ? (
-            <EmptyState title="لا توجد أدوار مخصصة بعد." />
+            <EmptyState title={tr.emptyCustom} />
           ) : (
             <div className="space-y-3">
               {customRoles.map((role) => {
@@ -124,32 +128,32 @@ export default async function RolesSettingsPage({
                   <Card key={role.id} data-testid={`custom-role-${role.id}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-base font-semibold text-navy">{role.name_ar}</h2>
-                        <p className="text-sm text-muted">{role.name_en}</p>
+                        <h2 className="text-base font-semibold text-ink">{pickLocalized(locale, role.name_ar, role.name_en)}</h2>
+                        <p className="text-sm text-muted">{locale === "ar" ? role.name_en : role.name_ar}</p>
                         <p className="mt-1 text-xs text-muted">
-                          الرمز: {role.code} · الإدارة المرتبطة: {role.department_id ? deptName.get(role.department_id) ?? "—" : "بدون"} · صلاحيات: {permCount} · مستخدمون: {users}
+                          {format(tr.code, { code: role.code })} · {format(tr.department, { name: role.department_id ? deptName.get(role.department_id) ?? "—" : tr.none })} · {format(tr.permissionCount, { count: permCount })} · {format(tr.userCount, { count: users })}
                         </p>
                         <p className="text-xs text-muted">
-                          أُنشئ: {new Date(role.created_at).toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                          {format(tr.createdAt, { date: new Date(role.created_at).toLocaleDateString(intlLocale(locale), { timeZone: "Asia/Riyadh" }) })}
                         </p>
                       </div>
                       <Badge tone={role.is_active ? "success" : "danger"}>
-                        {role.is_active ? "نشط" : "موقوف"}
+                        {role.is_active ? tr.active : tr.suspended}
                       </Badge>
                     </div>
                     {canManage ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Link
                           href={`/settings/roles?edit=${role.id}`}
-                          className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-white px-3 text-sm font-medium text-navy"
+                          className="inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-medium text-ink hover:bg-surface-muted"
                         >
-                          تعديل
+                          {tr.edit}
                         </Link>
                         <ServerActionForm action={setCustomRoleActiveAction}>
                           <input type="hidden" name="roleId" value={role.id} />
                           <input type="hidden" name="isActive" value={role.is_active ? "false" : "true"} />
                           <Button type="submit" variant={role.is_active ? "danger" : "secondary"}>
-                            {role.is_active ? "إيقاف" : "إعادة تفعيل"}
+                            {role.is_active ? tr.deactivate : tr.reactivate}
                           </Button>
                         </ServerActionForm>
                       </div>
@@ -166,13 +170,13 @@ export default async function RolesSettingsPage({
             <Card key={role.id} data-testid={`system-role-${role.code}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-navy">{role.name_ar}</h2>
-                  <p className="text-sm text-muted">{role.name_en}</p>
+                  <h2 className="text-base font-semibold text-ink">{pickLocalized(locale, role.name_ar, role.name_en)}</h2>
+                  <p className="text-sm text-muted">{locale === "ar" ? role.name_en : role.name_ar}</p>
                   <p className="mt-1 text-xs text-muted">
-                    الرمز: {role.code} · صلاحيات: {keysByRole.get(role.id)?.length ?? 0} · مستخدمون: {assignmentCounts.get(role.id) ?? 0}
+                    {format(tr.code, { code: role.code })} · {format(tr.permissionCount, { count: keysByRole.get(role.id)?.length ?? 0 })} · {format(tr.userCount, { count: assignmentCounts.get(role.id) ?? 0 })}
                   </p>
                 </div>
-                <Badge tone="navy">دور نظام</Badge>
+                <Badge tone="navy">{tr.systemRole}</Badge>
               </div>
               <ul className="mt-3 columns-1 gap-2 text-xs text-muted sm:columns-2">
                 {(keysByRole.get(role.id) ?? []).sort().map((key) => (

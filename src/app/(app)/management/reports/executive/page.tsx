@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Card } from "@/components/ui/primitives";
+import { Section } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
 import {
   DecisionBriefView,
@@ -16,11 +16,16 @@ import { canViewManagement, resolveManagementSections } from "@/modules/manageme
 import { ManagementRepository } from "@/server/repositories/management.repository";
 import { createReportContext } from "@/modules/management/reports/context";
 import { buildExecutiveReport } from "@/modules/management/reports/builders";
+import { intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function ExecutiveReportPage() {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!canViewManagement(ctx)) redirect("/");
+
+  const { t, locale } = await getI18n();
+  const copy = t.management.reports.executive;
 
   const sections = resolveManagementSections(ctx);
   const supabase = await createServerSupabaseClient();
@@ -34,46 +39,50 @@ export default async function ExecutiveReportPage() {
       <div className="print:hidden">
         <ManagementNav pathname="/management/reports" />
       </div>
-      <ReportChrome title="الملخص التنفيذي" context={report.context}>
-        <p className="mb-4 text-sm text-muted">{report.freshnessNoteAr}</p>
+      <ReportChrome title={copy.title} context={report.context}>
+        <p className="mb-4 text-sm text-muted">
+          {pickLocalized(locale, report.freshnessNoteAr, report.freshnessNoteEn)}
+        </p>
         <div className="mb-6">
           <ReportMetricGrid metrics={report.metrics} />
         </div>
         <div className="mb-6">
           <DecisionBriefView sections={report.decisionBrief} />
         </div>
-        <Card className="mb-6" data-testid="executive-attention">
-          <h2 className="mb-3 font-semibold text-navy">انتباه مطلوب</h2>
-          <AttentionList items={report.attention} />
-        </Card>
-        <ReportRiskSection findings={report.topRisks} title="أعلى المخاطر الحالية" />
+        <div className="mb-6 break-inside-avoid" data-testid="executive-attention">
+          <Section title={copy.attention} className="print:shadow-none">
+            <AttentionList items={report.attention} />
+          </Section>
+        </div>
+        <ReportRiskSection findings={report.topRisks} title={copy.topRisks} />
         {sections.activity ? (
-          <Card className="mt-4 break-inside-avoid" data-testid="executive-activity">
-            <h2 className="mb-3 font-semibold text-navy">نشاط حديث (محدود)</h2>
-            {report.activity.length === 0 ? (
-              <p className="text-sm text-muted">لا يوجد سجل تدقيق حديث.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {report.activity.map((a) => (
-                  <li key={a.id} className="flex flex-wrap justify-between gap-2 border-b border-line pb-2">
-                    <span>
-                      <span className="font-medium text-navy">{a.action}</span>
-                      <span className="text-muted"> · {a.entityType}</span>
-                    </span>
-                    <span className="text-muted tabular-nums">
-                      {new Date(a.createdAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 text-xs text-muted">
-              نافذة سجل التدقيق محدودة — ليست إعادة بناء تاريخية كاملة.{" "}
-              <Link href="/management/activity" className="underline">
-                المزيد
-              </Link>
-            </p>
-          </Card>
+          <div className="mt-4 break-inside-avoid" data-testid="executive-activity">
+            <Section title={copy.activity} className="print:shadow-none">
+              {report.activity.length === 0 ? (
+                <p className="text-sm text-muted">{copy.activityEmpty}</p>
+              ) : (
+                <ul className="divide-y divide-line text-sm">
+                  {report.activity.map((a) => (
+                    <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                      <span>
+                        <span className="font-medium text-ink">{a.action}</span>
+                        <span className="text-muted"> · {a.entityType}</span>
+                      </span>
+                      <span className="text-xs tabular-nums text-muted">
+                        {new Date(a.createdAt).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-xs text-muted">
+                {copy.activityNote}{" "}
+                <Link href="/management/activity" className="font-medium text-primary hover:underline print:hidden">
+                  {t.management.common.more}
+                </Link>
+              </p>
+            </Section>
+          </div>
         ) : null}
       </ReportChrome>
     </PageContainer>

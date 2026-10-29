@@ -7,21 +7,20 @@ import { getAuthContext } from "@/server/context";
 import { canViewManagement } from "@/modules/management/access";
 import { getManagementAIConfig } from "@/modules/management/ai/config";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function ManagementAnalystPage() {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!canViewManagement(ctx)) redirect("/");
 
+  const { t } = await getI18n();
   const cfg = getManagementAIConfig();
   const asOfDate = riyadhTodayYmd();
 
   return (
     <PageContainer data-testid="management-analyst" className="space-y-5">
-      <PageHeader
-        title="محلل الإدارة (ذكاء اصطناعي)"
-        description="قراءة فقط — يعتمد حصراً على تقارير المخاطر والبيانات الإدارية المصرّح بها. لا يكتب في النظام."
-      />
+      <PageHeader title={t.management.analyst.title} description={t.management.analyst.description} />
       <ManagementNav pathname="/management/analyst" />
       <ManagementAnalystClient
         asOfDate={asOfDate}

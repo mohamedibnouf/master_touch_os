@@ -27,10 +27,10 @@ export async function ProjectActivityTimeline({ items }: { items: ProjectActivit
               <p className="text-xs tabular-nums text-muted">
                 {new Date(item.createdAt).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}
               </p>
-              <p className="text-ink">{auditActionLabel(item.action)}</p>
+              <p className="text-ink">{auditActionLabel(item.action, locale)}</p>
               {item.automaticDetail ? <p className="text-xs text-primary">{item.automaticDetail}</p> : null}
               <p className="text-xs text-muted">
-                {auditEntityLabel(item.entityType)}
+                {auditEntityLabel(item.entityType, locale)}
                 {item.actorLabel ? ` · ${item.actorLabel}` : ""}
               </p>
             </li>

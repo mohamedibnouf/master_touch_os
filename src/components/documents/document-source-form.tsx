@@ -7,24 +7,25 @@ import { GoogleDrivePickerControls } from "@/components/documents/google-drive-p
 import { uploadDocumentAction } from "@/server/use-cases/platform";
 import { readGooglePickerPublicConfig, isGooglePickerReady } from "@/modules/documents/google-picker-config";
 import type { NormalizedGooglePickerFile } from "@/modules/documents/google-picker-normalize";
+import { useI18n } from "@/lib/i18n/client";
 
-const CATEGORIES: Array<{ value: string; label: string }> = [
-  { value: "business_case", label: "دراسة حالة / Business Case" },
-  { value: "contract", label: "عقد" },
-  { value: "drawing", label: "مخطط" },
-  { value: "shop_drawing", label: "مخطط ورشة" },
-  { value: "material_submittal", label: "تقديم مواد" },
-  { value: "rfi", label: "استفسار RFI" },
-  { value: "method_statement", label: "بيان طريقة" },
-  { value: "inspection_request", label: "طلب فحص" },
-  { value: "ncr", label: "NCR" },
-  { value: "invoice", label: "فاتورة" },
-  { value: "purchase_order", label: "أمر شراء" },
-  { value: "change_order", label: "أمر تغيير" },
-  { value: "handover", label: "تسليم" },
-  { value: "warranty", label: "ضمان" },
-  { value: "other", label: "أخرى" },
-];
+const CATEGORIES = [
+  "business_case",
+  "contract",
+  "drawing",
+  "shop_drawing",
+  "material_submittal",
+  "rfi",
+  "method_statement",
+  "inspection_request",
+  "ncr",
+  "invoice",
+  "purchase_order",
+  "change_order",
+  "handover",
+  "warranty",
+  "other",
+] as const;
 
 export function DocumentSourceForm({
   projectId,
@@ -35,6 +36,8 @@ export function DocumentSourceForm({
   showProjectPicker?: boolean;
   projects?: Array<{ id: string; project_code: string; name_ar: string }>;
 }) {
+  const { t } = useI18n();
+  const tf = t.documents.sourceForm;
   const pickerConfig = useMemo(
     () =>
       readGooglePickerPublicConfig({
@@ -67,32 +70,32 @@ export function DocumentSourceForm({
   return (
     <ServerActionForm action={uploadDocumentAction} className="grid gap-3 md:grid-cols-2">
       {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
-      <Field label="العنوان">
+      <Field label={tf.title}>
         <Input name="title" required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      <Field label="التصنيف">
+      <Field label={tf.category}>
         <Select name="category" required defaultValue="other">
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
+          {CATEGORIES.map((value) => (
+            <option key={value} value={value}>
+              {t.documents.categories[value]}
             </option>
           ))}
         </Select>
       </Field>
-      <Field label="مصدر الملف">
+      <Field label={tf.fileSource}>
         <Select
           name="fileSource"
           value={source}
           onChange={(e) => setSource(e.target.value === "storage" ? "storage" : "google_drive")}
         >
-          <option value="google_drive">Google Drive</option>
-          <option value="storage">رفع ملف (تخزين النظام)</option>
+          <option value="google_drive">{tf.sourceDrive}</option>
+          <option value="storage">{tf.sourceStorage}</option>
         </Select>
       </Field>
       {showProjectPicker ? (
-        <Field label="المشروع (اختياري)">
+        <Field label={tf.project}>
           <Select name="projectId" defaultValue="">
-            <option value="">بدون مشروع</option>
+            <option value="">{tf.noProject}</option>
             {(projects ?? []).map((project) => (
               <option key={project.id} value={project.id}>
                 {project.project_code} — {project.name_ar}
@@ -117,22 +120,20 @@ export function DocumentSourceForm({
               <Button
                 type="button"
                 variant="ghost"
-                className="px-0"
+                className="px-0 text-primary hover:bg-transparent hover:text-primary-hover"
                 onClick={() => setShowManualUrl((open) => !open)}
                 data-testid="document-drive-manual-toggle"
               >
-                إدخال رابط Google Drive يدويًا
+                {tf.manualToggle}
               </Button>
             </div>
           ) : null}
           {showManualUrl || !pickerReady ? (
-            <Field
-              label="رابط Google Drive"
-              hint="يفتح الرابط في Google Drive حسب صلاحيات حسابك هناك. النظام لا يمنح صلاحية Drive ولا يجعل الملف عامًا."
-            >
+            <Field label={tf.driveUrl} hint={tf.driveUrlHint}>
               <Input
                 name="driveUrl"
                 type="url"
+                dir="ltr"
                 required={!selected}
                 value={driveUrl}
                 onChange={(e) => {
@@ -151,13 +152,13 @@ export function DocumentSourceForm({
           )}
         </div>
       ) : (
-        <Field label="الملف">
+        <Field label={tf.file}>
           <Input name="file" type="file" required data-testid="document-storage-file" />
         </Field>
       )}
-      <div className="md:col-span-2">
+      <div className="flex justify-end border-t border-line pt-3 md:col-span-2">
         <Button type="submit" data-testid="document-save">
-          إضافة مستند
+          {tf.submit}
         </Button>
       </div>
     </ServerActionForm>

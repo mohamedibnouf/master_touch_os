@@ -8,7 +8,7 @@ import {
   ReportRiskSection,
   ReportTable,
 } from "@/components/management/report-chrome";
-import { Card } from "@/components/ui/primitives";
+import { Badge, Section } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { canViewManagement, resolveManagementSections } from "@/modules/management/access";
@@ -16,6 +16,14 @@ import { ManagementRepository } from "@/server/repositories/management.repositor
 import { createReportContext } from "@/modules/management/reports/context";
 import { buildProjectReport } from "@/modules/management/reports/builders";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import {
+  projectRiskLabel,
+  projectRiskTone,
+  projectStatusLabel,
+  projectStatusTone,
+} from "@/lib/ui/operational-labels";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function ProjectsReportPage() {
   const ctx = await getAuthContext();
@@ -24,6 +32,9 @@ export default async function ProjectsReportPage() {
 
   const sections = resolveManagementSections(ctx);
   if (!sections.projects) redirect("/management/reports");
+
+  const { t, locale } = await getI18n();
+  const copy = t.management.reports.projects;
 
   const supabase = await createServerSupabaseClient();
   const repo = new ManagementRepository(supabase);
@@ -44,7 +55,7 @@ export default async function ProjectsReportPage() {
         <ManagementNav pathname="/management/reports" />
       </div>
       <ReportChrome
-        title="محفظة المشاريع"
+        title={copy.title}
         context={report.context}
         csvHref="/management/reports/projects/export.csv"
       >
@@ -54,34 +65,50 @@ export default async function ProjectsReportPage() {
         <div className="mb-6">
           <DecisionBriefView sections={report.decisionBrief} />
         </div>
-        <Card className="mb-4 break-inside-avoid">
-          <h2 className="mb-3 font-semibold text-navy">تجاوزت تاريخ الانتهاء المخطط</h2>
-          <ReportTable
-            headers={["المشروع", "الحالة", "المخطط", "أيام التجاوز"]}
-            empty="لا توجد مشاريع متجاوزة ضمن المرشحين المحدودين."
-            rows={report.overdueProjects.map((p) => ({
-              key: p.id,
-              href: p.href,
-              cells: [p.projectCode, p.status, p.plannedEndDate, p.overdueDays],
-            }))}
-          />
-        </Card>
-        <Card className="mb-4 break-inside-avoid">
-          <h2 className="mb-3 font-semibold text-navy">مخاطر معلنة (risk_level)</h2>
-          <ReportTable
-            headers={["المشروع", "المستوى"]}
-            empty="لا توجد مشاريع بمستوى مخاطر high/critical ضمن المرشحين."
-            rows={report.declaredHighRisk.map((p) => ({
-              key: p.id,
-              href: p.href,
-              cells: [`${p.projectCode} — ${p.nameAr}`, p.riskLevel],
-            }))}
-          />
-        </Card>
+        <div className="mb-4 break-inside-avoid">
+          <Section title={copy.overdueTitle} className="print:shadow-none">
+            <ReportTable
+              headers={[copy.colProject, copy.colStatus, copy.colPlanned, copy.colOverdueDays]}
+              empty={copy.overdueEmpty}
+              rows={report.overdueProjects.map((p) => ({
+                key: p.id,
+                href: p.href,
+                cells: [
+                  p.projectCode,
+                  <Badge key="status" tone={projectStatusTone(p.status)}>
+                    {projectStatusLabel(p.status, locale)}
+                  </Badge>,
+                  p.plannedEndDate,
+                  <span key="days" className="font-semibold text-danger">
+                    {p.overdueDays}
+                  </span>,
+                ],
+              }))}
+            />
+          </Section>
+        </div>
+        <div className="mb-4 break-inside-avoid">
+          <Section title={copy.declaredTitle} className="print:shadow-none">
+            <ReportTable
+              headers={[copy.colProject, copy.colLevel]}
+              empty={copy.declaredEmpty}
+              rows={report.declaredHighRisk.map((p) => ({
+                key: p.id,
+                href: p.href,
+                cells: [
+                  `${p.projectCode} — ${p.nameAr}`,
+                  <Badge key="risk" tone={projectRiskTone(p.riskLevel)}>
+                    {projectRiskLabel(p.riskLevel, locale)}
+                  </Badge>,
+                ],
+              }))}
+            />
+          </Section>
+        </div>
         {report.risksByProject.map((g) => (
           <ReportRiskSection
             key={g.projectId}
-            title={`مخاطر: ${g.projectLabel}`}
+            title={format(copy.projectRisks, { project: g.projectLabel })}
             findings={g.findings}
           />
         ))}

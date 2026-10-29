@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/config";
 import { AI_LIMITS } from "./limits";
 import type { AiHealth, AiSeverity, AiRiskType, DeterministicRisk } from "./schemas";
 
@@ -191,6 +192,18 @@ export function healthLabelAr(health: AiHealth): string {
   if (health === "attention") return "يحتاج متابعة";
   if (health === "at_risk") return "معرّض للخطر";
   return "حرج";
+}
+
+const HEALTH_LABEL_EN: Record<string, string> = {
+  healthy: "Stable",
+  attention: "Needs follow-up",
+  at_risk: "At risk",
+  critical: "Critical",
+};
+
+/** Health label in the given locale; Arabic by default. */
+export function healthLabel(health: AiHealth, locale: Locale = "ar"): string {
+  return locale === "en" ? (HEALTH_LABEL_EN[health] ?? HEALTH_LABEL_EN.critical) : healthLabelAr(health);
 }
 
 export function severityLabelAr(severity: AiSeverity): string {

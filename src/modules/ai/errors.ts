@@ -1,5 +1,10 @@
 import { AppError, isAppError } from "@/lib/errors";
-import { AI_PROVIDER_USER_MESSAGE_AR, isAiProviderFailureCode } from "./provider-errors";
+import type { Locale } from "@/lib/i18n/config";
+import {
+  AI_PROVIDER_USER_MESSAGE_AR,
+  AI_PROVIDER_USER_MESSAGE_EN,
+  isAiProviderFailureCode,
+} from "./provider-errors";
 
 export type AiClientErrorCode =
   | "AI_DISABLED"
@@ -27,6 +32,38 @@ export const AI_ERROR_MESSAGE_AR: Record<AiClientErrorCode, string> = {
   UNAUTHORIZED: "يجب تسجيل الدخول للمتابعة.",
   INTERNAL: "تعذر إكمال التحليل حالياً. حاول مرة أخرى.",
 };
+
+export const AI_ERROR_MESSAGE_EN: Record<AiClientErrorCode, string> = {
+  AI_DISABLED: "Intelligent analysis is not enabled right now.",
+  FORBIDDEN: "You do not have permission to use this feature.",
+  NOT_FOUND: "The requested item is not available.",
+  DOCUMENT_UNSUPPORTED: "This document type is not supported for analysis yet.",
+  NO_EXTRACTABLE_TEXT: "No analysable text could be extracted from this document.",
+  RATE_LIMITED: "The temporary usage limit was reached. Try again later.",
+  PROVIDER_UNAVAILABLE: "The analysis could not be completed right now. Please try again.",
+  VALIDATION: "The analysis request is not valid.",
+  CONFLICT: "An analysis is already running. Wait for it to finish.",
+  UNAUTHORIZED: "Sign in to continue.",
+  INTERNAL: "The analysis could not be completed right now. Please try again.",
+};
+
+function isAiClientErrorCode(value: unknown): value is AiClientErrorCode {
+  return typeof value === "string" && value in AI_ERROR_MESSAGE_AR;
+}
+
+/**
+ * User-facing message for an AI action error code in the given locale (Arabic by default).
+ * Returns null for unknown codes so callers can fall back to the server-provided text.
+ */
+export function aiClientErrorMessage(code: string | null | undefined, locale: Locale = "ar"): string | null {
+  if (isAiProviderFailureCode(code)) {
+    return locale === "en" ? AI_PROVIDER_USER_MESSAGE_EN[code] : AI_PROVIDER_USER_MESSAGE_AR[code];
+  }
+  if (isAiClientErrorCode(code)) {
+    return locale === "en" ? AI_ERROR_MESSAGE_EN[code] : AI_ERROR_MESSAGE_AR[code];
+  }
+  return null;
+}
 
 export function mapToAiClientError(error: unknown): { code: string; message: string } {
   if (isAppError(error)) {

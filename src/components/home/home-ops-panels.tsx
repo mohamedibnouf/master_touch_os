@@ -21,10 +21,15 @@ import { resolveNotificationHref } from "@/lib/notifications/href";
 import { NotificationNavLink } from "@/components/notifications/notification-nav-link";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
 import type { AuthContext } from "@/types/models";
+import { format, intlLocale, type Locale } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
 
 type ProcAction = { id: string; label: string; href: string; status: string; overdue: boolean };
 
 const loadHomeOps = cache(async (ctx: AuthContext) => {
+  const { t } = await getI18n();
+  const o = t.home.ops;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const showOrgStats =
@@ -57,7 +62,7 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
           id: s.id,
           label: req.title ?? req.entity_type,
           href,
-          status: "بانتظار قراري",
+          status: o.statusAwaitingMyDecision,
           overdue: Boolean(s.due_at && s.due_at < new Date().toISOString()),
         });
       }
@@ -74,9 +79,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const r of rfqsReady ?? []) {
       procActions.push({
         id: r.id,
-        label: `RFQ ${r.rfq_number} — ${r.title}`,
+        label: format(o.labelRfq, { number: r.rfq_number, title: r.title }),
         href: `/procurement/rfqs/${r.id}`,
-        status: "يحتاج إصدار",
+        status: o.statusNeedsIssue,
         overdue: Boolean(r.response_due_date && r.response_due_date < today),
       });
     }
@@ -92,9 +97,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const r of rfqsResp ?? []) {
       procActions.push({
         id: `cmp-${r.id}`,
-        label: `مقارنة عروض ${r.rfq_number}`,
+        label: format(o.labelCompareQuotes, { number: r.rfq_number }),
         href: `/procurement/rfqs/${r.id}/comparison`,
-        status: "يحتاج مقارنة",
+        status: o.statusNeedsComparison,
         overdue: false,
       });
     }
@@ -110,9 +115,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const p of posApproved ?? []) {
       procActions.push({
         id: p.id,
-        label: `أمر شراء ${p.po_number}`,
+        label: format(o.labelPurchaseOrder, { number: p.po_number }),
         href: `/procurement/purchase-orders/${p.id}`,
-        status: "جاهز للإصدار",
+        status: o.statusReadyToIssue,
         overdue: false,
       });
     }
@@ -129,9 +134,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const i of invReview ?? []) {
       procActions.push({
         id: i.id,
-        label: `فاتورة ${i.invoice_number}`,
+        label: format(o.labelInvoice, { number: i.invoice_number }),
         href: `/finance/supplier-invoices/${i.id}`,
-        status: i.status === "discrepancy" ? "اختلاف" : "يحتاج مراجعة",
+        status: i.status === "discrepancy" ? o.statusDiscrepancy : o.statusNeedsReview,
         overdue: Boolean(i.due_date && i.due_date < today),
       });
     }
@@ -148,9 +153,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const i of invPay ?? []) {
       procActions.push({
         id: `pay-${i.id}`,
-        label: `دفع فاتورة ${i.invoice_number}`,
+        label: format(o.labelPayInvoice, { number: i.invoice_number }),
         href: `/finance/supplier-invoices/${i.id}`,
-        status: "بانتظار الصرف",
+        status: o.statusAwaitingPayment,
         overdue: Boolean(i.due_date && i.due_date < today),
       });
     }
@@ -166,9 +171,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const v of valReview ?? []) {
       procActions.push({
         id: v.id,
-        label: `مراجعة مستخلص ${v.valuation_number}`,
+        label: format(o.labelReviewValuation, { number: v.valuation_number }),
         href: `/finance/client-valuations/${v.id}`,
-        status: "مراجعة داخلية",
+        status: o.statusInternalReview,
         overdue: Boolean(v.due_date && v.due_date < today),
       });
     }
@@ -184,9 +189,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const v of valSubmit ?? []) {
       procActions.push({
         id: `vsub-${v.id}`,
-        label: `إرسال مستخلص ${v.valuation_number} للعميل`,
+        label: format(o.labelSendValuation, { number: v.valuation_number }),
         href: `/finance/client-valuations/${v.id}`,
-        status: "بانتظار إرسال للعميل",
+        status: o.statusAwaitingClientSend,
         overdue: false,
       });
     }
@@ -202,9 +207,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const i of invDraft ?? []) {
       procActions.push({
         id: `cinv-${i.id}`,
-        label: `إصدار فاتورة ${i.invoice_number}`,
+        label: format(o.labelIssueInvoice, { number: i.invoice_number }),
         href: `/finance/client-invoices/${i.id}`,
-        status: "مسودة — جاهزة للإصدار",
+        status: o.statusDraftReadyToIssue,
         overdue: false,
       });
     }
@@ -221,9 +226,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const i of arCollect ?? []) {
       procActions.push({
         id: `ar-${i.id}`,
-        label: `تحصيل ${i.invoice_number}`,
+        label: format(o.labelCollect, { number: i.invoice_number }),
         href: `/finance/client-invoices/${i.id}`,
-        status: i.status === "overdue" ? "متأخر" : "بانتظار التحصيل",
+        status: i.status === "overdue" ? o.statusOverdue : o.statusAwaitingCollection,
         overdue: Boolean(i.due_date && i.due_date < today),
       });
     }
@@ -239,9 +244,9 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
     for (const v of voPending ?? []) {
       procActions.push({
         id: v.id,
-        label: `اعتماد أمر تغيير ${v.vo_number}`,
+        label: format(o.labelApproveVariation, { number: v.vo_number }),
         href: `/finance/variations/${v.id}`,
-        status: "بانتظار الاعتماد",
+        status: o.statusAwaitingApproval,
         overdue: false,
       });
     }
@@ -262,14 +267,18 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
   return { dashboard, procActions, recentNotes, showOrgStats, canReadAudit };
 });
 
-function workKindLabel(kind: string) {
-  if (kind === "approval") return "موافقة";
-  if (kind === "workflow") return "مسار عمل";
-  if (kind === "rfi") return "طلب استفسار";
-  if (kind === "ncr") return "عدم مطابقة";
-  if (kind === "document_revision") return "مراجعة وثيقة";
-  if (kind === "inspection") return "فحص";
-  return "إجراء";
+function workKindLabel(kind: string, o: Dictionary["home"]["ops"]) {
+  if (kind === "approval") return o.kindApproval;
+  if (kind === "workflow") return o.kindWorkflow;
+  if (kind === "rfi") return o.kindRfi;
+  if (kind === "ncr") return o.kindNcr;
+  if (kind === "document_revision") return o.kindDocumentRevision;
+  if (kind === "inspection") return o.kindInspection;
+  return o.kindAction;
+}
+
+function formatStamp(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" });
 }
 
 function WorkKindIcon({ kind }: { kind: string }) {
@@ -285,7 +294,8 @@ function WorkKindIcon({ kind }: { kind: string }) {
 }
 
 export async function HomeAttentionRail({ ctx }: { ctx: AuthContext }) {
-  const { dashboard, procActions } = await loadHomeOps(ctx);
+  const [{ dashboard, procActions }, { t }] = await Promise.all([loadHomeOps(ctx), getI18n()]);
+  const o = t.home.ops;
   const myApprovals = dashboard.pendingActions.filter((a) => a.kind === "approval").length;
   const attentionCount = myApprovals + procActions.length;
   const unread = dashboard.stats.unreadNotifications;
@@ -297,23 +307,23 @@ export async function HomeAttentionRail({ ctx }: { ctx: AuthContext }) {
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-warning/15 text-warning">
           <Stamp className="h-4 w-4" aria-hidden />
         </span>
-        <p className="text-xs font-semibold text-warning">يحتاج انتباهك</p>
+        <p className="text-xs font-semibold text-warning">{o.attentionEyebrow}</p>
       </div>
       <p className="mt-4 text-3xl font-semibold tabular-nums leading-none text-ink">{attentionCount}</p>
-      <p className="mt-2 text-sm font-semibold text-ink">بانتظار قرارك</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted">موافقات وإجراءات تشغيلية مخصّصة لك</p>
+      <p className="mt-2 text-sm font-semibold text-ink">{o.attentionTitle}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted">{o.attentionHint}</p>
       {canOpenApprovals ? (
         <Link
           href="/approvals"
           className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[var(--radius-control)] bg-primary px-3 text-sm font-medium text-white duration-150 hover:bg-primary-hover"
         >
-          عرض صندوق الموافقات
+          {o.openApprovalsInbox}
         </Link>
       ) : null}
       {hasPermission(ctx, "notification.read") ? (
-        <div className="mt-auto flex items-center justify-between gap-3 pt-4">
-          <span className="text-xs text-muted">تنبيهات غير مقروءة</span>
-          <Link href="/notifications" className="text-sm font-semibold tabular-nums text-navy duration-150 hover:underline">
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4">
+          <span className="text-xs text-muted">{o.unreadNotifications}</span>
+          <Link href="/notifications" className="text-sm font-semibold tabular-nums text-primary duration-150 hover:underline">
             {unread}
           </Link>
         </div>
@@ -323,23 +333,27 @@ export async function HomeAttentionRail({ ctx }: { ctx: AuthContext }) {
 }
 
 export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
-  const { dashboard, procActions, recentNotes, canReadAudit } = await loadHomeOps(ctx);
+  const [{ dashboard, procActions, recentNotes, canReadAudit }, { t, locale }] = await Promise.all([
+    loadHomeOps(ctx),
+    getI18n(),
+  ]);
+  const o = t.home.ops;
 
   const shortcuts = [
     hasPermission(ctx, "project.read")
-      ? { href: "/projects", label: "المشاريع", Icon: FolderKanban }
+      ? { href: "/projects", label: o.shortcutProjects, Icon: FolderKanban }
       : null,
     hasPermission(ctx, "leave.request") && ctx.employee
-      ? { href: "/leave/new", label: "طلب إجازة", Icon: CalendarPlus }
+      ? { href: "/leave/new", label: o.shortcutLeaveRequest, Icon: CalendarPlus }
       : null,
     hasPermission(ctx, "reports.management.read")
-      ? { href: "/management", label: "مركز القيادة", Icon: Gauge }
+      ? { href: "/management", label: o.shortcutCommandCenter, Icon: Gauge }
       : null,
     hasPermission(ctx, "reports.management.read")
-      ? { href: "/management/analyst", label: "المحلل الذكي", Icon: Sparkles }
+      ? { href: "/management/analyst", label: o.shortcutAnalyst, Icon: Sparkles }
       : null,
     hasPermission(ctx, "document.read")
-      ? { href: "/documents", label: "المستندات", Icon: FileText }
+      ? { href: "/documents", label: o.shortcutDocuments, Icon: FileText }
       : null,
   ].filter((item): item is { href: string; label: string; Icon: typeof FolderKanban } => item !== null);
 
@@ -349,8 +363,8 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:gap-5">
       {shortcuts.length > 0 ? (
-        <nav className="min-w-0 xl:col-span-12" aria-label="إجراءات سريعة">
-          <h2 className="mt-section-title mb-2">إجراءات سريعة</h2>
+        <nav className="min-w-0 xl:col-span-12" aria-label={o.quickActions}>
+          <h2 className="mt-section-title mb-2">{o.quickActions}</h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
             {shortcuts.map((item) => {
               const Icon = item.Icon;
@@ -359,7 +373,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                   <span className="mt-icon-well">
                     <Icon className="h-4 w-4" aria-hidden />
                   </span>
-                  <span className="text-sm font-semibold leading-snug text-navy">{item.label}</span>
+                  <span className="text-sm font-semibold leading-snug text-ink">{item.label}</span>
                 </Link>
               );
             })}
@@ -369,15 +383,17 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
 
       <section className="min-w-0 xl:col-span-12">
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <h2 className="mt-section-title">عملي اليوم</h2>
+          <h2 className="mt-section-title">{o.myWorkToday}</h2>
           {canOpenApprovals ? (
-            <Link href="/approvals" className="text-xs font-medium text-navy duration-150 hover:underline">
-              عرض الكل
+            <Link href="/approvals" className="text-xs font-medium text-primary duration-150 hover:underline">
+              {o.viewAll}
             </Link>
           ) : null}
         </div>
         {workEmpty ? (
-          <p className="text-sm text-muted">لا توجد إجراءات معلقة حالياً.</p>
+          <p className="rounded-[var(--radius-control)] border border-dashed border-line bg-surface-muted px-4 py-6 text-center text-sm text-muted">
+            {o.noPendingActions}
+          </p>
         ) : (
           <ul className="mt-work-list mt-surface overflow-hidden p-1">
             {procActions.slice(0, 15).map((action) => (
@@ -387,14 +403,16 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                     <Wallet className="h-4 w-4" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-navy" dir="auto">
+                    <p className="truncate text-sm font-semibold text-ink" dir="auto">
                       {action.label}
                     </p>
-                    <p className="text-[11px] leading-relaxed text-muted">مالي / توريد · {action.status}</p>
+                    <p className="text-[11px] leading-relaxed text-muted">
+                      {o.financeProcurement} · {action.status}
+                    </p>
                   </div>
                   {action.overdue ? (
                     <Badge tone="danger" className="shrink-0">
-                      متأخر
+                      {o.overdue}
                     </Badge>
                   ) : null}
                 </Link>
@@ -407,18 +425,18 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                     <WorkKindIcon kind={action.kind} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-navy" dir="auto">
+                    <p className="truncate text-sm font-semibold text-ink" dir="auto">
                       {action.title}
                     </p>
-                    <p className="text-[11px] leading-relaxed text-muted">{workKindLabel(action.kind)}</p>
+                    <p className="text-[11px] leading-relaxed text-muted">{workKindLabel(action.kind, o)}</p>
                   </div>
                   {action.isOverdue ? (
                     <Badge tone="danger" className="shrink-0">
-                      متأخر
+                      {o.overdue}
                     </Badge>
                   ) : action.dueAt ? (
                     <Badge tone="neutral" className="shrink-0">
-                      ضمن المهلة
+                      {o.withinDeadline}
                     </Badge>
                   ) : null}
                 </Link>
@@ -429,11 +447,11 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
       </section>
 
       <section className="min-w-0 xl:col-span-6">
-        <h2 className="mt-section-title mb-2">تنبيهات أخيرة</h2>
+        <h2 className="mt-section-title mb-2">{o.recentNotifications}</h2>
         {!hasPermission(ctx, "notification.read") ? (
-          <p className="text-sm text-muted">عرض التنبيهات يتطلب صلاحية الإشعار.</p>
+          <p className="text-sm text-muted">{o.notificationsPermission}</p>
         ) : recentNotes.length === 0 ? (
-          <p className="text-sm text-muted">لا توجد تنبيهات.</p>
+          <p className="text-sm text-muted">{o.noNotifications}</p>
         ) : (
           <ul className="space-y-1">
             {recentNotes.map((item) => {
@@ -452,14 +470,12 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                   />
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`truncate text-sm leading-relaxed ${item.read_at ? "text-ink" : "font-semibold text-navy"}`}
+                      className={`truncate text-sm leading-relaxed text-ink ${item.read_at ? "" : "font-semibold"}`}
                       dir="auto"
                     >
                       {item.title}
                     </p>
-                    <p className="text-[11px] text-muted">
-                      {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
-                    </p>
+                    <p className="text-[11px] text-muted">{formatStamp(item.created_at, locale)}</p>
                   </div>
                 </div>
               );
@@ -470,7 +486,7 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
                       id={item.id}
                       href={href}
                       unread={!item.read_at}
-                      className="block rounded-[var(--radius-control)] duration-150 hover:bg-white"
+                      className="block rounded-[var(--radius-control)] duration-150 hover:bg-surface-muted"
                     >
                       {inner}
                     </NotificationNavLink>
@@ -486,18 +502,17 @@ export async function HomeOpsLower({ ctx }: { ctx: AuthContext }) {
 
       {canReadAudit ? (
         <section className="min-w-0 xl:col-span-6">
-          <h2 className="mt-section-title mb-2">آخر النشاطات</h2>
+          <h2 className="mt-section-title mb-2">{o.recentActivity}</h2>
           {dashboard.recentActivity.length === 0 ? (
-            <p className="text-sm text-muted">لا يوجد نشاط مسجّل بعد.</p>
+            <p className="text-sm text-muted">{o.noActivity}</p>
           ) : (
             <ol className="relative space-y-0 border-s-2 border-primary/15 ps-4">
               {dashboard.recentActivity.map((item) => (
                 <li key={item.id} className="relative pb-4 last:pb-0">
                   <span className="absolute top-1.5 -start-[21px] h-2.5 w-2.5 rounded-full border-2 border-white bg-primary" aria-hidden />
-                  <p className="text-sm font-semibold leading-relaxed text-navy">{auditActionLabel(item.action)}</p>
+                  <p className="text-sm font-semibold leading-relaxed text-ink">{auditActionLabel(item.action, locale)}</p>
                   <p className="text-[11px] text-muted">
-                    {auditEntityLabel(item.entity_type)} ·{" "}
-                    {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                    {auditEntityLabel(item.entity_type, locale)} · {formatStamp(item.created_at, locale)}
                   </p>
                 </li>
               ))}

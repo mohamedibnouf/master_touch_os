@@ -8,7 +8,7 @@ import {
   ReportRiskSection,
   ReportTable,
 } from "@/components/management/report-chrome";
-import { Card } from "@/components/ui/primitives";
+import { Badge, Section } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { canViewManagement, resolveManagementSections } from "@/modules/management/access";
@@ -16,6 +16,8 @@ import { ManagementRepository } from "@/server/repositories/management.repositor
 import { createReportContext } from "@/modules/management/reports/context";
 import { buildOperationsReport } from "@/modules/management/reports/builders";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
+import { approvalStatusLabel, approvalStatusTone } from "@/lib/ui/operational-labels";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function OperationsReportPage() {
   const ctx = await getAuthContext();
@@ -24,6 +26,9 @@ export default async function OperationsReportPage() {
 
   const sections = resolveManagementSections(ctx);
   if (!sections.approvals && !sections.procurement) redirect("/management/reports");
+
+  const { t, locale } = await getI18n();
+  const copy = t.management.reports.operations;
 
   const supabase = await createServerSupabaseClient();
   const repo = new ManagementRepository(supabase);
@@ -44,32 +49,37 @@ export default async function OperationsReportPage() {
         <ManagementNav pathname="/management/reports" />
       </div>
       <ReportChrome
-        title="العمليات والموافقات"
+        title={copy.title}
         context={report.context}
         csvHref="/management/reports/operations/export.csv"
       >
-        <p className="mb-4 text-sm text-muted">
-          أعمار الانتباه إداريّة موثّقة — ليست مخالفات SLA تعاقدية.
-        </p>
+        <p className="mb-4 text-sm text-muted">{copy.agingNote}</p>
         <div className="mb-6">
           <ReportMetricGrid metrics={report.metrics} />
         </div>
         <div className="mb-6">
           <DecisionBriefView sections={report.decisionBrief} />
         </div>
-        <Card className="mb-4 break-inside-avoid">
-          <h2 className="mb-3 font-semibold text-navy">أقدم الموافقات المفتوحة</h2>
-          <ReportTable
-            headers={["الطلب", "الحالة", "أيام مفتوح"]}
-            empty="لا توجد موافقات مفتوحة ضمن المرشحين."
-            rows={report.oldestApprovals.map((a) => ({
-              key: a.id,
-              href: a.href,
-              cells: [a.title, a.status, a.openDays],
-            }))}
-          />
-        </Card>
-        <ReportRiskSection findings={report.operationalRisks} title="مخاطر تشغيلية / موافقات" />
+        <div className="mb-4 break-inside-avoid">
+          <Section title={copy.oldestApprovals} className="print:shadow-none">
+            <ReportTable
+              headers={[copy.colRequest, copy.colStatus, copy.colOpenDays]}
+              empty={copy.approvalsEmpty}
+              rows={report.oldestApprovals.map((a) => ({
+                key: a.id,
+                href: a.href,
+                cells: [
+                  a.title,
+                  <Badge key="status" tone={approvalStatusTone(a.status)}>
+                    {approvalStatusLabel(a.status, locale)}
+                  </Badge>,
+                  a.openDays,
+                ],
+              }))}
+            />
+          </Section>
+        </div>
+        <ReportRiskSection findings={report.operationalRisks} title={copy.risks} />
       </ReportChrome>
     </PageContainer>
   );

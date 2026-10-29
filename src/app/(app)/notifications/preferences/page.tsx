@@ -13,6 +13,8 @@ import {
 import { PushOptInButton } from "@/components/notifications/push-opt-in";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { isValidE164, maskE164 } from "@/lib/phone/e164";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function NotificationPreferencesPage() {
   const ctx = await getAuthContext();
@@ -36,52 +38,54 @@ export default async function NotificationPreferencesPage() {
   const phone = contact?.phone ?? null;
   const hasValidPhone = Boolean(phone && isValidE164(phone));
   const optIn = contact?.whatsapp_opt_in === true;
+  const { t } = await getI18n();
+  const tp = t.workspace.preferences;
 
   return (
     <PageContainer data-testid="notification-preferences" className="space-y-5">
       <PageHeader
-        title="تفضيلات التنبيه"
-        description="التحكم بالقنوات لا يلغي صلاحياتك. التنبيه داخل التطبيق إلزامي للعمل والموافقات والرواتب. واتساب التشغيلي يتطلب موافقة صريحة بالإضافة إلى تفضيل الفئة."
+        title={tp.title}
+        description={tp.description}
       />
       <Card data-testid="whatsapp-operational-opt-in">
-        <h2 className="mb-2 font-semibold text-navy">إشعارات واتساب التشغيلية</h2>
+        <h2 className="mb-2 font-semibold text-ink">{tp.whatsappTitle}</h2>
         <p className="mb-3 text-sm text-muted">
-          موافقة تشغيلية فقط — ليست تسويقاً. لا تُفعَّل تلقائياً. يلزم رقم جوال صالح وتفضيل الفئة ومزوّد مفعّل لاحقاً.
+          {tp.whatsappBody}
         </p>
         <ServerActionForm action={saveOwnContactPhoneAction} className="mb-4 max-w-md space-y-3">
-          <Field label="رقم الجوال" hint={hasValidPhone && phone ? `المحفوظ: ${maskE164(phone)}` : "أضف رقم جوال صالحاً أولاً لتفعيل إشعارات واتساب."}>
+          <Field label={tp.phone} hint={hasValidPhone && phone ? format(tp.savedPhone, { phone: maskE164(phone) }) : tp.phoneRequired}>
             <Input name="phone" type="tel" dir="ltr" defaultValue={phone ?? ""} autoComplete="tel" />
           </Field>
-          <Button type="submit">حفظ الرقم</Button>
+          <Button type="submit">{tp.savePhone}</Button>
         </ServerActionForm>
         {hasValidPhone ? (
           <ServerActionForm action={saveWhatsAppOptInAction}>
             <input type="hidden" name="whatsapp_opt_in" value={optIn ? "false" : "true"} />
             <Button type="submit" variant={optIn ? "primary" : "secondary"} data-testid="whatsapp-opt-in-toggle">
-              {optIn ? "واتساب التشغيلي: مفعّل" : "تفعيل واتساب التشغيلي"}
+              {optIn ? tp.whatsappOn : tp.whatsappEnable}
             </Button>
           </ServerActionForm>
         ) : (
           <p className="text-sm text-muted" data-testid="whatsapp-opt-in-blocked">
-            أضف رقم جوال صالحاً أولاً لتفعيل إشعارات واتساب.
+            {tp.phoneRequired}
           </p>
         )}
       </Card>
       {!hubReady ? (
         <EmptyState
-          title="مركز القنوات غير مفعّل بعد"
-          description="سيتم تفعيل التفضيلات واشتراك الأجهزة بعد مراجعة وتطبيق الترحيل 062."
+          title={tp.hubNotReadyTitle}
+          description={tp.hubNotReadyBody}
         />
       ) : (
         <Card className="mb-6 p-0">
           <TableScroll>
           <table className="w-full min-w-[520px] text-sm">
-            <thead className="text-muted">
+            <thead className="bg-surface-muted text-muted">
               <tr>
-                <th className="px-2 py-2 text-start">الفئة</th>
+                <th className="px-3 py-2 text-start font-medium">{tp.category}</th>
                 {NOTIFICATION_CHANNELS.map((ch) => (
-                  <th key={ch} className="px-2 py-2 text-start">
-                    {ch}
+                  <th key={ch} className="px-3 py-2 text-start font-medium">
+                    {tp.channels[ch]}
                   </th>
                 ))}
               </tr>
@@ -89,17 +93,17 @@ export default async function NotificationPreferencesPage() {
             <tbody>
               {NOTIFICATION_CATEGORIES.map((category) => (
                 <tr key={category} className="border-t border-line">
-                  <td className="px-2 py-3 font-medium">{category}</td>
+                  <td className="px-3 py-3 font-medium text-ink">{tp.categories[category]}</td>
                   {NOTIFICATION_CHANNELS.map((channel) => {
                     const enabled = prefs.get(`${category}:${channel}`) ?? (channel === "in_app" || (channel === "email" && (category === "APPROVALS" || category === "WORK")));
                     return (
-                      <td key={channel} className="px-2 py-3">
+                      <td key={channel} className="px-3 py-3">
                         <ServerActionForm action={saveNotificationPreferenceAction}>
                           <input type="hidden" name="category" value={category} />
                           <input type="hidden" name="channel" value={channel} />
                           <input type="hidden" name="enabled" value={enabled ? "false" : "true"} />
                           <Button type="submit" variant={enabled ? "primary" : "secondary"} className="min-h-9 px-2 text-xs">
-                            {enabled ? "تشغيل" : "إيقاف"}
+                            {enabled ? tp.on : tp.off}
                           </Button>
                         </ServerActionForm>
                       </td>
@@ -114,11 +118,11 @@ export default async function NotificationPreferencesPage() {
       )}
 
       <Card>
-        <h2 className="mb-2 font-semibold text-navy">إشعارات الجهاز (PWA)</h2>
-        <p className="mb-3 text-sm text-muted">لا يُطلب الإذن تلقائياً. اضغط فقط إذا رغبت بتلقي تنبيهات على هذا الجهاز.</p>
+        <h2 className="mb-2 font-semibold text-ink">{tp.deviceTitle}</h2>
+        <p className="mb-3 text-sm text-muted">{tp.deviceBody}</p>
         <PushOptInButton vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
         <Badge className="mt-3" tone="neutral">
-          Web Push يحتاج مفاتيح VAPID بعد تطبيق 062
+          {tp.vapidNote}
         </Badge>
       </Card>
     </PageContainer>

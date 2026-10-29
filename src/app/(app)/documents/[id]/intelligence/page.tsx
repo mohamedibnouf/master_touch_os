@@ -1,6 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge, Card, PageHeader } from "@/components/ui/primitives";
 import { DocumentIntelligenceActions } from "@/components/documents/document-intelligence-actions";
 import { getAuthContext } from "@/server/context";
@@ -11,28 +12,38 @@ import { getDocumentAIConfig } from "@/modules/document-intelligence/ai-extract"
 import { compareBusinessCaseToProject } from "@/modules/document-intelligence/comparison";
 import { riyadhTodayYmd } from "@/modules/management/riyadh-date";
 import type { BusinessCaseExtraction, ExtractedFact } from "@/modules/document-intelligence/schema";
-import { DRIVE_INTELLIGENCE_UNAVAILABLE_AR, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
+import { driveIntelligenceUnavailableMessage, isStorageIntelligenceEligible } from "@/modules/documents/file-source";
 import { classifyDocumentSource } from "@/modules/ai/classify-source";
 import { isGooglePickerReady, readGooglePickerPublicConfig } from "@/modules/documents/google-picker-config";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
 
-function TrustBadge({ status }: { status: string | null }) {
-  if (status === "VERIFIED") return <Badge tone="navy" data-testid="trust-verified">Verified</Badge>;
-  if (status === "EXTRACTED") return <Badge tone="warning" data-testid="trust-extracted">AI Extracted — Not Verified</Badge>;
-  if (status === "FAILED") return <Badge tone="danger">Failed</Badge>;
-  if (status === "PROCESSING") return <Badge tone="neutral">Processing</Badge>;
-  return <Badge tone="neutral">No extraction</Badge>;
+type IntelCopy = Dictionary["documents"]["intelligence"];
+
+function TrustBadge({ status, copy }: { status: string | null; copy: IntelCopy }) {
+  if (status === "VERIFIED") return <Badge tone="success" data-testid="trust-verified">{copy.trustVerified}</Badge>;
+  if (status === "EXTRACTED") return <Badge tone="warning" data-testid="trust-extracted">{copy.trustExtracted}</Badge>;
+  if (status === "FAILED") return <Badge tone="danger">{copy.trustFailed}</Badge>;
+  if (status === "PROCESSING") return <Badge tone="neutral">{copy.trustProcessing}</Badge>;
+  return <Badge tone="neutral">{copy.trustNone}</Badge>;
 }
 
-function FactList({ title, facts }: { title: string; facts: ExtractedFact[] }) {
+function FactList({ title, facts, copy }: { title: string; facts: ExtractedFact[]; copy: IntelCopy }) {
   if (!facts.length) return null;
   return (
-    <Card className="mb-4 break-inside-avoid">
-      <h2 className="mb-2 font-semibold text-navy">{title}</h2>
-      <ul className="space-y-2 text-sm">
+    <Card className="break-inside-avoid">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs tabular-nums text-muted">{facts.length}</span>
+      </div>
+      <ul className="divide-y divide-line text-sm">
         {facts.map((f, i) => (
-          <li key={`${f.value}-${i}`} className="border-b border-line pb-2" data-testid="extracted-fact">
-            <p>{f.value}</p>
-            <p className="mt-1 text-xs text-muted">Evidence: {f.evidenceRefs.join(", ")}</p>
+          <li key={`${f.value}-${i}`} className="py-2 first:pt-0 last:pb-0" data-testid="extracted-fact">
+            <p className="text-ink">{f.value}</p>
+            <p className="mt-1 text-xs text-muted" dir="auto">
+              {format(copy.evidenceLabel, { refs: f.evidenceRefs.join(", ") })}
+            </p>
           </li>
         ))}
       </ul>
@@ -51,6 +62,9 @@ export default async function DocumentIntelligencePage({
     redirect("/");
   }
 
+  const { t, locale } = await getI18n();
+  const td = t.documents;
+  const ti = td.intelligence;
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const { data: doc } = await supabase
@@ -135,38 +149,44 @@ export default async function DocumentIntelligencePage({
         })
       : [];
 
+  const categoryLabel = (td.categories as Record<string, string>)[doc.category] ?? doc.category;
+  const severityLabel = (severity: string) =>
+    severity === "HIGH" ? ti.severityHigh : severity === "MEDIUM" ? ti.severityMedium : severity === "LOW" ? ti.severityLow : severity;
+  const Crumb = locale === "ar" ? ChevronLeft : ChevronRight;
+
   return (
     <PageContainer data-testid="document-intelligence" className="space-y-5 management-report">
-      <PageHeader
-        title="ذكاء المستند — دراسة الحالة"
-        description="استخراج منظم مع تحقق بشري. الذكاء الاصطناعي لا يعدّل سجلات المشروع تلقائياً."
-      />
-
-      <p className="mb-3 text-sm">
-        <Link href="/documents" className="text-navy underline">
-          المستندات
+      <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted print:hidden">
+        <Link href="/documents" className="hover:text-ink hover:underline">
+          {td.common.documents}
+        </Link>
+        <Crumb className="size-3.5" aria-hidden />
+        <Link href={`/documents/${doc.id}`} className="hover:text-ink hover:underline">
+          {doc.title}
         </Link>
         {doc.project_id ? (
           <>
-            {" · "}
-            <Link href={`/projects/${doc.project_id}`} className="text-navy underline">
-              المشروع
+            <span aria-hidden>·</span>
+            <Link href={`/projects/${doc.project_id}`} className="hover:text-ink hover:underline">
+              {ti.project}
             </Link>
           </>
         ) : null}
-      </p>
+      </nav>
 
-      <Card className="mb-4" data-testid="doc-intel-header">
+      <PageHeader title={ti.title} description={ti.description} />
+
+      <Card data-testid="doc-intel-header">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-navy">{doc.title}</h1>
+            <h1 className="text-lg font-semibold text-ink">{doc.title}</h1>
             <p className="mt-1 text-sm text-muted">
-              التصنيف: {doc.category} · الإصدار الحالي: {version?.revision ?? doc.current_revision}
+              {format(ti.meta, { category: categoryLabel, revision: version?.revision ?? doc.current_revision })}
               {version ? ` · ${version.file_name}` : ""}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <TrustBadge status={intel?.status ?? null} />
-              <Badge tone="neutral">AI analysis based on document text only</Badge>
+              <TrustBadge status={intel?.status ?? null} copy={ti} />
+              <Badge tone="neutral">{ti.textOnlyBadge}</Badge>
             </div>
           </div>
           <DocumentIntelligenceActions
@@ -182,12 +202,12 @@ export default async function DocumentIntelligencePage({
         </div>
         {!ai.enabled ? (
           <p className="mt-3 text-sm text-muted" data-testid="doc-intel-unavailable">
-            عيّن DOCUMENT_AI_PROVIDER=mock أو openai على الخادم.
+            {ti.aiNotConfigured}
           </p>
         ) : null}
         {driveBlocked ? (
           <p className="mt-3 text-sm text-muted" data-testid="doc-intel-drive-unavailable">
-            {DRIVE_INTELLIGENCE_UNAVAILABLE_AR}
+            {driveIntelligenceUnavailableMessage(locale)}
           </p>
         ) : null}
         {intel?.error_message ? (
@@ -199,76 +219,79 @@ export default async function DocumentIntelligencePage({
 
       {payload && (intel?.status === "EXTRACTED" || intel?.status === "VERIFIED") ? (
         <>
-          <Card className="mb-4 break-inside-avoid">
-            <h2 className="mb-2 font-semibold text-navy">الملخص</h2>
-            <p className="text-sm whitespace-pre-wrap" data-testid="doc-intel-summary">
-              {payload.summary || "—"}
+          <Card className="break-inside-avoid">
+            <h2 className="mb-2 text-sm font-semibold text-ink">{ti.summary}</h2>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink" data-testid="doc-intel-summary">
+              {payload.summary || td.common.none}
             </p>
           </Card>
-          <FactList title="الأهداف" facts={payload.objectives} />
-          <FactList title="المخرجات" facts={payload.deliverables} />
-          <FactList title="المعالم" facts={payload.milestones} />
-          <FactList
-            title="المواعيد"
-            facts={payload.deadlines.map((d) => ({
-              value: d.dateYmd ? `${d.value} (${d.dateYmd})` : d.value,
-              evidenceRefs: d.evidenceRefs,
-            }))}
-          />
-          <FactList title="وقائع الميزانية" facts={payload.budgetFacts} />
-          <FactList title="أصحاب المصلحة" facts={payload.stakeholders} />
-          <FactList title="الافتراضات" facts={payload.assumptions} />
-          <FactList title="الاعتماديات" facts={payload.dependencies} />
-          <FactList title="مخاطر مذكورة صراحة" facts={payload.explicitRisks} />
-          <FactList title="موافقات مطلوبة" facts={payload.requiredApprovals} />
-          <FactList title="إجراءات" facts={payload.actionItems} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <FactList title={ti.objectives} facts={payload.objectives} copy={ti} />
+            <FactList title={ti.deliverables} facts={payload.deliverables} copy={ti} />
+            <FactList title={ti.milestones} facts={payload.milestones} copy={ti} />
+            <FactList
+              title={ti.deadlines}
+              facts={payload.deadlines.map((d) => ({
+                value: d.dateYmd ? `${d.value} (${d.dateYmd})` : d.value,
+                evidenceRefs: d.evidenceRefs,
+              }))}
+              copy={ti}
+            />
+            <FactList title={ti.budgetFacts} facts={payload.budgetFacts} copy={ti} />
+            <FactList title={ti.stakeholders} facts={payload.stakeholders} copy={ti} />
+            <FactList title={ti.assumptions} facts={payload.assumptions} copy={ti} />
+            <FactList title={ti.dependencies} facts={payload.dependencies} copy={ti} />
+            <FactList title={ti.explicitRisks} facts={payload.explicitRisks} copy={ti} />
+            <FactList title={ti.requiredApprovals} facts={payload.requiredApprovals} copy={ti} />
+            <FactList title={ti.actionItems} facts={payload.actionItems} copy={ti} />
+          </div>
           {payload.ambiguities.length > 0 ? (
-            <Card className="mb-4">
-              <h2 className="mb-2 font-semibold text-navy">غموض</h2>
-              <ul className="list-disc space-y-1 pe-5 text-sm">
+            <Card>
+              <h2 className="mb-2 text-sm font-semibold text-ink">{ti.ambiguities}</h2>
+              <ul className="list-disc space-y-1 ps-5 text-sm text-ink">
                 {payload.ambiguities.map((a, i) => (
                   <li key={i}>{a}</li>
                 ))}
               </ul>
             </Card>
           ) : null}
-          <Card className="mb-4" data-testid="doc-intel-evidence">
-            <h2 className="mb-2 font-semibold text-navy">الأدلة (Evidence)</h2>
-            <p className="text-sm text-muted">
-              كل واقعة مرتبطة بمعرّفات أجزاء المستند (DOC_CHUNK_###). لا تُقبل مراجع غير معروفة من النموذج.
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              chunks: {intel?.chunk_count ?? 0} · characters: {intel?.character_count ?? 0}
-              {intel?.provider ? ` · provider: ${intel.provider}` : ""}
+          <Card className="bg-surface-muted" data-testid="doc-intel-evidence">
+            <h2 className="mb-2 text-sm font-semibold text-ink">{ti.evidenceHeading}</h2>
+            <p className="text-sm text-muted">{ti.evidenceBody}</p>
+            <p className="mt-2 text-xs tabular-nums text-muted">
+              {format(ti.evidenceStats, { chunks: intel?.chunk_count ?? 0, characters: intel?.character_count ?? 0 })}
+              {intel?.provider ? format(ti.evidenceProvider, { provider: intel.provider }) : ""}
             </p>
           </Card>
         </>
       ) : (
-        <Card className="mb-4" data-testid="doc-intel-empty">
-          <p className="text-sm text-muted">لا توجد نتيجة استخراج بعد. اضغط «تحليل دراسة الحالة».</p>
+        <Card data-testid="doc-intel-empty">
+          <p className="text-sm text-muted">{ti.empty}</p>
         </Card>
       )}
 
       {intel?.status === "VERIFIED" ? (
-        <Card className="mb-4" data-testid="doc-intel-comparison">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-navy">مقارنة تشغيلية حتمية</h2>
-            <Badge tone="navy">Deterministic Comparison</Badge>
+        <Card data-testid="doc-intel-comparison">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-semibold text-ink">{ti.comparisonHeading}</h2>
+            <Badge tone="navy">{ti.comparisonBadge}</Badge>
           </div>
           {comparisons.length === 0 ? (
-            <p className="text-sm text-muted">لا توجد فروقات حتمية وفق القواعد المتاحة.</p>
+            <p className="text-sm text-muted">{ti.comparisonEmpty}</p>
           ) : (
-            <ul className="space-y-3 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {comparisons.map((c) => (
-                <li key={c.id} className="border-b border-line pb-2" data-testid="comparison-finding">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge tone={c.severity === "HIGH" ? "danger" : "warning"}>{c.severity}</Badge>
-                    <span className="font-medium text-navy">{c.titleAr}</span>
+                <li key={c.id} className="py-3 first:pt-0 last:pb-0" data-testid="comparison-finding">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={c.severity === "HIGH" ? "danger" : c.severity === "LOW" ? "neutral" : "warning"}>
+                      {severityLabel(c.severity)}
+                    </Badge>
+                    <span className="font-medium text-ink">{pickLocalized(locale, c.titleAr, c.titleEn)}</span>
                   </div>
-                  <p className="mt-1 text-muted">{c.explanationAr}</p>
+                  <p className="mt-1 text-muted">{pickLocalized(locale, c.explanationAr, c.explanationEn)}</p>
                   {c.href ? (
-                    <Link href={c.href} className="text-xs text-navy underline">
-                      فتح المصدر
+                    <Link href={c.href} className="mt-1 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline">
+                      {ti.openSource}
                     </Link>
                   ) : null}
                 </li>
@@ -279,11 +302,11 @@ export default async function DocumentIntelligencePage({
       ) : null}
 
       <p className="text-sm text-muted">
-        للتحليل العام للمستند (ملخص ومخاطر) استخدم{" "}
-        <Link href={`/documents/${doc.id}`} className="text-navy underline">
-          صفحة المستند
+        {ti.footerBefore}{" "}
+        <Link href={`/documents/${doc.id}`} className="font-medium text-primary underline-offset-4 hover:underline">
+          {ti.footerLink}
         </Link>
-        . هذه الصفحة مخصصة لاستخراج دراسة الحالة والتحقق البشري فقط.
+        {ti.footerAfter}
       </p>
     </PageContainer>
   );

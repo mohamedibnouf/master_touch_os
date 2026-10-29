@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export type GooglePickerUiError =
   | "not_configured"
   | "script_failed"
@@ -23,8 +25,21 @@ export const GOOGLE_PICKER_ERROR_AR: Record<GooglePickerUiError, string> = {
   network: "تعذر الاتصال بـ Google.",
 };
 
-export function googlePickerErrorMessage(code: GooglePickerUiError): string {
-  return GOOGLE_PICKER_ERROR_AR[code];
+export const GOOGLE_PICKER_ERROR_EN: Record<GooglePickerUiError, string> = {
+  not_configured: "Google Drive selection is not configured in this environment.",
+  script_failed: "Google tools could not be loaded.",
+  popup_blocked: "The Google window was blocked. Allow pop-ups and try again.",
+  sign_in_cancelled: "Google sign-in was cancelled.",
+  token_error: "Google authorization could not be obtained.",
+  token_expired: "Your Google session expired. Select the file again.",
+  picker_cancelled: "No file was selected.",
+  invalid_selection: "The selected file is not valid.",
+  denied: "Google denied access.",
+  network: "Could not connect to Google.",
+};
+
+export function googlePickerErrorMessage(code: GooglePickerUiError, locale: Locale = "ar"): string {
+  return (locale === "en" ? GOOGLE_PICKER_ERROR_EN : GOOGLE_PICKER_ERROR_AR)[code];
 }
 
 export function mapGisTokenClientError(error: { type?: string; message?: string } | undefined): GooglePickerUiError {

@@ -1,14 +1,21 @@
 "use client";
 
+import { Printer } from "lucide-react";
+import { Button } from "@/components/ui/primitives";
+import { useI18n } from "@/lib/i18n/client";
+
 export function PrintReportButton() {
+  const { t } = useI18n();
   return (
-    <button
+    <Button
       type="button"
-      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white print:hidden"
+      variant="primary"
+      className="print:hidden"
       data-testid="report-print-button"
       onClick={() => window.print()}
     >
-      طباعة
-    </button>
+      <Printer className="h-4 w-4" aria-hidden />
+      {t.management.report.print}
+    </Button>
   );
 }

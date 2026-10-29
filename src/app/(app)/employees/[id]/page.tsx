@@ -1394,7 +1394,7 @@ export default async function EmployeeDetailPage({
             <ul className="grid gap-2 text-sm">
               {audit.map((a) => (
                 <li key={a.id} className="flex justify-between gap-3 border-b border-line pb-1">
-                  <span className="min-w-0 font-medium text-ink">{auditActionLabel(a.action)}</span>
+                  <span className="min-w-0 font-medium text-ink">{auditActionLabel(a.action, locale)}</span>
                   <span className="shrink-0 tabular-nums text-muted">
                     {new Date(a.created_at).toLocaleString(intlLocale(locale))}
                   </span>

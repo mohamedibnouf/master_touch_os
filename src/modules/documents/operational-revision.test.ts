@@ -21,8 +21,12 @@ const sql077 = readFileSync("supabase/migrations/077_step_local_workflow_executi
 const sql029 = readFileSync("supabase/migrations/029_document_version_lifecycle.sql", "utf8");
 const platformSrc = readFileSync("src/server/use-cases/platform.ts", "utf8");
 const storageSrc = readFileSync("src/server/services/storage.service.ts", "utf8");
-const pageSrc = readFileSync("src/app/(app)/documents/[id]/page.tsx", "utf8");
-const formSrc = readFileSync("src/components/documents/operational-revision-form.tsx", "utf8");
+// UI copy lives in the documents dictionary; append it so copy assertions still see the Arabic text.
+const documentsArSrc = readFileSync("src/lib/i18n/dictionaries/documents.ar.ts", "utf8");
+// Only the revision form's own block: the dictionary also holds the add-document form copy.
+const revisionFormCopy = /revisionForm: \{[\s\S]*?\n  \},/.exec(documentsArSrc)?.[0] ?? "";
+const pageSrc = readFileSync("src/app/(app)/documents/[id]/page.tsx", "utf8") + documentsArSrc;
+const formSrc = readFileSync("src/components/documents/operational-revision-form.tsx", "utf8") + revisionFormCopy;
 const openSrc = readFileSync("src/components/documents/document-open-control.tsx", "utf8");
 
 const ORG = "11111111-1111-1111-1111-111111111111";

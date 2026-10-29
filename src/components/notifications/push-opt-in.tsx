@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { savePushSubscriptionAction } from "@/server/use-cases/notification-preferences";
+import { useI18n } from "@/lib/i18n/client";
 
 export function PushOptInButton({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+  const { t } = useI18n();
+  const tp = t.workspace.pushOptIn;
   const [status, setStatus] = useState<"idle" | "unsupported" | "denied" | "on" | "blocked">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -15,7 +18,7 @@ export function PushOptInButton({ vapidPublicKey }: { vapidPublicKey: string | n
     }
     if (!vapidPublicKey) {
       setStatus("blocked");
-      setMessage("مفتاح VAPID غير مُعد على الخادم.");
+      setMessage(tp.noVapid);
       return;
     }
     const permission = await Notification.requestPermission();
@@ -33,7 +36,7 @@ export function PushOptInButton({ vapidPublicKey }: { vapidPublicKey: string | n
     });
     if (!result.ok) {
       setStatus("blocked");
-      setMessage(result.reason === "migration_062" ? "ترحيل 062 غير مطبّق بعد." : "تعذر حفظ الاشتراك.");
+      setMessage(result.reason === "migration_062" ? tp.migrationMissing : tp.saveFailed);
       return;
     }
     setStatus("on");
@@ -42,11 +45,11 @@ export function PushOptInButton({ vapidPublicKey }: { vapidPublicKey: string | n
   return (
     <div data-testid="push-opt-in">
       <Button type="button" onClick={() => void enable()}>
-        تفعيل الإشعارات
+        {tp.enable}
       </Button>
-      {status === "unsupported" ? <p className="mt-2 text-sm text-muted">المتصفح لا يدعم Web Push.</p> : null}
-      {status === "denied" ? <p className="mt-2 text-sm text-danger">تم رفض الإذن.</p> : null}
-      {status === "on" ? <p className="mt-2 text-sm text-success">تم تفعيل إشعارات هذا الجهاز.</p> : null}
+      {status === "unsupported" ? <p className="mt-2 text-sm text-muted">{tp.unsupported}</p> : null}
+      {status === "denied" ? <p className="mt-2 text-sm text-danger">{tp.denied}</p> : null}
+      {status === "on" ? <p className="mt-2 text-sm text-success">{tp.enabled}</p> : null}
       {message ? <p className="mt-2 text-sm text-muted">{message}</p> : null}
     </div>
   );

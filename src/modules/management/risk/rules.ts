@@ -39,6 +39,23 @@ function severityByOverdueDays(
   return "LOW";
 }
 
+/** English count phrase: "1 day", "3 days". */
+function daysEn(n: number): string {
+  return `${n} ${n === 1 ? "day" : "days"}`;
+}
+
+/** Status codes read better in English prose without underscores. */
+function statusEn(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
+const COMPLIANCE_LABEL_EN: Record<string, string> = {
+  iqama: "Iqama",
+  passport: "Passport",
+  work_permit: "Work permit",
+  insurance: "Medical insurance",
+};
+
 function f(partial: Omit<RiskFinding, "id"> & { sourceType: RiskSourceType; sourceId: string }): RiskFinding {
   return {
     ...partial,
@@ -79,7 +96,7 @@ const projectPlannedEndOverdue: RiskRule = {
           titleAr: "مشروع تجاوز تاريخ الانتهاء المخطط",
           titleEn: "Project past planned end date",
           explanationAr: `المشروع ${label} ما زال بحالة ${p.status} بينما planned_end_date كان ${p.planned_end_date} (منذ ${days} يوماً).`,
-          explanationEn: `Project ${label} is still ${p.status} while planned_end_date was ${p.planned_end_date} (${days} days ago).`,
+          explanationEn: `Project ${label} is still ${statusEn(p.status)}; its planned end date was ${p.planned_end_date} (${daysEn(days)} ago).`,
           evidence: {
             status: p.status,
             planned_end_date: p.planned_end_date,
@@ -112,9 +129,9 @@ const projectDeclaredHighRisk: RiskRule = {
           category: this.category,
           severity: p.risk_level === "critical" ? "CRITICAL" : "HIGH",
           titleAr: "مشروع بمستوى مخاطر معلَن",
-          titleEn: "Project with declared high risk level",
+          titleEn: "Project with declared high risk",
           explanationAr: `المشروع ${p.project_code} مسجّل بمستوى مخاطر ${p.risk_level} (قيمة تشغيلية معلنة وليست تنبؤاً).`,
-          explanationEn: `Project ${p.project_code} has declared risk_level=${p.risk_level} (operational declaration, not a prediction).`,
+          explanationEn: `Project ${p.project_code} is declared at ${p.risk_level} risk level (operational declaration, not a prediction).`,
           evidence: { risk_level: p.risk_level, status: p.status },
           sourceType: "project",
           sourceId: p.id,
@@ -145,9 +162,9 @@ const approvalPastDue: RiskRule = {
           category: this.category,
           severity: days >= 7 ? "HIGH" : "MEDIUM",
           titleAr: "موافقة تجاوزت تاريخ الاستحقاق",
-          titleEn: "Approval past due_at",
+          titleEn: "Approval overdue",
           explanationAr: `طلب الموافقة «${a.title ?? a.id.slice(0, 8)}» ما زال ${a.status} وdue_at=${a.due_at} مضى منذ ${days} يوماً.`,
-          explanationEn: `Approval “${a.title ?? a.id.slice(0, 8)}” is still ${a.status} and due_at=${a.due_at} was ${days} days ago.`,
+          explanationEn: `Approval “${a.title ?? a.id.slice(0, 8)}” is still ${statusEn(a.status)}; it was due on ${a.due_at} (${daysEn(days)} ago).`,
           evidence: { status: a.status, due_at: a.due_at, overdue_days: days },
           sourceType: "approval_request",
           sourceId: a.id,
@@ -182,9 +199,9 @@ const approvalOpenAge: RiskRule = {
           category: this.category,
           severity,
           titleAr: "موافقة معلّقة لفترة طويلة",
-          titleEn: "Approval open for many days",
+          titleEn: "Long-pending approval",
           explanationAr: `طلب الموافقة «${a.title ?? a.id.slice(0, 8)}» مفتوح منذ ${days} يوماً (حد الانتباه الإداري ${T.approvalOpenDaysMedium} أيام — ليس SLA تعاقدياً).`,
-          explanationEn: `Approval “${a.title ?? a.id.slice(0, 8)}” has been open for ${days} days (management attention threshold ${T.approvalOpenDaysMedium} days — not a contractual SLA).`,
+          explanationEn: `Approval “${a.title ?? a.id.slice(0, 8)}” has been open for ${daysEn(days)} (management attention threshold: ${daysEn(T.approvalOpenDaysMedium)} — not a contractual SLA).`,
           evidence: {
             status: a.status,
             created_at: a.created_at,
@@ -220,9 +237,9 @@ const prPendingAge: RiskRule = {
           category: this.category,
           severity: days >= T.prOpenDaysHigh ? "HIGH" : "MEDIUM",
           titleAr: "طلب شراء مفتوح لفترة",
-          titleEn: "Purchase request open for many days",
+          titleEn: "Long-open purchase request",
           explanationAr: `طلب الشراء ${pr.pr_number ?? pr.id.slice(0, 8)} بحالة ${pr.status} ومفتوح منذ ${days} يوماً.`,
-          explanationEn: `PR ${pr.pr_number ?? pr.id.slice(0, 8)} is ${pr.status} and has been open for ${days} days.`,
+          explanationEn: `Purchase request ${pr.pr_number ?? pr.id.slice(0, 8)} is ${statusEn(pr.status)} and has been open for ${daysEn(days)}.`,
           evidence: { status: pr.status, open_days: days, created_at: pr.created_at },
           sourceType: "purchase_request",
           sourceId: pr.id,
@@ -252,9 +269,9 @@ const rfqResponseDuePassed: RiskRule = {
           category: this.category,
           severity: days >= 7 ? "HIGH" : "MEDIUM",
           titleAr: "مناقصة تجاوزت تاريخ الرد",
-          titleEn: "RFQ past response due date",
+          titleEn: "RFQ past response deadline",
           explanationAr: `المناقصة ${r.rfq_number ?? r.id.slice(0, 8)} صادرة وresponse_due_date=${r.response_due_date} مضى منذ ${days} يوماً.`,
-          explanationEn: `RFQ ${r.rfq_number ?? r.id.slice(0, 8)} is issued and response_due_date=${r.response_due_date} was ${days} days ago.`,
+          explanationEn: `RFQ ${r.rfq_number ?? r.id.slice(0, 8)} is issued; responses were due on ${r.response_due_date} (${daysEn(days)} ago).`,
           evidence: { status: r.status, response_due_date: r.response_due_date, overdue_days: days },
           sourceType: "rfq",
           sourceId: r.id,
@@ -283,7 +300,7 @@ const rfqNeedsComparison: RiskRule = {
           titleAr: "مناقصة تحتاج مقارنة عروض",
           titleEn: "RFQ awaiting quotation comparison",
           explanationAr: `المناقصة ${r.rfq_number ?? r.id.slice(0, 8)} بحالة responses_received وتحتاج مقارنة.`,
-          explanationEn: `RFQ ${r.rfq_number ?? r.id.slice(0, 8)} is in responses_received and needs comparison.`,
+          explanationEn: `RFQ ${r.rfq_number ?? r.id.slice(0, 8)} has received responses and needs a quotation comparison.`,
           evidence: { status: r.status },
           sourceType: "rfq",
           sourceId: r.id,
@@ -310,7 +327,7 @@ const poReadyToIssue: RiskRule = {
           titleAr: "أمر شراء جاهز للإصدار",
           titleEn: "Purchase order ready to issue",
           explanationAr: `أمر الشراء ${p.po_number ?? p.id.slice(0, 8)} بحالة approved ولم يُصدر بعد.`,
-          explanationEn: `PO ${p.po_number ?? p.id.slice(0, 8)} is approved and not yet issued.`,
+          explanationEn: `Purchase order ${p.po_number ?? p.id.slice(0, 8)} is approved but not yet issued.`,
           evidence: { status: p.status },
           sourceType: "purchase_order",
           sourceId: p.id,
@@ -338,9 +355,9 @@ const poDeliveryDatePassed: RiskRule = {
           category: this.category,
           severity: days >= 14 ? "HIGH" : "MEDIUM",
           titleAr: "أمر شراء تجاوز تاريخ التسليم المطلوب",
-          titleEn: "PO past required delivery date",
+          titleEn: "Purchase order delivery overdue",
           explanationAr: `أمر الشراء ${p.po_number ?? p.id.slice(0, 8)} ما زال ${p.status} وrequired_delivery_date=${p.required_delivery_date} مضى منذ ${days} يوماً.`,
-          explanationEn: `PO ${p.po_number ?? p.id.slice(0, 8)} is still ${p.status} and required_delivery_date=${p.required_delivery_date} was ${days} days ago.`,
+          explanationEn: `Purchase order ${p.po_number ?? p.id.slice(0, 8)} is still ${statusEn(p.status)}; delivery was required by ${p.required_delivery_date} (${daysEn(days)} ago).`,
           evidence: {
             status: p.status,
             required_delivery_date: p.required_delivery_date,
@@ -374,9 +391,9 @@ const supplierInvoicePastDue: RiskRule = {
           category: this.category,
           severity: days >= 14 ? "HIGH" : "MEDIUM",
           titleAr: "فاتورة مورد تجاوزت تاريخ الاستحقاق",
-          titleEn: "Supplier invoice past due date",
+          titleEn: "Supplier invoice overdue",
           explanationAr: `فاتورة المورد ${inv.invoice_number ?? inv.id.slice(0, 8)} ما زالت ${inv.status} وdue_date=${inv.due_date} مضى منذ ${days} يوماً.`,
-          explanationEn: `Supplier invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} is still ${inv.status} and due_date=${inv.due_date} was ${days} days ago.`,
+          explanationEn: `Supplier invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} is still ${statusEn(inv.status)}; it was due on ${inv.due_date} (${daysEn(days)} ago).`,
           evidence: { status: inv.status, due_date: inv.due_date, overdue_days: days },
           sourceType: "supplier_invoice",
           sourceId: inv.id,
@@ -413,8 +430,8 @@ const clientInvoicePastDue: RiskRule = {
             ? `فاتورة العميل ${inv.invoice_number ?? inv.id.slice(0, 8)} بحالة overdue${inv.due_date ? ` (due_date=${inv.due_date})` : ""}.`
             : `فاتورة العميل ${inv.invoice_number ?? inv.id.slice(0, 8)} due_date=${inv.due_date} مضى منذ ${days} يوماً.`,
           explanationEn: byStatus
-            ? `Client invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} has status overdue${inv.due_date ? ` (due_date=${inv.due_date})` : ""}.`
-            : `Client invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} due_date=${inv.due_date} was ${days} days ago.`,
+            ? `Client invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} is marked overdue${inv.due_date ? ` (due ${inv.due_date})` : ""}.`
+            : `Client invoice ${inv.invoice_number ?? inv.id.slice(0, 8)} was due on ${inv.due_date} (${daysEn(days ?? 0)} ago).`,
           evidence: {
             status: inv.status,
             due_date: inv.due_date,
@@ -451,7 +468,7 @@ const valuationPending: RiskRule = {
           titleAr: "مستخلص عميل معلّق",
           titleEn: "Client valuation pending",
           explanationAr: `المستخلص ${v.valuation_number ?? v.id.slice(0, 8)} بحالة ${v.status} ومفتوح منذ ${days} يوماً.`,
-          explanationEn: `Valuation ${v.valuation_number ?? v.id.slice(0, 8)} is ${v.status} and has been open for ${days} days.`,
+          explanationEn: `Valuation ${v.valuation_number ?? v.id.slice(0, 8)} is ${statusEn(v.status)} and has been open for ${daysEn(days)}.`,
           evidence: { status: v.status, open_days: days },
           sourceType: "client_valuation",
           sourceId: v.id,
@@ -482,9 +499,9 @@ const variationPending: RiskRule = {
           category: this.category,
           severity: days >= T.commercialPendingDaysHigh ? "HIGH" : "MEDIUM",
           titleAr: "أمر تغيير معلّق",
-          titleEn: "Variation pending decision",
+          titleEn: "Variation order pending decision",
           explanationAr: `أمر التغيير ${v.vo_number ?? v.id.slice(0, 8)} بحالة ${v.status} ومفتوح منذ ${days} يوماً.`,
-          explanationEn: `Variation ${v.vo_number ?? v.id.slice(0, 8)} is ${v.status} and has been open for ${days} days.`,
+          explanationEn: `Variation order ${v.vo_number ?? v.id.slice(0, 8)} is ${statusEn(v.status)} and has been open for ${daysEn(days)}.`,
           evidence: { status: v.status, open_days: days },
           sourceType: "variation",
           sourceId: v.id,
@@ -521,7 +538,7 @@ function complianceFindings(input: RiskInputSnapshot): RiskFinding[] {
             titleAr: "وثيقة امتثال منتهية",
             titleEn: "Compliance document expired",
             explanationAr: `انتهت صلاحية ${field.label} للموظف ${row.employee_id.slice(0, 8)}… بتاريخ ${expiry} (منذ ${-days} يوماً).`,
-            explanationEn: `${field.label} for employee ${row.employee_id.slice(0, 8)}… expired on ${expiry} (${-days} days ago).`,
+            explanationEn: `${COMPLIANCE_LABEL_EN[field.label] ?? field.label} for employee ${row.employee_id.slice(0, 8)}… expired on ${expiry} (${daysEn(-days)} ago).`,
             evidence: { field: field.label, expiry, days_past: -days },
             sourceType: "employee_compliance",
             sourceId: `${row.employee_id}:${field.label}`,
@@ -539,7 +556,7 @@ function complianceFindings(input: RiskInputSnapshot): RiskFinding[] {
             titleAr: "وثيقة امتثال تنتهي قريباً",
             titleEn: "Compliance document expiring soon",
             explanationAr: `${field.label} للموظف ${row.employee_id.slice(0, 8)}… تنتهي في ${expiry} (خلال ${days} يوماً؛ حد التحذير ${T.expiryWarningDays}).`,
-            explanationEn: `${field.label} for employee ${row.employee_id.slice(0, 8)}… expires on ${expiry} (in ${days} days; warning window ${T.expiryWarningDays}).`,
+            explanationEn: `${COMPLIANCE_LABEL_EN[field.label] ?? field.label} for employee ${row.employee_id.slice(0, 8)}… expires on ${expiry} (in ${daysEn(days)}; warning window ${daysEn(T.expiryWarningDays)}).`,
             evidence: { field: field.label, expiry, days_remaining: days },
             sourceType: "employee_compliance",
             sourceId: `${row.employee_id}:${field.label}`,
@@ -584,7 +601,7 @@ const contractExpiring: RiskRule = {
           titleAr: "عقد ينتهي قريباً",
           titleEn: "Employee contract ending soon",
           explanationAr: `العقد ${c.contract_number} ينتهي في ${c.end_date} (خلال ${days} يوماً).`,
-          explanationEn: `Contract ${c.contract_number} ends on ${c.end_date} (in ${days} days).`,
+          explanationEn: `Contract ${c.contract_number} ends on ${c.end_date} (in ${daysEn(days)}).`,
           evidence: { end_date: c.end_date, days_remaining: days },
           sourceType: "employee_contract",
           sourceId: c.id,
@@ -613,7 +630,7 @@ const missingCheckout: RiskRule = {
           titleAr: "حضور بلا انصراف اليوم",
           titleEn: "Missing checkout today",
           explanationAr: `سجل حضور ${r.id.slice(0, 8)}… ليوم ${input.asOfDate} بحالة missing_checkout.`,
-          explanationEn: `Attendance record ${r.id.slice(0, 8)}… on ${input.asOfDate} has status missing_checkout.`,
+          explanationEn: `Attendance record ${r.id.slice(0, 8)}… on ${input.asOfDate} has no checkout.`,
           evidence: { attendance_date: input.asOfDate, attendance_status: r.attendance_status },
           sourceType: "attendance_record",
           sourceId: r.id,
@@ -640,7 +657,7 @@ const absentToday: RiskRule = {
           titleAr: "غياب اليوم",
           titleEn: "Absent today",
           explanationAr: `سجل حضور ${r.id.slice(0, 8)}… ليوم ${input.asOfDate} بحالة absent (لا يُفسَّر كاتجاه متكرر).`,
-          explanationEn: `Attendance record ${r.id.slice(0, 8)}… on ${input.asOfDate} is absent (not a repeated-absence trend).`,
+          explanationEn: `Attendance record ${r.id.slice(0, 8)}… on ${input.asOfDate} is marked absent (a single day, not a repeated-absence trend).`,
           evidence: { attendance_date: input.asOfDate, attendance_status: r.attendance_status },
           sourceType: "attendance_record",
           sourceId: r.id,
@@ -667,7 +684,7 @@ const leavePending: RiskRule = {
         titleAr: "طلب إجازة بانتظار الموافقة",
         titleEn: "Leave request awaiting approval",
         explanationAr: `طلب إجازة ${r.id.slice(0, 8)}… بحالة submitted ومفتوح منذ ${days} يوماً.`,
-        explanationEn: `Leave request ${r.id.slice(0, 8)}… is submitted and has been open for ${days} days.`,
+        explanationEn: `Leave request ${r.id.slice(0, 8)}… was submitted and has been awaiting approval for ${daysEn(days)}.`,
         evidence: { status: "submitted", open_days: days },
         sourceType: "leave_request",
         sourceId: r.id,
@@ -696,7 +713,7 @@ const payrollWaitingReview: RiskRule = {
           titleAr: "مسير بانتظار المراجعة",
           titleEn: "Payroll period awaiting review",
           explanationAr: `فترة ${p.year}/${String(p.month).padStart(2, "0")} بحالة under_review منذ ${days} يوماً.`,
-          explanationEn: `Period ${p.year}/${String(p.month).padStart(2, "0")} is under_review for ${days} days.`,
+          explanationEn: `Payroll period ${p.year}/${String(p.month).padStart(2, "0")} has been under review for ${daysEn(days)}.`,
           evidence: { status: p.status, open_days: days },
           sourceType: "payroll_period",
           sourceId: p.id,
@@ -726,7 +743,7 @@ const payrollWaitingLock: RiskRule = {
           titleAr: "مسير معتمد بانتظار القفل",
           titleEn: "Approved payroll awaiting lock",
           explanationAr: `فترة ${p.year}/${String(p.month).padStart(2, "0")} بحالة approved وبانتظار القفل منذ ${days} يوماً.`,
-          explanationEn: `Period ${p.year}/${String(p.month).padStart(2, "0")} is approved and awaiting lock for ${days} days.`,
+          explanationEn: `Payroll period ${p.year}/${String(p.month).padStart(2, "0")} is approved and has been awaiting lock for ${daysEn(days)}.`,
           evidence: { status: p.status, open_days: days },
           sourceType: "payroll_period",
           sourceId: p.id,
@@ -753,7 +770,7 @@ const payrollLockedUnpaid: RiskRule = {
           titleAr: "مسير مقفل بقيود غير مصروفة",
           titleEn: "Locked payroll with unpaid entries",
           explanationAr: `فترة ${p.year}/${String(p.month).padStart(2, "0")} مقفلة ويوجد ${p.unpaidEntryCount} قيداً غير مدفوع (بدون عرض مبالغ).`,
-          explanationEn: `Period ${p.year}/${String(p.month).padStart(2, "0")} is locked with ${p.unpaidEntryCount} unpaid entries (no amounts shown).`,
+          explanationEn: `Payroll period ${p.year}/${String(p.month).padStart(2, "0")} is locked with ${p.unpaidEntryCount} unpaid ${p.unpaidEntryCount === 1 ? "entry" : "entries"} (amounts not shown).`,
           evidence: { status: p.status, unpaid_entry_count: p.unpaidEntryCount },
           sourceType: "payroll_period",
           sourceId: p.id,

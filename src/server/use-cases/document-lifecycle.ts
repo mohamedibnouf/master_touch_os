@@ -19,6 +19,7 @@ import { formActionFailure, type FormActionState } from "@/server/forms/form-sta
 import { assertProjectBelongsToOrganization } from "@/modules/documents/project-scope";
 import {
   ARCHIVE_RESTRICTION_AR,
+  ARCHIVE_RESTRICTION_EN,
   LIFECYCLE_AUDIT,
   applyArchiveFields,
   applyRestoreFields,
@@ -122,7 +123,7 @@ async function assertArchiveAllowed(
     hasEmployeeDocumentLink: employeeDocs > 0,
   });
   if (code) {
-    throw new ValidationError(ARCHIVE_RESTRICTION_AR[code], ARCHIVE_RESTRICTION_AR[code]);
+    throw new ValidationError(ARCHIVE_RESTRICTION_AR[code], ARCHIVE_RESTRICTION_EN[code]);
   }
 }
 
@@ -163,7 +164,7 @@ export async function archiveDocumentAction(
   try {
     const { ctx, supabase, doc } = await authorizeLifecycleDocument(formData);
     if (doc.archived_at) {
-      throw new ConflictError(ARCHIVE_RESTRICTION_AR.alreadyArchived, ARCHIVE_RESTRICTION_AR.alreadyArchived);
+      throw new ConflictError(ARCHIVE_RESTRICTION_AR.alreadyArchived, ARCHIVE_RESTRICTION_EN.alreadyArchived);
     }
     await assertArchiveAllowed(supabase, doc);
 
@@ -212,7 +213,7 @@ export async function restoreDocumentAction(
   try {
     const { ctx, supabase, doc } = await authorizeLifecycleDocument(formData);
     if (!doc.archived_at) {
-      throw new ConflictError(ARCHIVE_RESTRICTION_AR.notArchived, ARCHIVE_RESTRICTION_AR.notArchived);
+      throw new ConflictError(ARCHIVE_RESTRICTION_AR.notArchived, ARCHIVE_RESTRICTION_EN.notArchived);
     }
 
     const previousStatus = doc.status;

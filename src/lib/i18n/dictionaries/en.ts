@@ -11,6 +11,11 @@ import { procurementSourcingEn } from "./procurement-sourcing.en";
 import { procurementOrdersEn } from "./procurement-orders.en";
 import { financeClientEn } from "./finance-client.en";
 import { financePayablesEn } from "./finance-payables.en";
+import { workspaceEn } from "./workspace.en";
+import { aiEn } from "./ai.en";
+import { managementEn } from "./management.en";
+import { documentsEn } from "./documents.en";
+import { engineeringEn } from "./engineering.en";
 
 export const en: Dictionary = {
   projectDetail: projectDetailEn,
@@ -25,6 +30,11 @@ export const en: Dictionary = {
   procurementOrders: procurementOrdersEn,
   financeClient: financeClientEn,
   financePayables: financePayablesEn,
+  workspace: workspaceEn,
+  ai: aiEn,
+  management: managementEn,
+  documents: documentsEn,
+  engineering: engineeringEn,
   meta: {
     title: "Master Touch | Internal Operating System",
     description: "Business operating system for Master Touch",
@@ -169,5 +179,59 @@ export const en: Dictionary = {
     leave: "Leave",
     leavePending: "· {count} in progress",
     myLeave: "My leave",
+    ops: {
+      statusAwaitingMyDecision: "Awaiting my decision",
+      statusNeedsIssue: "Needs issuing",
+      statusNeedsComparison: "Needs comparison",
+      statusReadyToIssue: "Ready to issue",
+      statusDiscrepancy: "Discrepancy",
+      statusNeedsReview: "Needs review",
+      statusAwaitingPayment: "Awaiting payment",
+      statusInternalReview: "Internal review",
+      statusAwaitingClientSend: "Awaiting submission to client",
+      statusDraftReadyToIssue: "Draft — ready to issue",
+      statusOverdue: "Overdue",
+      statusAwaitingCollection: "Awaiting collection",
+      statusAwaitingApproval: "Awaiting approval",
+      labelRfq: "RFQ {number} — {title}",
+      labelCompareQuotes: "Compare quotations {number}",
+      labelPurchaseOrder: "Purchase order {number}",
+      labelInvoice: "Invoice {number}",
+      labelPayInvoice: "Pay invoice {number}",
+      labelReviewValuation: "Review valuation {number}",
+      labelSendValuation: "Send valuation {number} to client",
+      labelIssueInvoice: "Issue invoice {number}",
+      labelCollect: "Collect {number}",
+      labelApproveVariation: "Approve variation order {number}",
+      kindApproval: "Approval",
+      kindWorkflow: "Workflow",
+      kindRfi: "RFI",
+      kindNcr: "Non-conformance",
+      kindDocumentRevision: "Document revision",
+      kindInspection: "Inspection",
+      kindAction: "Action",
+      attentionEyebrow: "Needs your attention",
+      attentionTitle: "Awaiting your decision",
+      attentionHint: "Approvals and operational actions assigned to you",
+      openApprovalsInbox: "Open approvals inbox",
+      unreadNotifications: "Unread notifications",
+      shortcutProjects: "Projects",
+      shortcutLeaveRequest: "Request leave",
+      shortcutCommandCenter: "Command center",
+      shortcutAnalyst: "AI analyst",
+      shortcutDocuments: "Documents",
+      quickActions: "Quick actions",
+      myWorkToday: "My work today",
+      viewAll: "View all",
+      noPendingActions: "No pending actions right now.",
+      financeProcurement: "Finance / Procurement",
+      overdue: "Overdue",
+      withinDeadline: "On time",
+      recentNotifications: "Recent notifications",
+      notificationsPermission: "Viewing notifications requires the notification permission.",
+      noNotifications: "No notifications.",
+      recentActivity: "Recent activity",
+      noActivity: "No activity recorded yet.",
+    },
   },
 };

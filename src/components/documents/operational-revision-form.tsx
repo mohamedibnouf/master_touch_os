@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Field, Input, Select } from "@/components/ui/primitives";
+import { Badge, Button, Field, Input, Select } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { GoogleDrivePickerControls } from "@/components/documents/google-drive-picker-controls";
 import { uploadDocumentAction } from "@/server/use-cases/platform";
 import { readGooglePickerPublicConfig, isGooglePickerReady } from "@/modules/documents/google-picker-config";
 import type { NormalizedGooglePickerFile } from "@/modules/documents/google-picker-normalize";
+import { useI18n } from "@/lib/i18n/client";
+import { format } from "@/lib/i18n/config";
 
 export function OperationalDocumentRevisionForm({
   documentId,
@@ -25,6 +27,8 @@ export function OperationalDocumentRevisionForm({
   currentRevision: string;
   nextRevision: string;
 }) {
+  const { t } = useI18n();
+  const tr = t.documents.revisionForm;
   const pickerConfig = useMemo(
     () =>
       readGooglePickerPublicConfig({
@@ -53,10 +57,19 @@ export function OperationalDocumentRevisionForm({
 
   return (
     <div data-testid="document-add-version">
-      <h2 className="mb-2 font-semibold text-navy">إضافة إصدار جديد</h2>
-      <p className="mb-4 text-sm text-muted">
-        الإصدار الحالي: {currentRevision} · الإصدار التالي: {nextRevision}. يبقى الإصدار السابق محفوظًا.
-      </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-ink">{tr.heading}</h2>
+          <p className="mt-1 text-sm text-muted">
+            {format(tr.description, { current: currentRevision, next: nextRevision })}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted" dir="ltr">
+          <Badge tone="neutral">{currentRevision}</Badge>
+          <span aria-hidden>→</span>
+          <Badge tone="info">{nextRevision}</Badge>
+        </div>
+      </div>
       <ServerActionForm action={uploadDocumentAction} className="grid gap-3 md:grid-cols-2" testId="document-add-version-form">
         <input type="hidden" name="documentId" value={documentId} data-testid="document-revision-document-id" />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
@@ -64,14 +77,14 @@ export function OperationalDocumentRevisionForm({
         <input type="hidden" name="category" value={category} />
         <input type="hidden" name="confidentiality" value={confidentiality} />
         <input type="hidden" name="expectedCurrentRevision" value={currentRevision} />
-        <Field label="مصدر الملف">
+        <Field label={tr.fileSource}>
           <Select
             name="fileSource"
             value={source}
             onChange={(e) => setSource(e.target.value === "google_drive" ? "google_drive" : "storage")}
           >
-            <option value="storage">رفع ملف (تخزين النظام)</option>
-            <option value="google_drive">Google Drive</option>
+            <option value="storage">{tr.sourceStorage}</option>
+            <option value="google_drive">{tr.sourceDrive}</option>
           </Select>
         </Field>
         {source === "google_drive" ? (
@@ -90,22 +103,20 @@ export function OperationalDocumentRevisionForm({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="px-0"
+                  className="px-0 text-primary hover:bg-transparent hover:text-primary-hover"
                   onClick={() => setShowManualUrl((open) => !open)}
                   data-testid="document-revision-drive-manual-toggle"
                 >
-                  إدخال رابط Google Drive يدويًا
+                  {tr.manualToggle}
                 </Button>
               </div>
             ) : null}
             {showManualUrl || !pickerReady ? (
-              <Field
-                label="رابط Google Drive"
-                hint="يفتح الرابط في Google Drive حسب صلاحيات حسابك هناك. النظام لا يمنح صلاحية Drive ولا يجعل الملف عامًا."
-              >
+              <Field label={tr.driveUrl} hint={tr.driveUrlHint}>
                 <Input
                   name="driveUrl"
                   type="url"
+                  dir="ltr"
                   required={!selected}
                   value={driveUrl}
                   onChange={(e) => {
@@ -124,13 +135,13 @@ export function OperationalDocumentRevisionForm({
             )}
           </div>
         ) : (
-          <Field label="الملف المعدّل">
+          <Field label={tr.file}>
             <Input name="file" type="file" required data-testid="document-revision-storage-file" />
           </Field>
         )}
-        <div className="md:col-span-2">
+        <div className="flex justify-end border-t border-line pt-3 md:col-span-2">
           <Button type="submit" data-testid="document-revision-save">
-            إضافة إصدار جديد
+            {tr.submit}
           </Button>
         </div>
       </ServerActionForm>

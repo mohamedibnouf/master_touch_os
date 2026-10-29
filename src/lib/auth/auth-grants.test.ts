@@ -20,7 +20,9 @@ describe("post-login destination (digest 744597307)", () => {
     expect(action).toContain("revalidatePath(\"/\", \"layout\")");
     expect(action).toContain("safePostLoginPath");
     expect(action).toContain('formData.get("next")');
-    const errorPage = readFileSync(join(process.cwd(), "src/app/error.tsx"), "utf8");
+    const errorPage =
+      readFileSync(join(process.cwd(), "src/app/error.tsx"), "utf8") +
+      readFileSync(join(process.cwd(), "src/lib/i18n/dictionaries/workspace.ar.ts"), "utf8");
     expect(errorPage).toContain('href="/"');
     expect(errorPage).toContain("الرئيسية");
   });

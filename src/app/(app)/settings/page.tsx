@@ -11,8 +11,10 @@ import { saveManagementNotificationEmailAction, saveManagementNotificationWhatsa
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { auditActionLabel, auditEntityLabel } from "@/lib/ui/audit-action-labels";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
-type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
+type RoleRow = { id: string; name_ar: string; name_en?: string | null; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
 type MemberRow = {
   profile_id: string;
   status: string;
@@ -35,6 +37,8 @@ export default async function SettingsPage() {
   }
 
   const canManageSettings = hasPermission(ctx, "settings.manage");
+  const { t, locale } = await getI18n();
+  const ts = t.workspace.settings;
   const supabase = await createServerSupabaseClient();
   const repo = new CoreRepository(supabase);
   const [users, roles, audit] = await Promise.all([
@@ -57,41 +61,41 @@ export default async function SettingsPage() {
   return (
     <PageContainer className="space-y-5">
       <PageHeader
-        title="الإعدادات"
-        description="المنشأة وإدارة المستخدمين وسجل التدقيق"
+        title={ts.title}
+        description={ts.description}
         actions={
           hasPermission(ctx, "role.read") || hasPermission(ctx, "role.manage") ? (
             <Link
               href="/settings/roles"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-white px-4 text-sm font-medium text-navy md:min-h-10"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-medium text-ink hover:bg-surface-muted md:min-h-10"
             >
-              الأدوار والصلاحيات
+              {ts.rolesLink}
             </Link>
           ) : null
         }
       />
 
       <Card className="mb-6">
-        <h2 className="text-base font-semibold text-navy">المنشأة</h2>
+        <h2 className="text-base font-semibold text-ink">{ts.organization}</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted">الاسم</dt>
+            <dt className="text-muted">{ts.nameAr}</dt>
             <dd className="font-medium">{ctx.organization.name_ar}</dd>
           </div>
           <div>
-            <dt className="text-muted">English</dt>
+            <dt className="text-muted">{ts.nameEn}</dt>
             <dd className="font-medium">{ctx.organization.name_en}</dd>
           </div>
           <div>
-            <dt className="text-muted">المنطقة الزمنية</dt>
+            <dt className="text-muted">{ts.timezone}</dt>
             <dd className="font-medium">{ctx.organization.timezone}</dd>
           </div>
           <div>
-            <dt className="text-muted">العملة</dt>
+            <dt className="text-muted">{ts.currency}</dt>
             <dd className="font-medium">{ctx.organization.default_currency}</dd>
           </div>
           <div>
-            <dt className="text-muted">الحالة</dt>
+            <dt className="text-muted">{ts.status}</dt>
             <dd>
               <Badge tone="success">{ctx.organization.status}</Badge>
             </dd>
@@ -101,12 +105,12 @@ export default async function SettingsPage() {
 
       {canManageSettings ? (
         <Card className="mb-6" data-testid="management-notification-email">
-          <h2 className="text-base font-semibold text-navy">بريد تنبيهات الإدارة</h2>
+          <h2 className="text-base font-semibold text-ink">{ts.managementEmailTitle}</h2>
           <p className="mt-2 text-sm text-muted">
-            يُستخدم هذا البريد لاستقبال إشعارات الإدارة عند تفعيل خدمة البريد الإلكتروني. هذا ليس بريد تسجيل الدخول وليس تفضيل الموظف الشخصي. اتركه فارغاً لتعطيل بريد الإدارة.
+            {ts.managementEmailBody}
           </p>
           <ServerActionForm action={saveManagementNotificationEmailAction} className="mt-4 max-w-md space-y-3">
-            <Field label="بريد تنبيهات الإدارة" hint="اختياري — مثال: operations@notify.example.com">
+            <Field label={ts.managementEmailField} hint={ts.managementEmailHint}>
               <Input
                 name="management_notification_email"
                 type="email"
@@ -115,19 +119,19 @@ export default async function SettingsPage() {
                 autoComplete="off"
               />
             </Field>
-            <Button type="submit">حفظ</Button>
+            <Button type="submit">{ts.save}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {canManageSettings ? (
         <Card className="mb-6" data-testid="management-notification-whatsapp">
-          <h2 className="text-base font-semibold text-navy">واتساب تنبيهات الإدارة</h2>
+          <h2 className="text-base font-semibold text-ink">{ts.managementWhatsappTitle}</h2>
           <p className="mt-2 text-sm text-muted">
-            رقم تشغيلي واحد لاستقبال تنبيهات الإدارة عبر واتساب بعد تفعيل المزوّد لاحقاً. يجب أن يكون مخوّلاً من المنشأة. لا يُستنتج من رقم المدير أو البريد. اتركه فارغاً لتعطيل واتساب الإدارة. ليس رسائل تسويقية.
+            {ts.managementWhatsappBody}
           </p>
           <ServerActionForm action={saveManagementNotificationWhatsappAction} className="mt-4 max-w-md space-y-3">
-            <Field label="رقم واتساب الإدارة" hint="اختياري — صيغة دولية مثل 05XXXXXXXX أو +9665XXXXXXXX">
+            <Field label={ts.managementWhatsappField} hint={ts.managementWhatsappHint}>
               <Input
                 name="management_notification_whatsapp"
                 type="tel"
@@ -136,16 +140,16 @@ export default async function SettingsPage() {
                 autoComplete="off"
               />
             </Field>
-            <Button type="submit">حفظ</Button>
+            <Button type="submit">{ts.save}</Button>
           </ServerActionForm>
         </Card>
       ) : null}
 
       {canManageUsers ? (
         <Card className="mb-6">
-          <h2 className="mb-4 text-base font-semibold text-navy">المستخدمون والصلاحيات</h2>
+          <h2 className="mb-4 text-base font-semibold text-ink">{ts.usersTitle}</h2>
           {members.length === 0 ? (
-            <EmptyState title="لا يوجد أعضاء." />
+            <EmptyState title={ts.noMembers} />
           ) : (
             <div className="space-y-4">
               {members.map((member) => {
@@ -155,26 +159,26 @@ export default async function SettingsPage() {
                   ? member.employees[0]
                   : member.employees;
                 return (
-                  <div key={member.profile_id} className="rounded-md border border-line p-4">
+                  <div key={member.profile_id} className="rounded-[var(--radius-control)] border border-line bg-surface p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="font-medium text-navy">{profile.full_name_ar}</p>
+                        <p className="font-medium text-ink">{pickLocalized(locale, profile.full_name_ar, profile.full_name_en)}</p>
                         <p className="text-xs text-muted">
-                          {employee?.job_title_ar || "—"} · عضوية: {member.status}
+                          {employee?.job_title_ar || "—"} · {format(ts.membership, { status: member.status })}
                         </p>
                       </div>
                       <Badge tone={profile.is_active ? "success" : "danger"}>
-                        {profile.is_active ? "نشط" : "موقوف"}
+                        {profile.is_active ? ts.active : ts.suspended}
                       </Badge>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3">
                       {hasPermission(ctx, "role.assign") ? (
                         <ServerActionForm action={assignRoleAction} className="flex items-end gap-2">
                           <input type="hidden" name="profileId" value={profile.id} />
-                          <Field label="الدور والصلاحيات">
+                          <Field label={ts.roleField}>
                             <Select name="roleId" required defaultValue="">
                               <option value="" disabled>
-                                اختر
+                                {ts.choose}
                               </option>
                               {roleRows
                                 .filter((role) =>
@@ -188,13 +192,13 @@ export default async function SettingsPage() {
                                 )
                                 .map((role) => (
                                   <option key={role.id} value={role.id}>
-                                    {role.name_ar}
+                                    {pickLocalized(locale, role.name_ar, role.name_en)}
                                   </option>
                                 ))}
                             </Select>
                           </Field>
                           <Button type="submit" variant="secondary">
-                            تعيين
+                            {ts.assign}
                           </Button>
                         </ServerActionForm>
                       ) : null}
@@ -207,7 +211,7 @@ export default async function SettingsPage() {
                             value={profile.is_active ? "false" : "true"}
                           />
                           <Button type="submit" variant={profile.is_active ? "danger" : "primary"}>
-                            {profile.is_active ? "إيقاف" : "تفعيل"}
+                            {profile.is_active ? ts.deactivate : ts.activate}
                           </Button>
                         </ServerActionForm>
                       ) : null}
@@ -222,17 +226,17 @@ export default async function SettingsPage() {
 
       {hasPermission(ctx, "audit.read") ? (
         <Card>
-          <h2 className="mb-4 text-base font-semibold text-navy">سجل التدقيق</h2>
+          <h2 className="mb-4 text-base font-semibold text-ink">{ts.auditTitle}</h2>
           {audit.length === 0 ? (
-            <EmptyState title="لا يوجد سجل بعد." />
+            <EmptyState title={ts.auditEmpty} />
           ) : (
             <ul className="space-y-3">
               {audit.map((item) => (
                 <li key={item.id} className="border-b border-line pb-3 text-sm last:border-0">
-                  <p className="font-medium text-navy">{auditActionLabel(item.action)}</p>
+                  <p className="font-medium text-ink">{auditActionLabel(item.action, locale)}</p>
                   <p className="text-xs text-muted">
-                    {auditEntityLabel(item.entity_type)} ·{" "}
-                    {new Date(item.created_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                    {auditEntityLabel(item.entity_type, locale)} ·{" "}
+                    {new Date(item.created_at).toLocaleString(intlLocale(locale), { timeZone: "Asia/Riyadh" })}
                   </p>
                 </li>
               ))}

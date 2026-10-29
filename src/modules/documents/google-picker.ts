@@ -5,13 +5,14 @@ import { googlePickerErrorMessage, type GooglePickerUiError } from "./google-pic
 import { normalizeGooglePickerDocument, type NormalizedGooglePickerFile } from "./google-picker-normalize";
 import { loadGooglePickerScript } from "./google-script-loader";
 import { googlePickerAppIdFromClientId } from "./drive-ai-auth";
+import type { Locale } from "@/lib/i18n/config";
 
 export type GooglePickerSelectResult =
   | { ok: true; file: NormalizedGooglePickerFile }
   | { ok: false; code: GooglePickerUiError; message: string };
 
-function fail(code: GooglePickerUiError): GooglePickerSelectResult {
-  return { ok: false, code, message: googlePickerErrorMessage(code) };
+function fail(code: GooglePickerUiError, locale: Locale = "ar"): GooglePickerSelectResult {
+  return { ok: false, code, message: googlePickerErrorMessage(code, locale) };
 }
 
 export async function pickGoogleDriveFile(input: {
@@ -19,14 +20,17 @@ export async function pickGoogleDriveFile(input: {
   apiKey: string;
   interactive?: boolean;
   title?: string;
+  /** UI language for the picker and its error messages (Arabic by default). */
+  locale?: Locale;
 }): Promise<GooglePickerSelectResult> {
+  const locale: Locale = input.locale ?? "ar";
   try {
     const token = await requestGoogleDriveFileAccessToken(input.clientId, {
       interactive: Boolean(input.interactive),
     });
     await loadGooglePickerScript();
     const pickerApi = window.google?.picker;
-    if (!pickerApi) return fail("script_failed");
+    if (!pickerApi) return fail("script_failed", locale);
 
     return await new Promise<GooglePickerSelectResult>((resolve) => {
       const view = new pickerApi.DocsView(pickerApi.ViewId.DOCS)
@@ -38,17 +42,17 @@ export async function pickGoogleDriveFile(input: {
         .setOAuthToken(token)
         .setDeveloperKey(input.apiKey)
         .setOrigin(window.location.origin)
-        .setLocale("ar")
+        .setLocale(locale)
         .setCallback((data) => {
           if (data.action === pickerApi.Action.LOADED) return;
           if (data.action === pickerApi.Action.CANCEL) {
-            resolve(fail("picker_cancelled"));
+            resolve(fail("picker_cancelled", locale));
             return;
           }
           if (data.action !== pickerApi.Action.PICKED) return;
           const file = normalizeGooglePickerDocument(data.docs?.[0]);
           if (!file) {
-            resolve(fail("invalid_selection"));
+            resolve(fail("invalid_selection", locale));
             return;
           }
           resolve({ ok: true, file });
@@ -62,6 +66,6 @@ export async function pickGoogleDriveFile(input: {
     });
   } catch (error) {
     const code = googlePickerErrorFromUnknown(error);
-    return fail(code);
+    return fail(code, locale);
   }
 }

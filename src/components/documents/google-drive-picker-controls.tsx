@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { pickGoogleDriveFile } from "@/modules/documents/google-picker";
 import { googlePickerErrorMessage } from "@/modules/documents/google-picker-errors";
 import type { NormalizedGooglePickerFile } from "@/modules/documents/google-picker-normalize";
+import { useI18n } from "@/lib/i18n/client";
 
 function mimeLabel(mimeType: string | null, kind: NormalizedGooglePickerFile["kind"]): string {
   if (kind === "document") return "Google Docs";
@@ -29,6 +31,8 @@ export function GoogleDrivePickerControls({
   onCleared: () => void;
   busy?: boolean;
 }) {
+  const { t, locale } = useI18n();
+  const tp = t.documents.drivePicker;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +40,7 @@ export function GoogleDrivePickerControls({
     setError(null);
     setPending(true);
     try {
-      const result = await pickGoogleDriveFile({ clientId, apiKey });
+      const result = await pickGoogleDriveFile({ clientId, apiKey, locale });
       if (!result.ok) {
         if (result.code !== "picker_cancelled" && result.code !== "sign_in_cancelled") {
           setError(result.message);
@@ -47,7 +51,7 @@ export function GoogleDrivePickerControls({
       }
       onSelected(result.file);
     } catch {
-      setError(googlePickerErrorMessage("network"));
+      setError(googlePickerErrorMessage("network", locale));
     } finally {
       setPending(false);
     }
@@ -62,12 +66,12 @@ export function GoogleDrivePickerControls({
           disabled={pending || busy}
           data-testid="document-drive-picker"
         >
-          {pending ? "جارٍ فتح Google Drive…" : "اختيار من Google Drive"}
+          {pending ? tp.opening : tp.pick}
         </Button>
         {selected ? (
           <>
             <Button type="button" variant="secondary" onClick={() => void openPicker()} disabled={pending || busy}>
-              تغيير الاختيار
+              {tp.change}
             </Button>
             <Button
               type="button"
@@ -79,23 +83,26 @@ export function GoogleDrivePickerControls({
               disabled={pending || busy}
               data-testid="document-drive-picker-clear"
             >
-              إزالة الاختيار
+              {tp.clear}
             </Button>
           </>
         ) : null}
       </div>
       {selected ? (
         <div
-          className="rounded-[var(--radius-control)] border border-line bg-white p-3 text-sm shadow-[var(--shadow-1)]"
+          className="flex items-start gap-3 rounded-[var(--radius-control)] border border-line bg-surface-muted p-3 text-sm"
           data-testid="document-drive-picker-selection"
         >
-          <p className="font-medium text-navy">{selected.name}</p>
-          <p className="mt-1 text-xs text-muted">
-            Google Drive · {mimeLabel(selected.mimeType, selected.kind)}
-          </p>
-          <p className="mt-2 text-xs text-muted">
-            الفتح يخضع لصلاحيات Google Drive. النظام لا يغيّر المشاركة ولا يجعل الملف عامًا.
-          </p>
+          <span className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-primary-soft text-primary">
+            <FileText className="size-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-ink">{selected.name}</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Google Drive · {mimeLabel(selected.mimeType, selected.kind)}
+            </p>
+            <p className="mt-2 text-xs text-muted">{tp.accessNote}</p>
+          </div>
         </div>
       ) : null}
       {error ? (

@@ -1,15 +1,19 @@
 import { PageContainer } from "@/components/layout/page-container";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Archive, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Badge, Card, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/policies/authorize";
-import { documentStatusLabel } from "@/lib/ui/operational-labels";
+import { documentStatusLabel, documentStatusTone } from "@/lib/ui/operational-labels";
+import { intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 import { DocumentOpenControl, DocumentSourceBadge } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl, DocumentRestoreControl } from "@/components/documents/document-lifecycle-controls";
 import { OperationalDocumentRevisionForm } from "@/components/documents/operational-revision-form";
-import { documentFileSourceLabelAr } from "@/modules/documents/file-source";
+import { documentFileSourceLabel } from "@/modules/documents/file-source";
 import { canOfferOperationalRevision, nextOperationalRevision } from "@/modules/documents/operational-revision";
 import { DocumentAiAnalysisPanel } from "@/components/ai/document-ai-analysis";
 import { classifyDocumentSource, isInteractiveDocumentAiSource } from "@/modules/ai/classify-source";
@@ -25,6 +29,8 @@ export default async function DocumentDetailPage({
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
+  const { t, locale } = await getI18n();
+  const td = t.documents;
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const { data: doc } = await supabase
@@ -47,7 +53,7 @@ export default async function DocumentDetailPage({
     doc.project_id
       ? supabase
           .from("projects")
-          .select("id, project_code, name_ar")
+          .select("id, project_code, name_ar, name_en")
           .eq("id", doc.project_id)
           .eq("organization_id", ctx.organization.id)
           .maybeSingle()
@@ -81,71 +87,73 @@ export default async function DocumentDetailPage({
   const googlePickerClientId = isGooglePickerReady(pickerConfig) ? pickerConfig.clientId : "";
   const unsupportedAiMessage =
     isArchived
-      ? "لا يمكن تحليل مستند مؤرشف."
+      ? td.detail.aiArchived
       : !current
-        ? "لا يوجد إصدار حالي يمكن تحليله."
+        ? td.detail.aiNoCurrent
         : sourceClass === "UNSUPPORTED"
-          ? "نوع الملف غير مدعوم للتحليل حالياً (المدعوم: PDF وDOCX وTXT ومستندات Google Docs)."
-          : "تحليل المحتوى غير متاح لهذا المصدر حالياً.";
+          ? td.detail.aiUnsupported
+          : td.detail.aiUnavailableSource;
+
+  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Riyadh",
+  });
+  const categoryLabel = (td.categories as Record<string, string>)[doc.category] ?? doc.category;
+  const Crumb = locale === "ar" ? ChevronLeft : ChevronRight;
+
+  const facts: Array<{ label: string; value: ReactNode }> = [
+    { label: td.detail.number, value: doc.document_number || td.common.none },
+    { label: td.common.category, value: categoryLabel },
+    { label: td.detail.currentRevision, value: <Badge tone="navy">{doc.current_revision}</Badge> },
+    {
+      label: td.common.status,
+      value: <Badge tone={documentStatusTone(doc.status)}>{documentStatusLabel(doc.status, locale)}</Badge>,
+    },
+    { label: td.common.source, value: <DocumentSourceBadge source={current?.file_source} /> },
+    { label: td.detail.confidentiality, value: doc.confidentiality },
+  ];
 
   return (
     <PageContainer className="space-y-5" data-testid="document-detail">
-      <PageHeader title={doc.title} description="بيانات المستند وإصداراته ومصدر الملف." />
-      {isArchived ? (
-        <p className="rounded-[var(--radius-control)] border border-line bg-paper px-3 py-2 text-sm text-navy" data-testid="document-archived-banner">
-          مؤرشف — مخفي من القوائم التشغيلية. الملف والإصدارات محفوظة.
-        </p>
-      ) : null}
-
-      <p className="text-sm">
-        <Link href="/documents" className="text-navy underline">
-          المستندات
+      <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
+        <Link href="/documents" className="hover:text-ink hover:underline">
+          {td.common.documents}
         </Link>
         {project ? (
           <>
-            {" · "}
-            <Link href={`/projects/${project.id}?tab=documents`} className="text-navy underline">
-              {project.project_code} — {project.name_ar}
+            <Crumb className="size-3.5" aria-hidden />
+            <Link href={`/projects/${project.id}?tab=documents`} className="hover:text-ink hover:underline">
+              {project.project_code} — {pickLocalized(locale, project.name_ar, project.name_en)}
             </Link>
           </>
         ) : null}
-      </p>
+      </nav>
+
+      <PageHeader title={doc.title} description={td.detail.description} />
+      {isArchived ? (
+        <p
+          className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface-muted px-3 py-2 text-sm text-ink"
+          data-testid="document-archived-banner"
+        >
+          <Archive className="size-4 shrink-0 text-muted" aria-hidden />
+          {td.detail.archivedBanner}
+        </p>
+      ) : null}
 
       <Card>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted">الرقم</dt>
-            <dd>{doc.document_number || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">التصنيف</dt>
-            <dd>{doc.category}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">الإصدار الحالي</dt>
-            <dd>{doc.current_revision}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">الحالة</dt>
-            <dd>
-              <Badge tone="neutral">{documentStatusLabel(doc.status)}</Badge>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted">المصدر</dt>
-            <dd>
-              <DocumentSourceBadge source={current?.file_source} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted">السرية</dt>
-            <dd>{doc.confidentiality}</dd>
-          </div>
+        <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {facts.map((fact) => (
+            <div key={fact.label} className="min-w-0">
+              <dt className="text-xs font-medium text-muted">{fact.label}</dt>
+              <dd className="mt-1 text-ink">{fact.value}</dd>
+            </div>
+          ))}
         </dl>
         {doc.is_register_controlled ? (
-          <p className="mt-3 text-xs text-muted">مستند سجل رسمي. لا يُحوَّل تلقائياً من رابط Drive غير الرسمي.</p>
+          <p className="mt-4 text-xs text-muted">{td.detail.registerNote}</p>
         ) : null}
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <DocumentOpenControl
             documentId={doc.id}
             file={
@@ -160,20 +168,30 @@ export default async function DocumentDetailPage({
             canOpenStorage={canOpenStorage}
           />
           {doc.category === "business_case" ? (
-            <Link href={`/documents/${doc.id}/intelligence`} className="text-sm text-navy underline">
-              ذكاء المستند
+            <Link
+              href={`/documents/${doc.id}/intelligence`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              <Sparkles className="size-4" aria-hidden />
+              {td.detail.intelligenceLink}
             </Link>
           ) : null}
           {canArchive && !isArchived ? (
-            <DocumentArchiveControl documentId={doc.id} fileSource={current?.file_source} />
+            <div className="ms-auto">
+              <DocumentArchiveControl documentId={doc.id} fileSource={current?.file_source} />
+            </div>
           ) : null}
-          {canArchive && isArchived ? <DocumentRestoreControl documentId={doc.id} /> : null}
+          {canArchive && isArchived ? (
+            <div className="ms-auto">
+              <DocumentRestoreControl documentId={doc.id} />
+            </div>
+          ) : null}
         </div>
       </Card>
 
       {canSeeDocumentAi ? (
         <Card data-testid="document-ai-entry">
-          <h2 className="mb-3 font-semibold text-navy">التحليل بالذكاء الاصطناعي</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.detail.aiHeading}</h2>
           {!isArchived && isInteractiveDocumentAiSource(sourceClass) ? (
             <DocumentAiAnalysisPanel
               documentId={doc.id}
@@ -208,31 +226,48 @@ export default async function DocumentDetailPage({
         </Card>
       ) : null}
 
-      <Card>
-        <h2 className="mb-3 font-semibold text-navy">الإصدارات</h2>
-        <TableScroll>
+      <Card className="p-0 md:p-0">
+        <h2 className="px-4 pt-4 text-sm font-semibold text-ink md:px-5 md:pt-5">{td.detail.versionsHeading}</h2>
+        <TableScroll className="mt-3">
           <table className="min-w-full text-sm">
-            <thead className="text-start text-muted">
+            <thead className="bg-surface-muted text-xs text-muted">
               <tr>
-                <th className="px-2 py-2 font-medium">الإصدار</th>
-                <th className="px-2 py-2 font-medium">المصدر</th>
-                <th className="px-2 py-2 font-medium">الملف</th>
-                <th className="px-2 py-2 font-medium">الحالة</th>
-                <th className="px-2 py-2 font-medium">التاريخ</th>
-                <th className="px-2 py-2 font-medium">فتح</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.revision}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.source}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.file}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.status}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.date}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{td.common.open}</th>
               </tr>
             </thead>
             <tbody>
+              {(versions ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-muted">
+                    {td.detail.noVersions}
+                  </td>
+                </tr>
+              ) : null}
               {(versions ?? []).map((v) => (
                 <tr key={v.id} className="border-t border-line">
-                  <td className="px-2 py-2">{v.revision}</td>
-                  <td className="px-2 py-2">{documentFileSourceLabelAr(v.file_source)}</td>
-                  <td className="px-2 py-2">{v.file_name}</td>
-                  <td className="px-2 py-2">{v.is_current ? "الحالي" : v.is_superseded ? "سابق" : "سجل"}</td>
-                  <td className="px-2 py-2 text-muted">
-                    {new Date(v.uploaded_at).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+                  <td className="px-4 py-2.5">
+                    <Badge tone={v.is_current ? "navy" : "neutral"}>{v.revision}</Badge>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-4 py-2.5 text-muted">{documentFileSourceLabel(v.file_source, locale)}</td>
+                  <td className="max-w-[16rem] truncate px-4 py-2.5 text-ink">{v.file_name}</td>
+                  <td className="px-4 py-2.5">
+                    {v.is_current ? (
+                      <Badge tone="success">{td.detail.versionCurrent}</Badge>
+                    ) : v.is_superseded ? (
+                      <Badge tone="neutral">{td.detail.versionSuperseded}</Badge>
+                    ) : (
+                      <span className="text-muted">{td.detail.versionHistory}</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-muted">
+                    {dateFmt.format(new Date(v.uploaded_at))}
+                  </td>
+                  <td className="px-4 py-2.5">
                     <DocumentOpenControl
                       documentId={doc.id}
                       versionId={v.id}

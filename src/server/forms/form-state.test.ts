@@ -23,6 +23,13 @@ describe("appErrorBoundaryCopy", () => {
 });
 
 describe("formActionFailure", () => {
+  it("returns English messages when the locale is English", () => {
+    expect(formActionFailure(new ValidationError("خطأ", "Bad input"), "fallback", "en")?.message).toBe("Bad input");
+    expect(formActionFailure(new ForbiddenError(), "fallback", "en")?.message).toContain("permission");
+    expect(formActionFailure(new Error("boom"), "تعذر", "en")?.message).toBe("Something went wrong. Please try again.");
+    expect(formActionFailure(new Error("boom"), "تعذر")?.message).toBe("تعذر");
+  });
+
   it("returns validation Arabic", () => {
     const state = formActionFailure(new ValidationError("تحقق من البيانات المدخلة.", "check"), "fallback");
     expect(state?.ok).toBe(false);

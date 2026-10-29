@@ -1,20 +1,34 @@
+import type { ReactNode } from "react";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
   Field,
   Input,
   PageHeader,
+  Section,
   Select,
+  StatCard,
+  TableScroll,
 } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
+import { getI18n } from "@/lib/i18n/server";
+import { intlLocale, pickLocalized, type Locale } from "@/lib/i18n/config";
+import {
+  engineeringStatusLabel,
+  engineeringStatusTone,
+  ncrSeverityLabel,
+  officialDecisionTone,
+  officialDecisionWithCode,
+  rfiPriorityLabel,
+  severityTone,
+} from "@/lib/ui/engineering-labels";
 import {
   closeNcrAction,
   createInspectionRequestAction,
@@ -28,6 +42,15 @@ import {
   submitRfiAction,
 } from "@/server/use-cases/engineering";
 
+const PRIORITIES = ["low", "medium", "high", "critical"] as const;
+const INSPECTION_RESULTS = ["passed", "passed_with_comments", "failed"] as const;
+
+const thClass = "px-3 py-2.5 text-start text-xs font-medium text-muted";
+const tdClass = "px-3 py-2.5 align-top";
+
+type ProjectOption = { id: string; project_code: string; name_ar: string | null; name_en: string | null };
+type DisciplineOption = { code: string; name_ar: string | null; name_en: string | null };
+
 export default async function EngineeringPage({
   searchParams,
 }: {
@@ -39,21 +62,24 @@ export default async function EngineeringPage({
     redirect("/");
   }
 
+  const { t, locale } = await getI18n();
+  const e = t.engineering;
   const { project: projectFilter, module: moduleFilter = "rfi" } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const now = new Date().toISOString();
+  const dateFmt = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" });
 
   const [projects, disciplines] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, project_code, name_ar")
+      .select("id, project_code, name_ar, name_en")
       .eq("organization_id", ctx.organization.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
       .from("engineering_disciplines")
-      .select("code, name_ar")
+      .select("code, name_ar, name_en")
       .eq("organization_id", ctx.organization.id)
       .eq("is_active", true)
       .order("code"),
@@ -131,14 +157,16 @@ export default async function EngineeringPage({
       ["submitted", "under_review"].includes(r.status),
   );
 
-  const defaultProject = projectFilter || projects.data?.[0]?.id || "";
+  const projectOptions: ProjectOption[] = projects.data ?? [];
+  const disciplineOptions: DisciplineOption[] = disciplines.data ?? [];
+  const defaultProject = projectFilter || projectOptions[0]?.id || "";
   const modules = [
-    { id: "rfi", label: "RFI" },
-    { id: "mat", label: "اعتماد مواد" },
-    { id: "shd", label: "مخططات تنفيذية" },
-    { id: "ms", label: "طرق تنفيذ" },
-    { id: "ir", label: "فحوصات" },
-    { id: "ncr", label: "NCR" },
+    { id: "rfi", label: e.modules.rfi },
+    { id: "mat", label: e.modules.mat },
+    { id: "shd", label: e.modules.shd },
+    { id: "ms", label: e.modules.ms },
+    { id: "ir", label: e.modules.ir },
+    { id: "ncr", label: e.modules.ncr },
   ];
 
   const projectQs = projectFilter ? `&project=${projectFilter}` : "";
@@ -146,307 +174,220 @@ export default async function EngineeringPage({
   return (
     <PageContainer className="space-y-5">
       <PageHeader
-        title="الهندسة"
-        description="طلبات الاستفسار، الاعتمادات، المخططات، الفحوصات، وعدم المطابقة"
+        title={e.title}
+        description={e.description}
         actions={
-          <Link href="/document-control" className="text-sm text-navy underline">
-            مراقبة الوثائق
+          <Link href="/document-control" className="text-sm font-medium text-primary hover:underline">
+            {e.documentControlLink}
           </Link>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <p className="text-sm text-muted">RFI متأخرة</p>
-          <p className="mt-2 text-3xl font-semibold text-danger">{overdueRfis.length}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">مواد معلّقة</p>
-          <p className="mt-2 text-3xl font-semibold text-navy">
-            {(mats.data ?? []).filter((m) => !["approved", "closed", "rejected"].includes(m.status)).length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">معتمد للتنفيذ</p>
-          <p className="mt-2 text-3xl font-semibold text-success">
-            {(shds.data ?? []).filter((s) => s.approved_for_execution).length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">فحوصات فاشلة</p>
-          <p className="mt-2 text-3xl font-semibold text-danger">
-            {(irs.data ?? []).filter((i) => i.status === "failed").length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">NCR / إعادة تقديم</p>
-          <p className="mt-2 text-3xl font-semibold text-warning">
-            {(ncrs.data ?? []).filter((n) => n.status !== "closed").length + (pendingDocs.data ?? []).length}
-          </p>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label={e.stats.overdueRfis} value={overdueRfis.length} tone="danger" />
+        <StatCard
+          label={e.stats.pendingMaterials}
+          value={(mats.data ?? []).filter((m) => !["approved", "closed", "rejected"].includes(m.status)).length}
+          tone="info"
+        />
+        <StatCard
+          label={e.stats.approvedForExecution}
+          value={(shds.data ?? []).filter((s) => s.approved_for_execution).length}
+          tone="success"
+        />
+        <StatCard
+          label={e.stats.failedInspections}
+          value={(irs.data ?? []).filter((i) => i.status === "failed").length}
+          tone="danger"
+        />
+        <StatCard
+          label={e.stats.openNcrsResubmissions}
+          value={(ncrs.data ?? []).filter((n) => n.status !== "closed").length + (pendingDocs.data ?? []).length}
+          tone="warning"
+        />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-line pb-2">
+      <nav aria-label={e.common.modulesLabel} className="flex flex-wrap gap-2 border-b border-line pb-2">
         {modules.map((m) => (
           <a
             key={m.id}
             href={`/engineering?module=${m.id}${projectQs}`}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              moduleFilter === m.id ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-muted"
+            aria-current={moduleFilter === m.id ? "page" : undefined}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              moduleFilter === m.id ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-muted hover:text-ink"
             }`}
           >
             {m.label}
           </a>
         ))}
-      </div>
+      </nav>
 
       {defaultProject && moduleFilter === "rfi" && hasPermission(ctx, "rfi.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب استفسار فني (RFI)</h2>
+        <Section title={e.rfis.createTitle}>
           <ServerActionForm action={createRfiAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" required defaultValue="GENERAL">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code} — {d.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="الموضوع">
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField
+              label={e.common.discipline}
+              disciplines={disciplineOptions}
+              defaultValue="GENERAL"
+              required
+              withName
+              locale={locale}
+            />
+            <Field label={e.rfis.subject} required>
               <Input name="subject" required />
             </Field>
-            <Field label="الأولوية">
+            <Field label={e.rfis.priority}>
               <Select name="priority" defaultValue="medium">
-                <option value="low">منخفضة</option>
-                <option value="medium">متوسطة</option>
-                <option value="high">عالية</option>
-                <option value="critical">حرجة</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {rfiPriorityLabel(p, locale)}
+                  </option>
+                ))}
               </Select>
             </Field>
             <div className="md:col-span-2">
-              <Field label="السؤال">
+              <Field label={e.rfis.question} required>
                 <Input name="question" required />
               </Field>
             </div>
-            <Button type="submit">إنشاء RFI</Button>
+            <div>
+              <Button type="submit">{e.rfis.create}</Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {defaultProject && moduleFilter === "mat" && hasPermission(ctx, "submittal.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب اعتماد مواد (MAT)</h2>
+        <Section title={e.submittals.createTitle}>
           <ServerActionForm action={createMaterialSubmittalAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" defaultValue="GENERAL">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="فئة المادة">
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField label={e.common.discipline} disciplines={disciplineOptions} defaultValue="GENERAL" locale={locale} />
+            <Field label={e.submittals.materialCategory} required>
               <Input name="materialCategory" required />
             </Field>
-            <Field label="الشركة المصنّعة">
+            <Field label={e.submittals.manufacturer}>
               <Input name="manufacturer" />
             </Field>
             <div className="md:col-span-2">
-              <Field label="الوصف الفني">
+              <Field label={e.submittals.technicalDescription}>
                 <Input name="technicalDescription" />
               </Field>
             </div>
-            <Button type="submit">تسجيل اعتماد مواد</Button>
+            <div>
+              <Button type="submit">{e.submittals.create}</Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {defaultProject && moduleFilter === "shd" && hasPermission(ctx, "shop_drawing.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء مخطط تنفيذي (SHD)</h2>
+        <Section title={e.shopDrawings.createTitle}>
           <ServerActionForm action={createShopDrawingAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" defaultValue="ELEC">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="عنوان المخطط">
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField label={e.common.discipline} disciplines={disciplineOptions} defaultValue="ELEC" locale={locale} />
+            <Field label={e.shopDrawings.drawingTitle} required>
               <Input name="drawingTitle" required />
             </Field>
-            <Field label="رقم المخطط">
-              <Input name="drawingNumber" />
+            <Field label={e.shopDrawings.drawingNumber}>
+              <Input name="drawingNumber" dir="ltr" />
             </Field>
-            <Field label="الطابق / المنطقة">
+            <Field label={e.shopDrawings.floorZone}>
               <Input name="floorZone" />
             </Field>
-            <Button type="submit">تسجيل مخطط</Button>
+            <div className="flex items-end">
+              <Button type="submit">{e.shopDrawings.create}</Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {defaultProject && moduleFilter === "ms" && hasPermission(ctx, "method_statement.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طريقة تنفيذ (MS)</h2>
+        <Section title={e.methodStatements.createTitle}>
           <ServerActionForm action={createMethodStatementAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" defaultValue="GENERAL">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="النشاط">
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField label={e.common.discipline} disciplines={disciplineOptions} defaultValue="GENERAL" locale={locale} />
+            <Field label={e.methodStatements.activity} required>
               <Input name="activity" required />
             </Field>
-            <Field label="النطاق">
+            <Field label={e.methodStatements.scope}>
               <Input name="scope" />
             </Field>
             <div className="md:col-span-2">
-              <Field label="الإجراء">
+              <Field label={e.methodStatements.procedure}>
                 <Input name="methodProcedure" />
               </Field>
             </div>
-            <Button type="submit">تسجيل طريقة تنفيذ</Button>
+            <div>
+              <Button type="submit">{e.methodStatements.create}</Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {defaultProject && moduleFilter === "ir" && hasPermission(ctx, "inspection.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء طلب فحص (IR)</h2>
+        <Section title={e.inspections.createTitle}>
           <ServerActionForm action={createInspectionRequestAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" defaultValue="GENERAL">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="النشاط">
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField label={e.common.discipline} disciplines={disciplineOptions} defaultValue="GENERAL" locale={locale} />
+            <Field label={e.inspections.activity} required>
               <Input name="relatedActivity" required />
             </Field>
-            <Field label="الموقع">
+            <Field label={e.inspections.location}>
               <Input name="location" />
             </Field>
-            <Field label="تاريخ الفحص المطلوب">
+            <Field label={e.inspections.inspectionDate}>
               <Input name="inspectionDate" type="date" />
             </Field>
-            <Button type="submit">تسجيل طلب فحص</Button>
+            <div className="flex items-end">
+              <Button type="submit">{e.inspections.create}</Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {defaultProject && moduleFilter === "ncr" && hasPermission(ctx, "ncr.create") ? (
-        <Card className="mb-6">
-          <h2 className="mb-3 text-base font-semibold text-navy">إنشاء تقرير عدم مطابقة (NCR)</h2>
+        <Section title={e.ncrs.createTitle}>
           <ServerActionForm action={createNcrAction} className="grid gap-3 md:grid-cols-2">
-            <Field label="المشروع">
-              <Select name="projectId" required defaultValue={defaultProject}>
-                {(projects.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_code} — {p.name_ar}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="التخصص">
-              <Select name="disciplineCode" defaultValue="GENERAL">
-                {(disciplines.data ?? []).map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <ProjectField label={e.common.project} projects={projectOptions} defaultValue={defaultProject} locale={locale} />
+            <DisciplineField label={e.common.discipline} disciplines={disciplineOptions} defaultValue="GENERAL" locale={locale} />
             <div className="md:col-span-2">
-              <Field label="الوصف">
+              <Field label={e.ncrs.description} required>
                 <Input name="description" required />
               </Field>
             </div>
-            <Field label="الخطورة">
+            <Field label={e.ncrs.severity}>
               <Select name="severity" defaultValue="medium">
-                <option value="low">منخفضة</option>
-                <option value="medium">متوسطة</option>
-                <option value="high">عالية</option>
-                <option value="critical">حرجة</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {ncrSeverityLabel(p, locale)}
+                  </option>
+                ))}
               </Select>
             </Field>
-            <Button type="submit" variant="danger">
-              تسجيل NCR
-            </Button>
+            <div className="flex items-end">
+              <Button type="submit" variant="danger">
+                {e.ncrs.create}
+              </Button>
+            </div>
           </ServerActionForm>
-        </Card>
+        </Section>
       ) : null}
 
       {moduleFilter === "rfi" ? (
-        <Card>
-          <h2 className="mb-4 text-base font-semibold text-navy">سجل طلبات الاستفسار الفني</h2>
+        <Section title={e.rfis.registerTitle}>
           {(rfis.data ?? []).length === 0 ? (
-            <EmptyState title="لا توجد طلبات استفسار." />
+            <EmptyState title={e.rfis.empty} />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <table className="min-w-full text-sm">
-                <thead className="bg-paper text-start text-muted">
+                <thead className="bg-surface-muted">
                   <tr>
-                    <th className="px-3 py-2 font-medium">الرقم</th>
-                    <th className="px-3 py-2 font-medium">الموضوع</th>
-                    <th className="px-3 py-2 font-medium">الحالة</th>
-                    <th className="px-3 py-2 font-medium">إجراء</th>
+                    <th className={thClass}>{e.common.number}</th>
+                    <th className={thClass}>{e.rfis.subject}</th>
+                    <th className={thClass}>{e.rfis.responseDue}</th>
+                    <th className={thClass}>{e.common.status}</th>
+                    <th className={thClass}>{e.common.action}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,20 +397,32 @@ export default async function EngineeringPage({
                       rfi.response_required_by < now &&
                       ["submitted", "under_review"].includes(rfi.status);
                     return (
-                      <tr key={rfi.id} className="border-t border-line align-top">
-                        <td className="px-3 py-2 font-medium text-navy">{rfi.rfi_number}</td>
-                        <td className="px-3 py-2">{rfi.subject}</td>
-                        <td className="px-3 py-2">
-                          <Badge tone={overdue ? "danger" : "navy"}>{rfi.status}</Badge>
+                      <tr key={rfi.id} className="border-t border-line">
+                        <td className={`${tdClass} whitespace-nowrap font-mono text-xs font-semibold text-ink`}>
+                          <span dir="ltr">{rfi.rfi_number}</span>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className={`${tdClass} text-ink`} dir="auto">
+                          {rfi.subject}
+                        </td>
+                        <td className={`${tdClass} whitespace-nowrap text-muted`}>
+                          {rfi.response_required_by ? dateFmt.format(new Date(rfi.response_required_by)) : "—"}
+                        </td>
+                        <td className={tdClass}>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Badge tone={overdue ? "danger" : engineeringStatusTone(rfi.status)}>
+                              {engineeringStatusLabel(rfi.status, locale)}
+                            </Badge>
+                            {overdue ? <Badge tone="danger">{e.rfis.overdue}</Badge> : null}
+                          </div>
+                        </td>
+                        <td className={tdClass}>
                           <div className="flex flex-col gap-2">
                             {["draft", "internal_review"].includes(rfi.status) &&
                             hasPermission(ctx, "rfi.submit") ? (
                               <ServerActionForm action={submitRfiAction}>
                                 <input type="hidden" name="rfiId" value={rfi.id} />
                                 <Button type="submit" variant="secondary">
-                                  تقديم
+                                  {e.rfis.submit}
                                 </Button>
                               </ServerActionForm>
                             ) : null}
@@ -477,13 +430,11 @@ export default async function EngineeringPage({
                             hasPermission(ctx, "rfi.respond") ? (
                               <ServerActionForm action={respondRfiAction} className="flex gap-2">
                                 <input type="hidden" name="rfiId" value={rfi.id} />
-                                <Input name="response" placeholder="الرد" required />
-                                <Button type="submit">رد</Button>
+                                <Input name="response" placeholder={e.rfis.responsePlaceholder} required />
+                                <Button type="submit">{e.rfis.respond}</Button>
                               </ServerActionForm>
                             ) : null}
-                            {rfi.response ? (
-                              <p className="text-xs text-muted">الرد محفوظ · السؤال الأصلي لا يُستبدل</p>
-                            ) : null}
+                            {rfi.response ? <p className="text-xs text-muted">{e.rfis.responseSaved}</p> : null}
                           </div>
                         </td>
                       </tr>
@@ -491,128 +442,143 @@ export default async function EngineeringPage({
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
-        </Card>
+        </Section>
       ) : null}
 
       {moduleFilter === "mat" ? (
         <RegisterTable
-          title="اعتمادات المواد"
-          empty="لا توجد اعتمادات مواد."
-          headers={["الرقم", "الفئة", "الحالة", "القرار"]}
-          rows={(mats.data ?? []).map((m) => [
-            m.mat_number,
-            m.material_category,
-            m.status,
-            m.official_decision ?? "—",
-          ])}
+          title={e.submittals.registerTitle}
+          empty={e.submittals.empty}
+          headers={[e.common.number, e.submittals.category, e.common.status, e.common.decision]}
+          rows={(mats.data ?? []).map((m) => ({
+            id: m.id,
+            number: m.mat_number,
+            title: m.material_category,
+            status: <StatusBadge status={m.status} locale={locale} />,
+            extra: <DecisionBadge code={m.official_decision} locale={locale} />,
+          }))}
         />
       ) : null}
 
       {moduleFilter === "shd" ? (
         <RegisterTable
-          title="المخططات التنفيذية"
-          empty="لا توجد مخططات."
-          headers={["الرقم", "العنوان", "الحالة", "معتمد للتنفيذ"]}
-          rows={(shds.data ?? []).map((s) => [
-            s.shd_number,
-            s.drawing_title,
-            s.status,
-            s.approved_for_execution ? "نعم — معتمد للتنفيذ" : "لا",
-          ])}
+          title={e.shopDrawings.registerTitle}
+          empty={e.shopDrawings.empty}
+          headers={[e.common.number, e.shopDrawings.titleColumn, e.common.status, e.shopDrawings.approvedForExecution]}
+          rows={(shds.data ?? []).map((s) => ({
+            id: s.id,
+            number: s.shd_number,
+            title: s.drawing_title,
+            status: <StatusBadge status={s.status} locale={locale} />,
+            extra: s.approved_for_execution ? (
+              <Badge tone="success">{e.shopDrawings.approvedYes}</Badge>
+            ) : (
+              <span className="text-muted">{e.shopDrawings.approvedNo}</span>
+            ),
+          }))}
         />
       ) : null}
 
       {moduleFilter === "ms" ? (
         <RegisterTable
-          title="طرق التنفيذ"
-          empty="لا توجد طرق تنفيذ."
-          headers={["الرقم", "النشاط", "الحالة", "القرار"]}
-          rows={(mss.data ?? []).map((m) => [
-            m.ms_number,
-            m.activity,
-            m.status,
-            m.official_decision ?? "—",
-          ])}
+          title={e.methodStatements.registerTitle}
+          empty={e.methodStatements.empty}
+          headers={[e.common.number, e.methodStatements.activity, e.common.status, e.common.decision]}
+          rows={(mss.data ?? []).map((m) => ({
+            id: m.id,
+            number: m.ms_number,
+            title: m.activity,
+            status: <StatusBadge status={m.status} locale={locale} />,
+            extra: <DecisionBadge code={m.official_decision} locale={locale} />,
+          }))}
         />
       ) : null}
 
       {moduleFilter === "ir" ? (
-        <Card>
-          <h2 className="mb-4 text-base font-semibold text-navy">طلبات الفحص</h2>
+        <Section title={e.inspections.registerTitle}>
           {(irs.data ?? []).length === 0 ? (
-            <EmptyState title="لا توجد طلبات فحص." />
+            <EmptyState title={e.inspections.empty} />
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll>
               <table className="min-w-full text-sm">
-                <thead className="bg-paper text-start text-muted">
+                <thead className="bg-surface-muted">
                   <tr>
-                    <th className="px-3 py-2">الرقم</th>
-                    <th className="px-3 py-2">النشاط</th>
-                    <th className="px-3 py-2">الحالة</th>
-                    <th className="px-3 py-2">نتيجة</th>
+                    <th className={thClass}>{e.common.number}</th>
+                    <th className={thClass}>{e.inspections.activity}</th>
+                    <th className={thClass}>{e.common.status}</th>
+                    <th className={thClass}>{e.inspections.result}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(irs.data ?? []).map((ir) => (
                     <tr key={ir.id} className="border-t border-line">
-                      <td className="px-3 py-2 font-medium text-navy">{ir.ir_number}</td>
-                      <td className="px-3 py-2">{ir.related_activity}</td>
-                      <td className="px-3 py-2">
-                        <Badge tone={ir.status === "failed" ? "danger" : "navy"}>{ir.status}</Badge>
+                      <td className={`${tdClass} whitespace-nowrap font-mono text-xs font-semibold text-ink`}>
+                        <span dir="ltr">{ir.ir_number}</span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`${tdClass} text-ink`} dir="auto">
+                        {ir.related_activity}
+                        {ir.location ? <span className="block text-xs text-muted">{ir.location}</span> : null}
+                      </td>
+                      <td className={tdClass}>
+                        <StatusBadge status={ir.status} locale={locale} />
+                      </td>
+                      <td className={tdClass}>
                         {hasPermission(ctx, "inspection.perform") &&
                         ["ready", "submitted", "scheduled", "inspected"].includes(ir.status) ? (
-                          <ServerActionForm action={recordInspectionResultAction} className="flex gap-2">
+                          <ServerActionForm action={recordInspectionResultAction} className="flex flex-wrap gap-2">
                             <input type="hidden" name="inspectionId" value={ir.id} />
                             <Select name="result" defaultValue="passed">
-                              <option value="passed">ناجح</option>
-                              <option value="passed_with_comments">ناجح مع ملاحظات</option>
-                              <option value="failed">فاشل</option>
+                              {INSPECTION_RESULTS.map((r) => (
+                                <option key={r} value={r}>
+                                  {engineeringStatusLabel(r, locale)}
+                                </option>
+                              ))}
                             </Select>
-                            <Input name="comments" placeholder="ملاحظات" />
+                            <Input name="comments" placeholder={e.inspections.commentsPlaceholder} />
                             <Button type="submit" variant="secondary">
-                              تسجيل
+                              {e.inspections.record}
                             </Button>
                           </ServerActionForm>
                         ) : (
-                          "—"
+                          <span className="text-muted">—</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
-        </Card>
+        </Section>
       ) : null}
 
       {moduleFilter === "ncr" ? (
-        <Card>
-          <h2 className="mb-4 text-base font-semibold text-navy">تقارير عدم المطابقة</h2>
+        <Section title={e.ncrs.registerTitle}>
           {(ncrs.data ?? []).length === 0 ? (
-            <EmptyState title="لا توجد تقارير." />
+            <EmptyState title={e.ncrs.empty} />
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-line">
               {(ncrs.data ?? []).map((ncr) => (
-                <li key={ncr.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-                  <div>
-                    <p className="font-medium text-navy">{ncr.ncr_number}</p>
-                    <p className="text-sm text-muted">{ncr.description}</p>
+                <li key={ncr.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-semibold text-ink">
+                      <span dir="ltr">{ncr.ncr_number}</span>
+                    </p>
+                    <p className="mt-1 text-sm text-muted" dir="auto">
+                      {ncr.description}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge tone={ncr.severity === "critical" ? "danger" : "warning"}>
-                      {ncr.severity} · {ncr.status}
-                    </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={severityTone(ncr.severity)}>{ncrSeverityLabel(ncr.severity, locale)}</Badge>
+                    <StatusBadge status={ncr.status} locale={locale} />
                     {ncr.status !== "closed" && hasPermission(ctx, "ncr.close") ? (
                       <ServerActionForm action={closeNcrAction} className="flex gap-2">
                         <input type="hidden" name="ncrId" value={ncr.id} />
-                        <Input name="verification" placeholder="التحقق" required />
+                        <Input name="verification" placeholder={e.ncrs.verificationPlaceholder} required />
                         <Button type="submit" variant="secondary">
-                          إغلاق
+                          {e.ncrs.close}
                         </Button>
                       </ServerActionForm>
                     ) : null}
@@ -621,9 +587,74 @@ export default async function EngineeringPage({
               ))}
             </ul>
           )}
-        </Card>
+        </Section>
       ) : null}
     </PageContainer>
+  );
+}
+
+function ProjectField({
+  label,
+  projects,
+  defaultValue,
+  locale,
+}: {
+  label: string;
+  projects: ProjectOption[];
+  defaultValue: string;
+  locale: Locale;
+}) {
+  return (
+    <Field label={label} required>
+      <Select name="projectId" required defaultValue={defaultValue}>
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.project_code} — {pickLocalized(locale, p.name_ar, p.name_en)}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+}
+
+function DisciplineField({
+  label,
+  disciplines,
+  defaultValue,
+  required,
+  withName,
+  locale,
+}: {
+  label: string;
+  disciplines: DisciplineOption[];
+  defaultValue: string;
+  required?: boolean;
+  withName?: boolean;
+  locale: Locale;
+}) {
+  return (
+    <Field label={label} required={required}>
+      <Select name="disciplineCode" required={required} defaultValue={defaultValue}>
+        {disciplines.map((d) => (
+          <option key={d.code} value={d.code}>
+            {withName ? `${d.code} — ${pickLocalized(locale, d.name_ar, d.name_en)}` : d.code}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+}
+
+function StatusBadge({ status, locale }: { status: string | null; locale: Locale }) {
+  return <Badge tone={engineeringStatusTone(status)}>{engineeringStatusLabel(status, locale)}</Badge>;
+}
+
+function DecisionBadge({ code, locale }: { code: string | null; locale: Locale }) {
+  if (!code) return <span className="text-muted">—</span>;
+  return (
+    <Badge tone={officialDecisionTone(code)}>
+      <span dir="auto">{officialDecisionWithCode(code, locale)}</span>
+    </Badge>
   );
 }
 
@@ -636,39 +667,41 @@ function RegisterTable({
   title: string;
   empty: string;
   headers: string[];
-  rows: string[][];
+  rows: { id: string; number: string; title: string | null; status: ReactNode; extra: ReactNode }[];
 }) {
   return (
-    <Card>
-      <h2 className="mb-4 text-base font-semibold text-navy">{title}</h2>
+    <Section title={title}>
       {rows.length === 0 ? (
         <EmptyState title={empty} />
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="min-w-full text-sm">
-            <thead className="bg-paper text-start text-muted">
+            <thead className="bg-surface-muted">
               <tr>
                 {headers.map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">
+                  <th key={h} className={thClass}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} className="border-t border-line">
-                  {row.map((cell, j) => (
-                    <td key={j} className={`px-3 py-2 ${j === 0 ? "font-medium text-navy" : ""}`}>
-                      {cell}
-                    </td>
-                  ))}
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t border-line">
+                  <td className={`${tdClass} whitespace-nowrap font-mono text-xs font-semibold text-ink`}>
+                    <span dir="ltr">{row.number}</span>
+                  </td>
+                  <td className={`${tdClass} text-ink`} dir="auto">
+                    {row.title}
+                  </td>
+                  <td className={tdClass}>{row.status}</td>
+                  <td className={tdClass}>{row.extra}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
-    </Card>
+    </Section>
   );
 }

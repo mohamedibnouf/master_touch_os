@@ -49,9 +49,9 @@ export function buildExecutiveReport(input: {
     metrics.push(metric("active-employees", "موظفون نشطون", "Active employees", s.people.activeEmployees, "/employees"));
   }
   if (context.sections.payroll && s.payroll) {
-    metrics.push(metric("payroll-review", "مسيرات للمراجعة", "Payroll under review", s.payroll.underReview, "/payroll"));
+    metrics.push(metric("payroll-review", "مسيرات للمراجعة", "Payroll periods under review", s.payroll.underReview, "/payroll"));
   }
-  metrics.push(metric("risk-total", "نتائج المخاطر", "Risk findings", s.risks.length, "/management/reports/risks"));
+  metrics.push(metric("risk-total", "نتائج المخاطر", "Open risks", s.risks.length, "/management/reports/risks"));
 
   return {
     kind: "executive",
@@ -75,7 +75,7 @@ export function buildExecutiveReport(input: {
     freshnessNoteAr:
       "المقاييس الحالية بتاريخ «كما في». النشاط الحديث إن وُجد يعكس نافذة محدودة من سجل التدقيق — وليس لقطة تاريخية كاملة.",
     freshnessNoteEn:
-      "Current-state metrics are labeled As of. Recent activity reflects a bounded audit window — not a full historical reconstruction.",
+      "Metrics show the current position As of the date shown. Recent activity covers a limited audit-log window — not a full historical record.",
   };
 }
 
@@ -131,7 +131,7 @@ export function buildProjectReport(input: {
     metrics: [
       metric("active", "نشطة", "Active", s.projects.active),
       metric("on-hold", "معلّقة", "On hold", s.projects.onHold),
-      metric("at-risk", "مخاطر معلنة", "Declared at risk", s.projects.atRisk),
+      metric("at-risk", "مخاطر معلنة", "Declared high risk", s.projects.atRisk),
       metric("overdue", "تجاوزت المخطط", "Past planned end", s.projects.overduePlannedEnd),
     ],
     overdueProjects,
@@ -184,14 +184,14 @@ export function buildOperationsReport(input: {
   const metrics: ReportMetric[] = [];
   if (context.sections.approvals) {
     metrics.push(metric("pending", "موافقات معلّقة", "Pending approvals", s.approvals.pending, "/approvals"));
-    metrics.push(metric("overdue", "موافقات past due_at", "Past due_at", s.approvals.overdue, "/approvals"));
+    metrics.push(metric("overdue", "موافقات past due_at", "Overdue approvals", s.approvals.overdue, "/approvals"));
   }
   if (context.sections.purchaseRequests) {
-    metrics.push(metric("pr", "طلبات شراء للمراجعة", "PRs awaiting review", s.procurement.prAwaitingReview));
+    metrics.push(metric("pr", "طلبات شراء للمراجعة", "Purchase requests awaiting review", s.procurement.prAwaitingReview));
   }
   if (context.sections.rfqs) {
     metrics.push(metric("rfq-issued", "مناقصات صادرة", "RFQs issued", s.procurement.rfqIssued));
-    metrics.push(metric("rfq-compare", "تحتاج مقارنة", "Need comparison", s.procurement.rfqNeedsComparison));
+    metrics.push(metric("rfq-compare", "تحتاج مقارنة", "RFQs awaiting comparison", s.procurement.rfqNeedsComparison));
   }
   if (context.sections.purchaseOrders) {
     metrics.push(metric("po-ready", "أوامر جاهزة للإصدار", "POs ready to issue", s.procurement.poReadyToIssue));
@@ -232,20 +232,20 @@ export function buildFinanceReport(input: {
   const redacted = !context.sections.finance;
 
   if (context.sections.finance && s.commercial) {
-    metrics.push(metric("ar-open", "ذمم عملاء مفتوحة (عدد)", "Outstanding AR (count)", s.commercial.outstandingAr, "/finance/receivables"));
+    metrics.push(metric("ar-open", "ذمم عملاء مفتوحة (عدد)", "Outstanding receivables (count)", s.commercial.outstandingAr, "/finance/receivables"));
     metrics.push(metric("ar-overdue", "فواتير عملاء متأخرة", "Overdue client invoices", s.commercial.overdueAr, "/finance/receivables"));
     metrics.push(metric("ap-overdue", "فواتير موردين متأخرة", "Overdue supplier invoices", s.commercial.overdueAp, "/finance/supplier-invoices"));
     metrics.push(metric("valuations", "مستخلصات معلّقة", "Pending valuations", s.commercial.pendingValuations, "/finance/client-valuations"));
-    metrics.push(metric("variations", "أوامر تغيير مفتوحة", "Open variations", s.commercial.openVariations, "/finance/variations"));
+    metrics.push(metric("variations", "أوامر تغيير مفتوحة", "Open variation orders", s.commercial.openVariations, "/finance/variations"));
   }
   if (context.sections.payroll && s.payroll) {
-    metrics.push(metric("payroll-review", "مسيرات للمراجعة", "Payroll under review", s.payroll.underReview, "/payroll"));
+    metrics.push(metric("payroll-review", "مسيرات للمراجعة", "Payroll periods under review", s.payroll.underReview, "/payroll"));
     if (context.sections.payrollAmounts && s.payroll.latestNet != null) {
       metrics.push(
         metric(
           "payroll-net",
           "صافي آخر فترة (تجميعي)",
-          "Latest period net (aggregate)",
+          "Latest period net payroll (aggregate)",
           s.payroll.latestNet,
           "/payroll",
           true,
@@ -278,8 +278,8 @@ export function buildFinanceReport(input: {
       ? "المقاييس المالية مخفية — يتطلب صلاحيات مالية/تجارية. reports.management.read وحدها لا تكفي."
       : "المبالغ التفصيلية تُعرض في الشاشات التشغيلية حسب الصلاحيات. هذا التقرير يعرض أعداداً حالاتية.",
     redactionNoteEn: redacted
-      ? "Financial metrics hidden — requires finance/commercial permissions. reports.management.read alone is insufficient."
-      : "Detailed amounts remain on operational finance screens. This report shows status counts.",
+      ? "Financial metrics are hidden — finance/commercial permissions are required; reports.management.read alone is insufficient."
+      : "Detailed amounts stay on the operational finance screens, subject to permissions. This report shows counts by status.",
   };
 }
 
@@ -295,10 +295,10 @@ export function buildPeopleReport(input: {
       metrics.push(metric("active", "موظفون نشطون", "Active employees", s.people.activeEmployees, "/employees"));
     }
     if (context.sections.compliance) {
-      metrics.push(metric("compliance", "امتثال خلال 30 يوماً", "Compliance ≤30d", s.people.complianceExpiring30d));
+      metrics.push(metric("compliance", "امتثال خلال 30 يوماً", "Compliance documents expiring ≤30 days", s.people.complianceExpiring30d));
     }
     if (context.sections.contracts) {
-      metrics.push(metric("contracts", "عقود تنتهي خلال 30 يوماً", "Contracts ≤30d", s.people.contractsEnding30d));
+      metrics.push(metric("contracts", "عقود تنتهي خلال 30 يوماً", "Contracts ending ≤30 days", s.people.contractsEnding30d));
     }
     metrics.push(metric("on-leave", "في إجازة اليوم", "On leave today", s.people.onLeaveToday));
   }
@@ -306,7 +306,7 @@ export function buildPeopleReport(input: {
     metrics.push(metric("present", "حاضرون", "Present", s.attendance.present));
     metrics.push(metric("absent", "غائبون", "Absent", s.attendance.absent));
     metrics.push(metric("mco", "بلا انصراف", "Missing checkout", s.attendance.missingCheckout));
-    metrics.push(metric("leave-pending", "إجازات معلّقة", "Pending leave", s.attendance.pendingLeaveApprovals));
+    metrics.push(metric("leave-pending", "إجازات معلّقة", "Leave requests pending", s.attendance.pendingLeaveApprovals));
   }
 
   const peopleRisks = s.risks.filter((r) =>
@@ -332,7 +332,7 @@ export function buildPeopleReport(input: {
       },
     }),
     privacyNoteAr: "لا يتضمن هذا التقرير IBAN أو رواتب فردية أو تعويضات.",
-    privacyNoteEn: "This report does not include IBAN, individual salaries, or compensation.",
+    privacyNoteEn: "This report excludes IBANs, individual salaries and compensation.",
   };
 }
 
@@ -346,13 +346,13 @@ export function buildPayrollReport(input: {
   const metrics: ReportMetric[] = [];
   if (p) {
     metrics.push(metric("latest-label", "آخر فترة", "Latest period", p.latestLabel ?? "—"));
-    metrics.push(metric("latest-status", "حالة آخر فترة", "Latest status", p.latestStatus ?? "—"));
-    metrics.push(metric("employees", "عدد موظفي آخر فترة", "Latest employee count", p.latestEmployeeCount ?? "—"));
+    metrics.push(metric("latest-status", "حالة آخر فترة", "Latest period status", p.latestStatus ?? "—"));
+    metrics.push(metric("employees", "عدد موظفي آخر فترة", "Headcount in latest period", p.latestEmployeeCount ?? "—"));
     metrics.push(metric("under-review", "بانتظار المراجعة", "Under review", p.underReview, "/payroll"));
     metrics.push(metric("awaiting-lock", "معتمدة بانتظار القفل", "Awaiting lock", p.approvedAwaitingLock, "/payroll"));
-    metrics.push(metric("locked-unpaid", "مقفلة غير مصروفة", "Locked unpaid entries", p.lockedUnpaidEntries, "/payroll"));
+    metrics.push(metric("locked-unpaid", "مقفلة غير مصروفة", "Unpaid entries in locked periods", p.lockedUnpaidEntries, "/payroll"));
     if (amountsVisible) {
-      metrics.push(metric("latest-net", "صافي آخر فترة (تجميعي)", "Latest net (aggregate)", p.latestNet!, "/payroll", true));
+      metrics.push(metric("latest-net", "صافي آخر فترة (تجميعي)", "Latest period net payroll (aggregate)", p.latestNet!, "/payroll", true));
     }
   }
 
@@ -379,7 +379,7 @@ export function buildPayrollReport(input: {
       : "صافي المسير مخفي — يتطلب payroll.view_all. لا تُعرض رواتب الأفراد.",
     redactionNoteEn: amountsVisible
       ? null
-      : "Payroll net hidden — requires payroll.view_all. Individual peer pay is never shown.",
+      : "Net payroll is hidden — requires payroll.view_all. Individual pay is never shown.",
   };
 }
 

@@ -23,6 +23,14 @@ import {
   DocumentSourceBadge,
 } from "@/components/documents/document-open-control";
 import { DocumentArchiveControl } from "@/components/documents/document-lifecycle-controls";
+import {
+  correspondenceDirectionLabel,
+  correspondenceStatusLabel,
+  engineeringStatusLabel,
+  ncrSeverityLabel,
+  reportStatusLabel,
+  reportTypeLabel,
+} from "@/lib/ui/engineering-labels";
 import { documentStatusLabel, projectRiskLabel, projectRiskTone, projectStatusLabel, projectStatusTone } from "@/lib/ui/operational-labels";
 import { commercialStatusLabel } from "@/lib/commercial/status-labels";
 import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
@@ -787,7 +795,7 @@ export default async function ProjectDetailPage({
           title={td.rfis.title}
           empty={td.rfis.empty}
           headers={[td.columns.number, td.columns.subject, td.columns.status]}
-          rows={(projectRfis.data ?? []).map((r) => [r.rfi_number, r.subject, r.status])}
+          rows={(projectRfis.data ?? []).map((r) => [r.rfi_number, r.subject, engineeringStatusLabel(r.status, locale)])}
           actionHref={`/engineering?module=rfi&project=${project.id}`}
           actionLabel={td.rfis.action}
         />
@@ -801,7 +809,7 @@ export default async function ProjectDetailPage({
           rows={(projectMats.data ?? []).map((m) => [
             m.mat_number,
             m.material_category,
-            m.status,
+            engineeringStatusLabel(m.status, locale),
             m.official_decision ?? "—",
           ])}
           actionHref={`/engineering?module=mat&project=${project.id}`}
@@ -817,7 +825,7 @@ export default async function ProjectDetailPage({
           rows={(projectShds.data ?? []).map((s) => [
             s.shd_number,
             s.drawing_title,
-            s.status,
+            engineeringStatusLabel(s.status, locale),
             s.approved_for_execution ? td.columns.approvedForExecution : "—",
           ])}
           actionHref={`/engineering?module=shd&project=${project.id}`}
@@ -830,7 +838,7 @@ export default async function ProjectDetailPage({
           title={td.inspections.title}
           empty={td.inspections.empty}
           headers={[td.columns.number, td.columns.activity, td.columns.status]}
-          rows={(projectIrs.data ?? []).map((i) => [i.ir_number, i.related_activity ?? "—", i.status])}
+          rows={(projectIrs.data ?? []).map((i) => [i.ir_number, i.related_activity ?? "—", engineeringStatusLabel(i.status, locale)])}
           actionHref={`/engineering?module=ir&project=${project.id}`}
           actionLabel={td.inspections.action}
         />
@@ -844,8 +852,8 @@ export default async function ProjectDetailPage({
           rows={(projectNcrs.data ?? []).map((n) => [
             n.ncr_number,
             n.description.slice(0, 80),
-            n.severity,
-            n.status,
+            ncrSeverityLabel(n.severity, locale),
+            engineeringStatusLabel(n.status, locale),
           ])}
           actionHref={`/engineering?module=ncr&project=${project.id}`}
           actionLabel={td.ncr.action}
@@ -858,10 +866,10 @@ export default async function ProjectDetailPage({
           empty={td.reports.empty}
           headers={[td.columns.type, td.columns.from, td.columns.to, td.columns.status]}
           rows={(projectReports.data ?? []).map((r) => [
-            r.report_type,
+            reportTypeLabel(r.report_type, locale),
             r.period_start,
             r.period_end,
-            r.status,
+            reportStatusLabel(r.status, locale),
           ])}
         />
       ) : null}
@@ -874,8 +882,8 @@ export default async function ProjectDetailPage({
           rows={(projectCors.data ?? []).map((c) => [
             c.reference_number,
             c.subject,
-            c.direction,
-            c.status,
+            correspondenceDirectionLabel(c.direction, locale),
+            correspondenceStatusLabel(c.status, locale),
           ])}
         />
       ) : null}

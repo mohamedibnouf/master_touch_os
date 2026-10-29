@@ -1,17 +1,21 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
-import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, EmptyState, PageHeader, Section } from "@/components/ui/primitives";
 import { ManagementNav } from "@/components/management/management-nav";
 import { getAuthContext } from "@/server/context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { canViewManagement, resolveManagementSections } from "@/modules/management/access";
 import { ManagementRepository } from "@/server/repositories/management.repository";
 import { maybeAiDigestSummary } from "@/modules/notifications/digest";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function ManagementDigestPage() {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
   if (!canViewManagement(ctx)) redirect("/");
+
+  const { t, locale } = await getI18n();
+  const copy = t.management.digest;
 
   const sections = resolveManagementSections(ctx);
   const supabase = await createServerSupabaseClient();
@@ -28,24 +32,27 @@ export default async function ManagementDigestPage() {
       (snapshot.attendance?.late ?? 0) +
       (snapshot.attendance?.absent ?? 0) +
       (snapshot.attendance?.missingCheckout ?? 0),
-    attentionTitles: snapshot.attention.slice(0, 8).map((a) => a.titleAr),
+    attentionTitles: snapshot.attention.slice(0, 8).map((a) => (locale === "en" ? a.titleEn || a.titleAr : a.titleAr)),
   };
 
-  const digest = await maybeAiDigestSummary(facts);
+  const digest = await maybeAiDigestSummary(facts, undefined, locale);
 
   return (
     <PageContainer data-testid="management-digest" className="space-y-5">
-      <PageHeader title="الملخص الإداري اليومي" description="حقائق حتمية من مركز القيادة. الذكاء الاصطناعي اختياري ولا يخترع أرقاماً." />
+      <PageHeader title={copy.title} description={copy.description} />
       <ManagementNav pathname="/management/digest" />
-      <Card>
-        <p className="mb-3 text-xs text-muted">المصدر: {digest.source === "ai" ? "حتمي + خلاصة مساعدة" : "حتمي فقط"}</p>
-        <pre className="whitespace-pre-wrap text-sm leading-7">{digest.text}</pre>
-      </Card>
-      {snapshot.attention.length === 0 ? (
-        <div className="mt-4">
-          <EmptyState title="لا عناصر انتباه اليوم." />
-        </div>
-      ) : null}
+      <Section
+        className="border-s-4 border-s-primary"
+        title={copy.title}
+        actions={
+          <Badge tone={digest.source === "ai" ? "info" : "neutral"}>
+            {copy.sourceLabel} {digest.source === "ai" ? copy.sourceAi : copy.sourceDeterministic}
+          </Badge>
+        }
+      >
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-ink">{digest.text}</pre>
+      </Section>
+      {snapshot.attention.length === 0 ? <EmptyState title={copy.empty} /> : null}
     </PageContainer>
   );
 }

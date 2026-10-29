@@ -111,7 +111,7 @@ describe("PROJECT_PLANNED_END_OVERDUE", () => {
     expect(hit!.severity).toBe("MEDIUM");
     expect(hit!.ageDays).toBe(1);
     expect(hit!.href).toBe("/projects/p1");
-    expect(hit!.explanationEn).toMatch(/1 days ago/);
+    expect(hit!.explanationEn).toMatch(/1 day ago/);
   });
 
   it("does not flag completed project with past planned_end_date", () => {
@@ -465,5 +465,42 @@ describe("declared project risk", () => {
     const hit = findings.find((f) => f.ruleId === "PROJECT_DECLARED_HIGH_RISK");
     expect(hit?.severity).toBe("HIGH");
     expect(hit?.explanationEn).toMatch(/declared/);
+  });
+});
+
+describe("risk finding English text", () => {
+  it("writes executive English without raw field names and keeps Arabic unchanged", () => {
+    const findings = evaluateRisks(
+      snap({
+        projects: [
+          {
+            id: "p1",
+            project_code: "P-1",
+            name_ar: "أ",
+            status: "on_hold",
+            risk_level: "low",
+            planned_end_date: "2026-09-10",
+          },
+        ],
+        compliance: [
+          {
+            employee_id: "e1234567-0000-4000-8000-000000000000",
+            iqama_expiry: "2026-09-01",
+            passport_expiry: null,
+            work_permit_expiry: null,
+            insurance_expiry: null,
+          },
+        ],
+      }),
+    );
+    const project = findings.find((f) => f.ruleId === "PROJECT_PLANNED_END_OVERDUE");
+    expect(project?.explanationEn).toMatch(/still on hold; its planned end date was 2026-09-10/);
+    expect(project?.explanationEn).not.toMatch(/planned_end_date|on_hold/);
+    expect(project?.explanationAr).toMatch(/planned_end_date/);
+    const iqama = findings.find((f) => f.ruleId === "COMPLIANCE_EXPIRED");
+    expect(iqama?.explanationEn).toMatch(/^Iqama for employee/);
+    for (const f of findings) {
+      expect(f.titleEn).not.toMatch(/[؀-ۿ]/);
+    }
   });
 });

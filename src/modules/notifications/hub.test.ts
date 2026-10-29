@@ -312,3 +312,35 @@ describe("reminder scan", () => {
     expect(events.some((e) => e.eventType === "APPROVAL_OVERDUE")).toBe(true);
   });
 });
+
+describe("digest English output", () => {
+  const facts = {
+    asOfDate: "2026-09-25",
+    overdueApprovals: 2,
+    projectsNeedingAttention: 1,
+    highRisks: 3,
+    criticalRisks: 1,
+    payrollUnderReview: 0,
+    attendanceExceptions: 4,
+    attentionTitles: ["Project past planned end date"],
+  };
+
+  it("renders the deterministic digest in English when asked", async () => {
+    const text = buildDeterministicDigest(facts, "en");
+    expect(text).toContain("Management digest — 2026-09-25");
+    expect(text).toContain("Overdue approvals: 2");
+    expect(text).toContain("Attention items:");
+    expect(text).not.toMatch(/[؀-ۿ]/);
+    const ai = await maybeAiDigestSummary(facts, async () => "All good.", "en");
+    expect(ai.source).toBe("ai");
+    expect(ai.text).toContain("Assistant summary:\nAll good.");
+  });
+
+  it("formats performance facts in English", () => {
+    const text = formatPerformanceFacts(
+      [{ profileId: USER_A, displayName: "Ahmed", assignedApprovals: 4, completedApprovals: 2, overdueApprovals: 1 }],
+      "en",
+    );
+    expect(text).toBe("Ahmed: assigned 4 · completed 2 · overdue 1");
+  });
+});
