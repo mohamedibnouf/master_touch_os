@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
 import { isInternalCronPath, requiresInteractiveLogin } from "@/lib/http/session-gate";
+import { CHANGE_PASSWORD_PATH, mustChangePassword } from "@/lib/auth/password-policy";
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   if (isInternalCronPath(request.nextUrl.pathname)) {
@@ -46,6 +47,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // A temporary password issued by HR must be replaced before using the app.
+  if (user && mustChangePassword(claimsData?.claims?.user_metadata) && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = CHANGE_PASSWORD_PATH;
     url.search = "";
     return NextResponse.redirect(url);
   }

@@ -24,6 +24,7 @@ import {
   deactivateEmployeeBankAction,
   setEmployeeActiveAction,
   provisionEmployeeLoginAction,
+  resetEmployeeLoginPasswordAction,
   updateEmployeeEmploymentAction,
   updateEmployeeProfileAction,
   uploadEmployeeDocumentAction,
@@ -357,9 +358,34 @@ export default async function EmployeeDetailPage({
                   </span>
                 </p>
                 {loginStatus === "ready" ? (
-                  <p className="text-sm text-muted" data-testid="employee-login-already-provisioned">
-                    {td.overview.loginCard.alreadyProvisioned}
-                  </p>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted" data-testid="employee-login-already-provisioned">
+                      {td.overview.loginCard.alreadyProvisioned}
+                    </p>
+                    {employee.is_active ? (
+                      <ServerActionForm
+                        action={resetEmployeeLoginPasswordAction}
+                        className="grid max-w-md gap-3 rounded-[var(--radius-control)] border border-line bg-surface-muted p-4"
+                      >
+                        <input type="hidden" name="employeeId" value={employee.id} />
+                        <p className="text-sm font-semibold text-ink">{td.overview.loginCard.resetTitle}</p>
+                        <p className="text-xs leading-relaxed text-muted">{td.overview.loginCard.resetHint}</p>
+                        <Field label={td.overview.loginCard.resetPassword} hint={td.overview.loginCard.passwordHint}>
+                          <Input
+                            name="password"
+                            type="password"
+                            required
+                            minLength={8}
+                            autoComplete="new-password"
+                            data-testid="employee-login-reset-password"
+                          />
+                        </Field>
+                        <Button type="submit" variant="secondary" data-testid="employee-login-reset">
+                          {td.overview.loginCard.resetSubmit}
+                        </Button>
+                      </ServerActionForm>
+                    ) : null}
+                  </div>
                 ) : employee.is_active && employee.employee_number ? (
                   <ServerActionForm action={provisionEmployeeLoginAction} className="grid max-w-md gap-3">
                     <input type="hidden" name="employeeId" value={employee.id} />

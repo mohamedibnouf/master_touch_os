@@ -64,6 +64,13 @@ export function isEmployeeLoginAllowed(input: {
 }
 
 /** Internal Auth email — never shown on employee login UI. */
+export const INTERNAL_AUTH_EMAIL_DOMAIN = "login.mastertouch.internal";
+
+/** Employee-number accounts use a generated address with no real mailbox. */
+export function isInternalAuthEmail(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.trim().toLowerCase().endsWith(`@${INTERNAL_AUTH_EMAIL_DOMAIN}`);
+}
+
 export function generateInternalAuthEmail(organizationId: string, employeeNumber: string): string {
   const org = organizationId.replace(/-/g, "").slice(0, 12);
   const raw = normalizeEmployeeNumber(employeeNumber);
@@ -74,7 +81,7 @@ export function generateInternalAuthEmail(organizationId: string, employeeNumber
     .replace(/^-|-$/g, "")
     .slice(0, 40);
   const local = ascii.length > 0 ? ascii : utf8HexToken(`${organizationId}:${raw}`);
-  return `mt.${org}.${local}@login.mastertouch.internal`;
+  return `mt.${org}.${local}@${INTERNAL_AUTH_EMAIL_DOMAIN}`;
 }
 
 function utf8HexToken(value: string): string {

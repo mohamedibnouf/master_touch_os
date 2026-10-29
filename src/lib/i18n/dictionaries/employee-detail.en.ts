@@ -60,7 +60,11 @@ export const employeeDetailEn: Dictionary["employeeDetail"] = {
       passwordHint: "At least 8 characters.",
       submit: "Activate login account",
       prerequisite: "Activate the employee and assign an employee number before enabling login.",
-      alreadyProvisioned: "The login account is active. Its password cannot be changed here.",
+      alreadyProvisioned: "The login account is active.",
+      resetTitle: "Reset password",
+      resetHint: "Sets a temporary password. The employee must choose a new one at the next sign-in and is notified. Managers and accounts with a real e-mail reset their own password from the sign-in page.",
+      resetPassword: "Temporary password",
+      resetSubmit: "Reset password",
     },
     basics: {
       title: "Basic information",

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft } from "lucide-react";
@@ -55,7 +56,16 @@ export function LoginForm({ nextPath = "" }: { nextPath?: string }) {
           data-testid="login-password"
         />
       </Field>
-      <p className="text-xs leading-relaxed text-muted">{t.auth.identifierHint}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs leading-relaxed text-muted">{t.auth.identifierHint}</p>
+        <Link
+          href="/auth/forgot-password"
+          className="shrink-0 text-xs font-medium text-primary hover:underline"
+          data-testid="login-forgot-password"
+        >
+          {t.auth.forgotLink}
+        </Link>
+      </div>
       {error ? (
         <p
           className="rounded-[var(--radius-control)] border border-danger-border bg-danger-soft px-3 py-2.5 text-sm text-danger"

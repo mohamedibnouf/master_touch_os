@@ -11,6 +11,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
 import { authorize, hasPermission, requireUser } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
+import { createNotificationService } from "@/server/services/notification.service";
+import { isInternalAuthEmail } from "@/lib/auth/employee-login";
 import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
 import { generateCorrelationId } from "@/lib/utils";
@@ -32,9 +34,11 @@ import {
   ACCOUNT_STATUS_REJECT_MESSAGES,
   EMPLOYMENT_OPTIONAL_FORM_FIELDS,
   PROVISION_LOGIN_REJECT_MESSAGES,
+  RESET_LOGIN_REJECT_MESSAGES,
   accountStatusRejectReason,
   omitAbsentFormFields,
   provisionLoginRejectReason,
+  resetLoginRejectReason,
   riyadhTerminationTimestamp,
   terminationPatch,
 } from "@/lib/hr/account-security";
@@ -1015,6 +1019,91 @@ export async function provisionEmployeeLoginAction(
       action: "employee.login_provisioned",
       entityType: "employee",
       entityId: emp.id,
+    });
+
+    revalidatePath(`/employees/${emp.id}`);
+  });
+}
+
+/**
+ * Issues a temporary password for an ordinary employee-number login (no real mailbox).
+ * The employee must choose a new password at the next sign-in. Guarded by
+ * resetLoginRejectReason so managers, admins and real-email accounts can't be taken over.
+ */
+export async function resetEmployeeLoginPasswordAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  return runFormAction("تعذر إعادة تعيين كلمة المرور. حاول مرة أخرى.", async () => {
+    const ctx = await getAuthContext();
+    if (!ctx) throw new ForbiddenError();
+    if (!hasPermission(ctx, "employee.manage")) throw new ForbiddenError({ permission: "employee.manage" });
+
+    const parsed = provisionEmployeeLoginSchema.safeParse({
+      employeeId: formData.get("employeeId"),
+      password: formData.get("password"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("كلمة المرور يجب ألا تقل عن 8 أحرف.", "Password must be at least 8 characters.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: emp, error: empErr } = await supabase
+      .from("employees")
+      .select("id, profile_id, is_active")
+      .eq("id", parsed.data.employeeId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle();
+    if (empErr) throw new DatabaseError(empErr);
+    if (!emp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
+
+    const admin = createAdminSupabaseClient();
+    const { data: userData, error: getErr } = await admin.auth.admin.getUserById(emp.profile_id);
+    if (getErr || !userData.user) throw new DatabaseError(getErr);
+    const target = await loadTargetAccountFacts(admin, {
+      organizationId: ctx.organization.id,
+      profileId: emp.profile_id,
+    });
+    const meta = (userData.user.user_metadata ?? {}) as Record<string, unknown>;
+    const reject = resetLoginRejectReason({
+      actorProfileId: ctx.userId,
+      targetProfileId: emp.profile_id,
+      targetIsPlatformAdmin: target.isPlatformAdmin,
+      targetRoleCodes: target.roleCodes,
+      otherOrganizationMemberships: target.otherOrganizationMemberships,
+      targetHasInternalEmail: isInternalAuthEmail(userData.user.email),
+      loginProvisioned: meta.login_provisioned === true,
+      hasSignedIn: Boolean(userData.user.last_sign_in_at),
+      membershipActive: target.membershipStatus === "active" && emp.is_active === true,
+    });
+    if (reject) {
+      const message = RESET_LOGIN_REJECT_MESSAGES[reject];
+      throw new ValidationError(message.ar, message.en);
+    }
+
+    const { error: updErr } = await admin.auth.admin.updateUserById(emp.profile_id, {
+      password: parsed.data.password,
+      user_metadata: { ...meta, must_change_password: true },
+    });
+    if (updErr) throw new DatabaseError(updErr);
+
+    await new AuditService(supabase).log({
+      organizationId: ctx.organization.id,
+      action: "employee.login_password_reset",
+      entityType: "employee",
+      entityId: emp.id,
+    });
+
+    // Tell the employee, so a reset they didn't ask for is noticed.
+    await createNotificationService(admin).notify({
+      organizationId: ctx.organization.id,
+      recipientProfileId: emp.profile_id,
+      type: "account.password_reset",
+      title: "تمت إعادة تعيين كلمة المرور",
+      titleEn: "Your password was reset",
+      message: "أعادت الموارد البشرية تعيين كلمة مرور حسابك. إذا لم تطلب ذلك فتواصل معهم فوراً.",
+      messageEn: "HR reset your account password. If you didn't ask for this, contact them right away.",
+      priority: "high",
     });
 
     revalidatePath(`/employees/${emp.id}`);

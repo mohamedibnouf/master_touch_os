@@ -53,6 +53,73 @@ export const PROVISION_LOGIN_REJECT_MESSAGES: Record<ProvisionLoginRejectReason,
   },
 };
 
+export type ResetLoginRejectReason =
+  | "self"
+  | "platform_admin"
+  | "privileged"
+  | "other_org"
+  | "real_email"
+  | "not_provisioned"
+  | "inactive";
+
+/**
+ * HR may issue a temporary password only for an ordinary employee-number account in
+ * this organization. Everyone else resets through their own e-mail (forgot password),
+ * so HR can never take over a manager, admin or real-mailbox account. The employee
+ * must choose a new password at the next sign-in (must_change_password).
+ */
+export function resetLoginRejectReason(input: {
+  actorProfileId: string;
+  targetProfileId: string;
+  targetIsPlatformAdmin: boolean;
+  targetRoleCodes: readonly (string | null | undefined)[];
+  otherOrganizationMemberships: number;
+  targetHasInternalEmail: boolean;
+  loginProvisioned: boolean;
+  hasSignedIn: boolean;
+  membershipActive: boolean;
+}): ResetLoginRejectReason | null {
+  if (input.actorProfileId === input.targetProfileId) return "self";
+  if (input.targetIsPlatformAdmin) return "platform_admin";
+  if (input.targetRoleCodes.some((code) => isPrivilegedRoleCode(code))) return "privileged";
+  if (input.otherOrganizationMemberships > 0) return "other_org";
+  if (!input.targetHasInternalEmail) return "real_email";
+  if (!input.loginProvisioned && !input.hasSignedIn) return "not_provisioned";
+  if (!input.membershipActive) return "inactive";
+  return null;
+}
+
+export const RESET_LOGIN_REJECT_MESSAGES: Record<ResetLoginRejectReason, Message> = {
+  self: {
+    ar: "لا يمكنك إعادة تعيين كلمة مرورك من هنا. استخدم «نسيت كلمة المرور» في صفحة الدخول.",
+    en: "You can't reset your own password here. Use “Forgot password” on the sign-in page.",
+  },
+  platform_admin: {
+    ar: "لا يمكن إعادة تعيين كلمة مرور مدير المنصة من هذا المسار.",
+    en: "Platform admin passwords cannot be reset from this path.",
+  },
+  privileged: {
+    ar: "هذا الحساب يحمل دور إدارة محمي. يعيد صاحبه تعيين كلمة مروره عبر بريده الإلكتروني.",
+    en: "This account holds a protected management role. Its owner resets the password by e-mail.",
+  },
+  other_org: {
+    ar: "هذا الحساب مرتبط بمنشأة أخرى ولا يمكن إعادة تعيين كلمة مروره من هنا.",
+    en: "This account belongs to another organization and cannot be reset here.",
+  },
+  real_email: {
+    ar: "هذا الحساب يدخل ببريد إلكتروني حقيقي. يعيد صاحبه تعيين كلمة المرور عبر «نسيت كلمة المرور».",
+    en: "This account signs in with a real e-mail. Its owner resets the password via “Forgot password”.",
+  },
+  not_provisioned: {
+    ar: "حساب الدخول غير مفعّل بعد. فعّله أولاً.",
+    en: "The login account isn't active yet. Activate it first.",
+  },
+  inactive: {
+    ar: "لا يمكن إعادة تعيين كلمة مرور موظف موقوف.",
+    en: "You can't reset the password of a suspended employee.",
+  },
+};
+
 export type AccountStatusRejectReason = "self" | "platform_admin" | "privileged";
 
 /** Who may deactivate/reactivate whom. Protected accounts need an equally privileged actor. */
