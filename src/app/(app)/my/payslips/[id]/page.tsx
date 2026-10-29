@@ -6,6 +6,7 @@ import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PayrollRepository } from "@/server/repositories/payroll.repository";
+import { isPayslipVisibleStatus } from "@/lib/payroll/payslip-visibility";
 import { formatPeriodLabel } from "@/lib/payroll/format";
 import { format } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
@@ -32,6 +33,8 @@ export default async function MyPayslipDetailPage({
   const tm = t.payroll.my;
 
   const period = await repo.getPeriod(ctx.organization.id, entry.payroll_period_id);
+  // HR/finance users can read non-final runs via payroll.view_all; /my shows final payslips only.
+  if (!period || !isPayslipVisibleStatus(period.status)) redirect("/my/payslips");
   const [earnings, deductions] = await Promise.all([
     repo.listEarnings(entry.id),
     repo.listDeductions(entry.id),

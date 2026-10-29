@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import type { ReactNode } from "react";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
@@ -226,7 +227,7 @@ export default async function ClientInvoiceDetailPage({ params }: { params: Prom
                     name="receivedDate"
                     type="date"
                     required
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    defaultValue={todayInRiyadh()}
                     data-testid="client-payment-date"
                   />
                 </Field>

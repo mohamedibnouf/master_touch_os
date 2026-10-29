@@ -72,3 +72,17 @@ export function mapStartWorkflowRpcError(message: string): {
     en: "Could not start the workflow.",
   };
 }
+
+/**
+ * The start form is shown when the project has no running workflow. A cancelled
+ * latest instance (e.g. rejected with no return step) can be restarted; a completed
+ * one stays read-only so a finished project is not re-run by accident.
+ * start_workflow itself only blocks while a pending/in_progress instance exists.
+ */
+export function canShowStartWorkflowForm(input: {
+  mode: string;
+  latestInstanceStatus: string | null | undefined;
+}): boolean {
+  if (input.mode !== "workflow") return true;
+  return input.latestInstanceStatus === "cancelled";
+}

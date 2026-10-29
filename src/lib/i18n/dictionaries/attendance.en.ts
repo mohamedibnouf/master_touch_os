@@ -141,6 +141,7 @@ export const attendanceEn: Dictionary["attendance"] = {
     chooseRecord: "Select a record",
     checkInLocal: "Check-in time (local)",
     checkOutLocal: "Check-out time (local)",
+    riyadhTimeHint: "Riyadh time (UTC+03:00)",
     statusOptional: "Status (optional)",
     autoRecalculate: "Recalculate automatically",
     notes: "Notes",

@@ -5,8 +5,15 @@
  *   monthly_gross = basic + housing + transport + other
  *   daily_rate    = round_money(monthly_gross / standard_payable_days)
  *   segment_pay   = round_money(monthly_gross * segment_payable_days / standard_payable_days)
- *   unpaid_deduction = round_money(daily_rate * unpaid_leave_days)
- *   absence_deduction (if enabled) = round_money(daily_rate * absent_days_not_already_unpaid)
+ *   unpaid_payable_days = min(payable_days,
+ *       full_period ? unpaid_calendar_days * standard_days / period_calendar_days
+ *                   : unpaid_calendar_days)                       (migration 089)
+ *   unpaid_deduction = round_money(gross_recurring * unpaid_payable_days / payable_days)
+ *   absence_deduction (if enabled) = round_money(daily_avg * absent_days)
+ *     (reconciliation already marks approved-leave days on_leave, so absent days
+ *      never overlap unpaid leave; 089 stopped subtracting unpaid leave here)
+ *   calculated deductions are capped so net pay never drops below 0, and
+ *   net_pay = max(0, earnings - deductions)                       (migration 089)
  *
  * Uses integer minor-units (halalas) to avoid IEEE float drift in app-layer tests.
  * SQL uses NUMERIC; both round half-up to `precision` decimal places (default 2).
@@ -160,27 +167,81 @@ export function unpaidLeaveDeduction(
   return roundMoney(rate * unpaidDays, precision);
 }
 
+/**
+ * Unpaid-leave calendar days expressed on the same basis as payable days (089).
+ * Full-period employees are paid on a fixed standard-days basis (e.g. 30), so a
+ * whole unpaid month must map to exactly those payable days in 28/29/31-day
+ * months too. Partial-period employees are paid per calendar day, so their
+ * unpaid days stay calendar days. Never exceeds the payable days.
+ */
+export function normalizedUnpaidLeaveDays(input: {
+  unpaidCalendarDays: number;
+  fullPeriod: boolean;
+  periodCalendarDays: number;
+  standardPayableDays: number;
+  payableDays: number;
+}): number {
+  if (input.unpaidCalendarDays <= 0 || input.payableDays <= 0) return 0;
+  const days =
+    input.fullPeriod && input.periodCalendarDays > 0
+      ? (input.unpaidCalendarDays * input.standardPayableDays) / input.periodCalendarDays
+      : input.unpaidCalendarDays;
+  return Math.min(days, input.payableDays);
+}
+
+/** Unpaid-leave deduction as a share of the recurring gross (089). */
+export function proportionalUnpaidLeaveDeduction(input: {
+  grossRecurring: number;
+  unpaidPayableDays: number;
+  payableDays: number;
+  precision?: number;
+}): Money {
+  const precision = input.precision ?? 2;
+  if (input.unpaidPayableDays <= 0 || input.payableDays <= 0 || input.grossRecurring <= 0) return 0;
+  if (input.unpaidPayableDays >= input.payableDays) return roundMoney(input.grossRecurring, precision);
+  return roundMoney((input.grossRecurring * input.unpaidPayableDays) / input.payableDays, precision);
+}
+
+/**
+ * Absence deduction. Approved leave days are reconciled as on_leave (057), so
+ * absent days never include leave days and are billed in full (089).
+ * `unpaidLeaveDays` is accepted for backward compatibility and ignored.
+ */
 export function absenceDeduction(input: {
   absentDays: number;
-  unpaidLeaveDays: number;
+  unpaidLeaveDays?: number;
   dailyRate: number;
   enabled: boolean;
   precision?: number;
 }): Money {
   if (!input.enabled) return 0;
   const precision = input.precision ?? 2;
-  const billable = Math.max(0, input.absentDays - input.unpaidLeaveDays);
+  const billable = Math.max(0, input.absentDays);
   if (billable <= 0) return 0;
   return roundMoney(input.dailyRate * billable, precision);
 }
 
+/**
+ * Caps calculated deductions, in order, so they never exceed the amount still
+ * available (gross + manual earnings - manual deductions). Mirrors 089.
+ */
+export function capDeductions(available: number, amounts: number[], precision = 2): Money[] {
+  let remaining = Math.max(0, roundMoney(available, precision));
+  return amounts.map((amount) => {
+    const capped = Math.min(Math.max(0, amount), remaining);
+    remaining = roundMoney(remaining - capped, precision);
+    return roundMoney(capped, precision);
+  });
+}
+
+/** Net pay never goes below zero (089); an entry with 0 net is paid with a 0 payment. */
 export function computeNetPay(input: {
   grossPay: number;
   totalDeductions: number;
   precision?: number;
 }): Money {
   const precision = input.precision ?? 2;
-  return roundMoney(input.grossPay - input.totalDeductions, precision);
+  return Math.max(0, roundMoney(input.grossPay - input.totalDeductions, precision));
 }
 
 /** Eligible employment window from employee + contract dates. */

@@ -10,6 +10,7 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { adjustLeaveBalanceAction } from "@/server/use-cases/leave";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function HrLeaveBalancesPage() {
   const ctx = await getAuthContext();
@@ -24,7 +25,7 @@ export default async function HrLeaveBalancesPage() {
   const tb = t.leave.balances;
   const tc = t.leave.common;
 
-  const year = new Date().getFullYear();
+  const year = Number(todayInRiyadh().slice(0, 4));
   const supabase = await createServerSupabaseClient();
   const leaveRepo = new LeaveRepository(supabase);
   const core = new CoreRepository(supabase);

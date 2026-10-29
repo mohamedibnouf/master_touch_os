@@ -227,6 +227,8 @@ export const procurementSourcingAr = {
     submittedTitle: "التوصية المقدّمة",
     nextStepTitle: "الخطوة التالية",
     createPo: "إنشاء أمر الشراء →",
+    viewPo: "عرض أمر الشراء {number} →",
+    poAlreadyCreated: "تم إنشاء أمر شراء لهذا العرض.",
   },
   quotations: {
     detail: {

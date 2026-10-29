@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ListParams = {
@@ -409,7 +410,7 @@ export class CommercialRepository {
       this.supabase.from("supplier_invoices").select("status, due_date, match_flags").eq("organization_id", organizationId),
     ]);
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInRiyadh();
     const prRows = prs.data ?? [];
     const rfqRows = rfqs.data ?? [];
     const poRows = pos.data ?? [];
@@ -437,7 +438,7 @@ export class CommercialRepository {
   }
 
   async financeDashboardStats(organizationId: string) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInRiyadh();
     const in7 = new Date();
     in7.setDate(in7.getDate() + 7);
     const in7Str = in7.toISOString().slice(0, 10);

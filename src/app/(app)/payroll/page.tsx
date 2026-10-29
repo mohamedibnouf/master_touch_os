@@ -11,6 +11,7 @@ import { createPayrollPeriodAction } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
 import { formatPeriodLabel, formatSar, monthName } from "@/lib/payroll/format";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 function statusTone(status: string): "neutral" | "success" | "danger" | "warning" | "navy" {
   if (status === "paid" || status === "locked" || status === "approved") return "success";
@@ -46,9 +47,7 @@ export default async function PayrollDashboardPage() {
   const supabase = await createServerSupabaseClient();
   const repo = new PayrollRepository(supabase);
   const periods = await repo.listPeriods(ctx.organization.id);
-  const now = new Date();
-  const defaultYear = now.getFullYear();
-  const defaultMonth = now.getMonth() + 1;
+  const [defaultYear, defaultMonth] = todayInRiyadh().split("-").map(Number);
 
   return (
     <PageContainer data-testid="payroll-dashboard" className="space-y-5">

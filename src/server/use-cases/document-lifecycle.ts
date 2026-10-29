@@ -16,6 +16,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import { formActionFailure, type FormActionState } from "@/server/forms/form-state";
+import { getLocale } from "@/lib/i18n/server";
 import { assertProjectBelongsToOrganization } from "@/modules/documents/project-scope";
 import {
   ARCHIVE_RESTRICTION_AR,
@@ -80,6 +81,32 @@ async function loadLifecycleDocument(
   return data;
 }
 
+/**
+ * A document frozen into an approval (approval_request_documents, e.g. a workflow
+ * gate) must not be archived while that approval is still open.
+ */
+async function hasOpenFrozenApprovalLink(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  doc: LifecycleDoc,
+): Promise<boolean> {
+  const { data: links, error } = await supabase
+    .from("approval_request_documents")
+    .select("approval_request_id")
+    .eq("organization_id", doc.organization_id)
+    .eq("document_id", doc.id);
+  if (error) throw new DatabaseError(error);
+  const requestIds = [...new Set((links ?? []).map((row) => row.approval_request_id as string))];
+  if (requestIds.length === 0) return false;
+  const { count, error: requestError } = await supabase
+    .from("approval_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", doc.organization_id)
+    .in("id", requestIds)
+    .in("status", ["pending", "in_progress"]);
+  if (requestError) throw new DatabaseError(requestError);
+  return (count ?? 0) > 0;
+}
+
 async function assertArchiveAllowed(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   doc: LifecycleDoc,
@@ -112,7 +139,10 @@ async function assertArchiveAllowed(
     countEq(supabase, "projects", { business_case_document_id: id, organization_id: org }),
   ]);
 
+  const hasOpenGateApprovalLink = await hasOpenFrozenApprovalLink(supabase, doc);
+
   const code = archiveRestrictionFor({
+    hasOpenGateApprovalLink,
     is_register_controlled: doc.is_register_controlled,
     approval_request_id: doc.approval_request_id,
     workflow_instance_id: doc.workflow_instance_id,
@@ -161,6 +191,7 @@ export async function archiveDocumentAction(
   _prev: FormActionState,
   formData: FormData,
 ): Promise<FormActionState> {
+  const locale = await getLocale();
   try {
     const { ctx, supabase, doc } = await authorizeLifecycleDocument(formData);
     if (doc.archived_at) {
@@ -200,9 +231,15 @@ export async function archiveDocumentAction(
     });
 
     revalidateDocumentPaths(doc);
-    return { ok: true, message: "تم أرشفة المستند. يمكن استعادته من المستندات المحذوفة." };
+    return {
+      ok: true,
+      message:
+        locale === "en"
+          ? "Document archived. It can be restored from deleted documents."
+          : "تم أرشفة المستند. يمكن استعادته من المستندات المحذوفة.",
+    };
   } catch (err) {
-    return formActionFailure(err, "تعذر أرشفة المستند. حاول مرة أخرى.");
+    return formActionFailure(err, "تعذر أرشفة المستند. حاول مرة أخرى.", locale);
   }
 }
 
@@ -210,6 +247,7 @@ export async function restoreDocumentAction(
   _prev: FormActionState,
   formData: FormData,
 ): Promise<FormActionState> {
+  const locale = await getLocale();
   try {
     const { ctx, supabase, doc } = await authorizeLifecycleDocument(formData);
     if (!doc.archived_at) {
@@ -248,8 +286,8 @@ export async function restoreDocumentAction(
     });
 
     revalidateDocumentPaths(doc);
-    return { ok: true, message: "تمت استعادة المستند." };
+    return { ok: true, message: locale === "en" ? "Document restored." : "تمت استعادة المستند." };
   } catch (err) {
-    return formActionFailure(err, "تعذر استعادة المستند. حاول مرة أخرى.");
+    return formActionFailure(err, "تعذر استعادة المستند. حاول مرة أخرى.", locale);
   }
 }

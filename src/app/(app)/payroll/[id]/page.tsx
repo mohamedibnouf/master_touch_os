@@ -20,6 +20,7 @@ import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
 import { formatPeriodLabel, formatSar } from "@/lib/payroll/format";
 import { format } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { payrollReviewControls } from "@/lib/payroll/review-controls";
 
 function statusTone(status: string): "neutral" | "success" | "danger" | "warning" | "navy" {
   if (status === "paid" || status === "locked" || status === "approved") return "success";
@@ -60,8 +61,14 @@ export default async function PayrollPeriodDetailPage({
   const canCalculate =
     hasPermission(ctx, "payroll.calculate") && (status === "draft" || status === "calculated");
   const canSubmit = hasPermission(ctx, "payroll.prepare") && status === "calculated";
-  const canReview = hasPermission(ctx, "payroll.review") && status === "under_review";
-  const canApprove = hasPermission(ctx, "payroll.approve") && status === "under_review";
+  const { canReview, canApprove, approveBlockedReason } = payrollReviewControls({
+    status,
+    reviewedAt: period.reviewed_at,
+    reviewedBy: period.reviewed_by,
+    viewerProfileId: ctx.profile?.id,
+    canReviewPermission: hasPermission(ctx, "payroll.review"),
+    canApprovePermission: hasPermission(ctx, "payroll.approve"),
+  });
   const canLock = hasPermission(ctx, "payroll.lock") && status === "approved";
   const canCancel =
     hasPermission(ctx, "payroll.prepare") && (status === "draft" || status === "calculated");
@@ -157,8 +164,15 @@ export default async function PayrollPeriodDetailPage({
               </Button>
             </ServerActionForm>
           ) : null}
-          {!hasAction && !canCancel ? <p className="text-sm text-muted">{tp.noActions}</p> : null}
+          {!hasAction && !canCancel && !approveBlockedReason ? (
+            <p className="text-sm text-muted">{tp.noActions}</p>
+          ) : null}
         </div>
+        {approveBlockedReason ? (
+          <p className="mt-3 text-sm text-muted" data-testid="payroll-approve-blocked">
+            {approveBlockedReason === "self_reviewed" ? tc.approveNeedsOtherUser : tc.approveNeedsReview}
+          </p>
+        ) : null}
 
         {canCancel ? (
           <ServerActionForm action={cancelPayrollPeriodAction} className="mt-4 border-t border-line pt-4" testId="payroll-cancel-form">

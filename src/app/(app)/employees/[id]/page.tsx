@@ -152,6 +152,7 @@ export default async function EmployeeDetailPage({
     loginStatus,
     roleGrants,
     assignableRoles,
+    managerOptions,
   ] = await Promise.all([
     repo.listDepartments(ctx.organization.id),
     new JobTitleRepository(supabase).listByOrganization(ctx.organization.id, { activeOnly: true }),
@@ -177,7 +178,11 @@ export default async function EmployeeDetailPage({
       ? roleRepo.listGrantsForProfile(ctx.organization.id, employee.profile_id)
       : Promise.resolve([]),
     canAssignRole ? repo.listRoles(ctx.organization.id) : Promise.resolve([]),
+    canManage ? repo.listEmployeeNameOptions(ctx.organization.id) : Promise.resolve([]),
   ]);
+  const currentManagerId = (employee.direct_manager_employee_id as string | null) ?? "";
+  const directManagerOptions = managerOptions.filter((option) => option.id !== employee.id);
+  const currentManagerListed = !currentManagerId || directManagerOptions.some((option) => option.id === currentManagerId);
 
   const profile = Array.isArray(employee.profiles) ? employee.profiles[0] : employee.profiles;
   const deptLinks = (employee.employee_departments as Array<Record<string, unknown>>) ?? [];
@@ -351,7 +356,11 @@ export default async function EmployeeDetailPage({
                     {td.loginStatus[loginStatus]}
                   </span>
                 </p>
-                {employee.is_active && employee.employee_number ? (
+                {loginStatus === "ready" ? (
+                  <p className="text-sm text-muted" data-testid="employee-login-already-provisioned">
+                    {td.overview.loginCard.alreadyProvisioned}
+                  </p>
+                ) : employee.is_active && employee.employee_number ? (
                   <ServerActionForm action={provisionEmployeeLoginAction} className="grid max-w-md gap-3">
                     <input type="hidden" name="employeeId" value={employee.id} />
                     <Field label={td.overview.loginCard.password} hint={td.overview.loginCard.passwordHint}>
@@ -519,6 +528,46 @@ export default async function EmployeeDetailPage({
                     />
                   </Field>
                 </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label={td.overview.employmentForm.contractStart}>
+                    <Input
+                      name="contract_start"
+                      type="date"
+                      defaultValue={employee.contract_start ?? ""}
+                      data-testid="edit-emp-contract-start"
+                    />
+                  </Field>
+                  <Field label={td.overview.employmentForm.contractEnd}>
+                    <Input
+                      name="contract_end"
+                      type="date"
+                      defaultValue={employee.contract_end ?? ""}
+                      data-testid="edit-emp-contract-end"
+                    />
+                  </Field>
+                </div>
+                <Field label={td.overview.employmentForm.directManager}>
+                  <Select
+                    name="direct_manager_employee_id"
+                    defaultValue={currentManagerId}
+                    data-testid="edit-emp-direct-manager"
+                  >
+                    <option value="">{td.overview.employmentForm.noDirectManager}</option>
+                    {!currentManagerListed ? (
+                      <option value={currentManagerId}>{td.overview.employmentForm.inactiveManager}</option>
+                    ) : null}
+                    {directManagerOptions.map((option) => {
+                      const name =
+                        pickLocalized(locale, option.profiles?.full_name_ar, option.profiles?.full_name_en) ||
+                        td.fallbackName;
+                      return (
+                        <option key={option.id} value={option.id}>
+                          {option.employee_number ? `${name} (${option.employee_number})` : name}
+                        </option>
+                      );
+                    })}
+                  </Select>
+                </Field>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={td.overview.employmentForm.workLocation}>
                     <Input

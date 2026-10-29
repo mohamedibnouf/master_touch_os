@@ -62,6 +62,7 @@ import {
   projectNeedsOrgUserDirectory,
   projectNeedsStagePackages,
 } from "@/modules/projects/project-detail-loaders";
+import { canShowStartWorkflowForm } from "@/modules/projects/start-workflow-input";
 
 const LATER_TAB_KEYS = ["safety", "quality", "communications"] as const;
 
@@ -169,6 +170,11 @@ export default async function ProjectDetailPage({
     instance: instanceRes.data ?? null,
     locale,
   });
+  const latestWorkflowStatus = (instanceRes.data?.status as string | undefined) ?? null;
+  const restartAfterCancel = latestWorkflowStatus === "cancelled";
+  const showStartWorkflow =
+    hasPermission(ctx, "workflow.start") &&
+    canShowStartWorkflowForm({ mode: workflow.mode, latestInstanceStatus: latestWorkflowStatus });
   const focusedStageId = workflowStageFocusId(
     workflow.nodes.map((node) => node.id),
     workflow.currentNodeId,
@@ -699,8 +705,11 @@ export default async function ProjectDetailPage({
               </Card>
             </>
           )}
-          {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
+          {showStartWorkflow ? (
             <Section title={td.stages.startWorkflow}>
+              {restartAfterCancel ? (
+                <p className="mb-3 text-sm text-muted">{td.stages.restartAfterCancel}</p>
+              ) : null}
               {(definitions.data ?? []).length === 0 ? (
                 <p className="text-sm text-muted">{td.stages.noTemplates}</p>
               ) : (
@@ -1126,8 +1135,11 @@ export default async function ProjectDetailPage({
                 </ServerActionForm>
               </Card>
             ) : null}
-            {hasPermission(ctx, "workflow.start") && workflow.mode !== "workflow" ? (
+            {showStartWorkflow ? (
               <Section title={td.stages.startWorkflow}>
+                {restartAfterCancel ? (
+                  <p className="mb-3 text-sm text-muted">{td.stages.restartAfterCancel}</p>
+                ) : null}
                 {(definitions.data ?? []).length === 0 ? (
                   <p className="text-sm text-muted">{td.stages.noTemplates}</p>
                 ) : (

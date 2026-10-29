@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
@@ -15,7 +16,7 @@ export async function readEmployeeSetupRows(input: {
   hasCompensation: boolean;
 }): Promise<EmployeeSetupRow[]> {
   const supabase = createAdminSupabaseClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
 
   const [roles, workplaces, shifts, leaveTypes] = await Promise.all([
     supabase

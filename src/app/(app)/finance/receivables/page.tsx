@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -9,6 +10,7 @@ import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CommercialRepository } from "@/server/repositories/commercial.repository";
 import { remainingBalance, roundMoney } from "@/server/domain/commercial";
+import { sumByCurrency } from "@/modules/procurement/integrity";
 import { format } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 
@@ -43,7 +45,7 @@ export default async function ReceivablesPage({
   const bucketLabels: Record<AgeBucket, string> = tr.buckets;
 
   const params = await searchParams;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new CommercialRepository(supabase);
   const rows = await repo.listReceivables(ctx.organization.id);
@@ -69,18 +71,19 @@ export default async function ReceivablesPage({
     };
   }).filter((i) => i.outstanding > 0);
 
-  const bucketTotals: Record<AgeBucket, { count: number; amount: number }> = {
-    CURRENT: { count: 0, amount: 0 },
-    "1-30": { count: 0, amount: 0 },
-    "31-60": { count: 0, amount: 0 },
-    "61-90": { count: 0, amount: 0 },
-    "90+": { count: 0, amount: 0 },
-  };
-
-  for (const item of items) {
-    bucketTotals[item.bucket].count += 1;
-    bucketTotals[item.bucket].amount = roundMoney(bucketTotals[item.bucket].amount + item.outstanding);
-  }
+  // Amounts are totalled per currency — invoices in different currencies are never added together.
+  const bucketTotals = Object.fromEntries(
+    AGE_BUCKETS.map((bucket) => {
+      const inBucket = items.filter((item) => item.bucket === bucket);
+      return [
+        bucket,
+        {
+          count: inBucket.length,
+          amounts: sumByCurrency(inBucket.map((item) => ({ currency: item.currency, amount: item.outstanding }))),
+        },
+      ];
+    }),
+  ) as Record<AgeBucket, { count: number; amounts: Array<{ currency: string; amount: number }> }>;
 
   const filtered = params.bucket
     ? items.filter((i) => i.bucket === params.bucket)
@@ -110,9 +113,17 @@ export default async function ReceivablesPage({
                 label={bucketLabels[bucket]}
                 tone={bucket === "CURRENT" ? "info" : bucket === "1-30" ? "warning" : "danger"}
                 value={
-                  <span className="text-lg">
-                    <MoneyDisplay amount={bucketTotals[bucket].amount} currency="SAR" locale={locale} />
-                  </span>
+                  bucketTotals[bucket].amounts.length === 0 ? (
+                    <span className="text-lg">
+                      <MoneyDisplay amount={0} currency="SAR" locale={locale} />
+                    </span>
+                  ) : (
+                    <span className="flex flex-col text-lg">
+                      {bucketTotals[bucket].amounts.map((total) => (
+                        <MoneyDisplay key={total.currency} amount={total.amount} currency={total.currency} locale={locale} />
+                      ))}
+                    </span>
+                  )
                 }
                 hint={format(tr.invoiceCount, { count: bucketTotals[bucket].count })}
               />

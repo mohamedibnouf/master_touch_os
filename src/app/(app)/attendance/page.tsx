@@ -16,6 +16,7 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function AttendanceDashboardPage() {
   const ctx = await getAuthContext();
@@ -39,7 +40,7 @@ export default async function AttendanceDashboardPage() {
     );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
 

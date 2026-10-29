@@ -30,7 +30,9 @@ export const recordPayrollPaymentSchema = z.object({
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentMethod: z.enum(["bank_transfer", "cash", "cheque", "other"]).default("bank_transfer"),
   paymentReference: z.string().max(120).optional(),
-  amount: z.coerce.number().positive(),
+  // 0 is valid for entries whose net pay is 0 (e.g. a full unpaid-leave month);
+  // the RPC still requires the amount to equal the entry's net pay exactly.
+  amount: z.coerce.number().nonnegative(),
   notes: z.string().max(1000).optional(),
 });
 

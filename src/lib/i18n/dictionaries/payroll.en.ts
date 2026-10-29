@@ -13,6 +13,10 @@ export const payrollEn: Dictionary["payroll"] = {
     deductions: "Deductions",
     net: "Net",
     manual: "Manual",
+    reviewed: "Reviewed",
+    approveNeedsReview: "Approval becomes available after the run has been reviewed.",
+    approveNeedsOtherUser: "You reviewed this run, so a different user must approve it.",
+    adjustmentResetsReview: "Adding an adjustment to a reviewed run resets its review; it must be reviewed again before approval.",
     periodRange: "{start} → {end}",
     paymentStatus: {
       unpaid: "Unpaid",
@@ -139,6 +143,7 @@ export const payrollEn: Dictionary["payroll"] = {
     amount: "Amount",
     notes: "Notes",
     recordPayment: "Mark as paid",
+    zeroNetHint: "Net pay is zero. Record a payment of 0.00 to close this entry so the run can be marked paid.",
   },
   my: {
     noEmployeeTitle: "Payslips",

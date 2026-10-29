@@ -22,6 +22,12 @@ describe("project detail tab loaders", () => {
     expect(projectNeedsDocumentCatalog("overview")).toBe(false);
   });
 
+  it("loads the document catalog wherever the gate approval card is rendered", () => {
+    expect(projectNeedsDocumentCatalog("documents")).toBe(true);
+    expect(projectNeedsDocumentCatalog("stages")).toBe(true);
+    expect(projectNeedsDocumentCatalog("approvals")).toBe(true);
+  });
+
   it("stages tab loads packages for the current step only", () => {
     expect(projectNeedsStagePackages("stages")).toBe(true);
     expect(

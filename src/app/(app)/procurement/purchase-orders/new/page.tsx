@@ -40,7 +40,19 @@ export default async function NewPurchaseOrderPage({
 
   if (!quote && quotationId) notFound();
 
-  // If no quotationId, show a selector for awarded quotations
+  // One awarded quotation → one active PO: an already-ordered quotation opens its PO.
+  if (quotationId) {
+    const { data: existingPo } = await supabase
+      .from("purchase_orders")
+      .select("id")
+      .eq("quotation_id", quotationId)
+      .neq("status", "cancelled")
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (existingPo) redirect(`/procurement/purchase-orders/${existingPo.id}`);
+  }
+
+  // If no quotationId, show a selector for awarded quotations that have no active PO yet
   let awardedQuotes: Array<Record<string, unknown>> = [];
   if (!quotationId) {
     const { data } = await supabase
@@ -50,7 +62,17 @@ export default async function NewPurchaseOrderPage({
       .eq("status", "accepted")
       .order("created_at", { ascending: false })
       .limit(50);
-    awardedQuotes = (data as Array<Record<string, unknown>>) ?? [];
+    const accepted = (data as Array<Record<string, unknown>>) ?? [];
+    const ids = accepted.map((q) => String(q.id));
+    const { data: orderedRows } = ids.length
+      ? await supabase
+          .from("purchase_orders")
+          .select("quotation_id")
+          .in("quotation_id", ids)
+          .neq("status", "cancelled")
+      : { data: [] as Array<{ quotation_id: string | null }> };
+    const ordered = new Set((orderedRows ?? []).map((r) => String(r.quotation_id)));
+    awardedQuotes = accepted.filter((q) => !ordered.has(String(q.id)));
 
     if (!awardedQuotes.length) {
       return (

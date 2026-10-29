@@ -140,6 +140,7 @@ export const attendanceAr = {
     chooseRecord: "اختر سجلًا",
     checkInLocal: "وقت الدخول (محلي)",
     checkOutLocal: "وقت الانصراف (محلي)",
+    riyadhTimeHint: "بتوقيت الرياض (UTC+03:00)",
     statusOptional: "الحالة (اختياري)",
     autoRecalculate: "إعادة حساب تلقائي",
     notes: "ملاحظات",

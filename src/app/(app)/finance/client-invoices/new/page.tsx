@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -168,7 +169,7 @@ export default async function NewClientInvoicePage({
                 name="invoiceDate"
                 type="date"
                 required
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                defaultValue={todayInRiyadh()}
                 data-testid="client-invoice-date"
               />
             </Field>

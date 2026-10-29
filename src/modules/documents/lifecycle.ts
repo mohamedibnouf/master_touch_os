@@ -36,11 +36,13 @@ export type ArchiveRestrictionInput = {
   hasTransmittalItem: boolean;
   isProjectBusinessCase: boolean;
   hasEmployeeDocumentLink: boolean;
+  /** Frozen into an open approval via approval_request_documents (e.g. a workflow gate). */
+  hasOpenGateApprovalLink?: boolean;
 };
 
 export function archiveRestrictionFor(input: ArchiveRestrictionInput): ArchiveRestrictionCode | null {
   if (input.is_register_controlled) return "register";
-  if (input.approval_request_id || input.workflow_instance_id) return "workflow";
+  if (input.approval_request_id || input.workflow_instance_id || input.hasOpenGateApprovalLink) return "workflow";
   if (input.hasEngineeringLink) return "engineering";
   if (input.hasTransmittalItem) return "transmittal";
   if (input.isProjectBusinessCase) return "businessCase";

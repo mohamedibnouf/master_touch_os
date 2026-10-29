@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -81,7 +82,7 @@ export default async function ProcurementPage({
   const { data: pendingPrs } = await pendingPrQuery;
 
   // RFQs with deadlines
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   let rfqQuery = supabase
     .from("rfqs")
     .select("id, rfq_number, title, status, response_due_date")

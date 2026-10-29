@@ -9,6 +9,7 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { assignEmployeeShiftAction } from "@/server/use-cases/attendance";
 import { pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function HrAttendanceAssignmentsPage() {
   const ctx = authorize(await getAuthContext(), "attendance.manage_shifts");
@@ -16,7 +17,7 @@ export default async function HrAttendanceAssignmentsPage() {
   const tg = t.attendance.assignments;
   const tc = t.attendance.common;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const core = new CoreRepository(supabase);

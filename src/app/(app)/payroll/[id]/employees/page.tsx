@@ -186,6 +186,12 @@ export default async function PayrollEmployeesPage({
         )}
       </Card>
 
+      {canAdjust && entries.length > 0 && period.status === "under_review" && period.reviewed_at ? (
+        <p className="text-sm text-muted" data-testid="payroll-adjustment-resets-review">
+          {tc.adjustmentResetsReview}
+        </p>
+      ) : null}
+
       {canAdjust && entries.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <ManualLineForm kind="earning" entries={entries} te={te} />

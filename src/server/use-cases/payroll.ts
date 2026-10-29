@@ -21,6 +21,40 @@ import {
   updatePayrollSettingsSchema,
 } from "@/modules/payroll/schemas";
 import type { PayrollPeriod } from "@/types/models";
+import { classifyPayrollRpcError } from "@/lib/payroll/review-controls";
+
+/** Maps payroll RPC guard errors (059/089) to clear bilingual messages. */
+function throwPayrollRpcError(error: { message?: string } | null): never {
+  switch (classifyPayrollRpcError(error?.message)) {
+    case "notReviewed":
+      throw new ValidationError(
+        "يجب إكمال مراجعة المسير قبل اعتماده.",
+        "The payroll run must be reviewed before it can be approved.",
+      );
+    case "selfApproval":
+      throw new ValidationError(
+        "لا يمكن لمن راجع المسير أن يعتمده. يلزم معتمد مختلف.",
+        "The user who reviewed this run cannot approve it. A different approver is required.",
+      );
+    case "netNegative":
+      throw new ValidationError(
+        "قيمة الخصم تتجاوز صافي الراتب المتبقي لهذا الموظف.",
+        "This deduction exceeds the employee's remaining net pay.",
+      );
+    case "amountMismatch":
+      throw new ValidationError(
+        "يجب أن يساوي مبلغ الصرف صافي الراتب تمامًا.",
+        "The payment amount must exactly equal the net pay.",
+      );
+    case "invalidStatus":
+      throw new ValidationError(
+        "لا يمكن تنفيذ هذا الإجراء في حالة المسير الحالية.",
+        "This action is not allowed in the payroll run's current status.",
+      );
+    default:
+      throw new DatabaseError(error);
+  }
+}
 
 async function listRoleRecipientIds(
   organizationId: string,
@@ -132,7 +166,7 @@ export async function createPayrollPeriodAction(
     p_year: parsed.data.year,
     p_month: parsed.data.month,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   revalidatePayroll((data as PayrollPeriod).id);
   });
 }
@@ -149,7 +183,7 @@ export async function calculatePayrollPeriodAction(
   const { error } = await supabase.rpc("calculate_payroll_period", {
     p_period_id: parsed.data.periodId,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   revalidatePayroll(parsed.data.periodId);
 
   });
@@ -167,7 +201,7 @@ export async function submitPayrollForReviewAction(
   const { error } = await supabase.rpc("submit_payroll_for_review", {
     p_period_id: parsed.data.periodId,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
 
   const financeIds = await listRoleRecipientIds(
     ctx.organization.id,
@@ -201,7 +235,7 @@ export async function markPayrollReviewedAction(
   const { error } = await supabase.rpc("mark_payroll_reviewed", {
     p_period_id: parsed.data.periodId,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
 
   const approverIds = await listRoleRecipientIds(
     ctx.organization.id,
@@ -235,7 +269,7 @@ export async function approvePayrollPeriodAction(
   const { error } = await supabase.rpc("approve_payroll_period", {
     p_period_id: parsed.data.periodId,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
 
   const financeIds = await listRoleRecipientIds(
     ctx.organization.id,
@@ -269,7 +303,7 @@ export async function lockPayrollPeriodAction(
   const { data, error } = await supabase.rpc("lock_payroll_period", {
     p_period_id: parsed.data.periodId,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
 
   // Notify employees with entries (capped, non-blocking fan-out).
   try {
@@ -327,7 +361,7 @@ export async function cancelPayrollPeriodAction(
     p_period_id: parsed.data.periodId,
     p_reason: parsed.data.reason,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   revalidatePayroll(parsed.data.periodId);
 
   });
@@ -357,7 +391,7 @@ export async function addPayrollManualEarningAction(
     p_amount: parsed.data.amount,
     p_reason: parsed.data.reason,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   const earning = data as { payroll_period_id?: string };
   revalidatePayroll(earning.payroll_period_id);
   revalidatePath(`/payroll/payslips/${parsed.data.entryId}`);
@@ -389,7 +423,7 @@ export async function addPayrollManualDeductionAction(
     p_amount: parsed.data.amount,
     p_reason: parsed.data.reason,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   const row = data as { payroll_period_id?: string };
   revalidatePayroll(row.payroll_period_id);
 
@@ -420,7 +454,7 @@ export async function recordPayrollPaymentAction(
     p_amount: parsed.data.amount,
     p_notes: parsed.data.notes ?? null,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   const pay = data as { payroll_period_id?: string; payroll_entry_id?: string };
   revalidatePayroll(pay.payroll_period_id);
   if (pay.payroll_entry_id) revalidatePath(`/payroll/payslips/${pay.payroll_entry_id}`);
@@ -456,7 +490,7 @@ export async function updatePayrollSettingsAction(
     p_rounding_precision: parsed.data.roundingPrecision,
     p_default_payment_method: parsed.data.defaultPaymentMethod,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) throwPayrollRpcError(error);
   revalidatePath("/payroll/settings");
   });
 }

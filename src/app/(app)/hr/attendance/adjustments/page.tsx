@@ -11,6 +11,8 @@ import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { formatAttendanceDateTime } from "@/components/attendance/attendance-format";
 import { pickLocalized, type Locale } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { isoToRiyadhLocalInput, todayInRiyadh } from "@/lib/time/riyadh";
+import { AttendanceAdjustFields } from "@/components/attendance/attendance-adjust-fields";
 
 const ADJUST_STATUSES = [
   "present",
@@ -56,7 +58,7 @@ export default async function HrAttendanceAdjustmentsPage() {
   const tj = t.attendance.adjustments;
   const tc = t.attendance.common;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const [adjustments, todayRecords] = await Promise.all([
@@ -77,25 +79,21 @@ export default async function HrAttendanceAdjustmentsPage() {
         <Card data-testid="attendance-adjust-form">
           <h2 className="mb-4 text-sm font-semibold text-ink">{tj.formTitle}</h2>
           <ServerActionForm action={adjustAttendanceRecordAction} className="grid gap-3 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <Field label={tj.todayRecord}>
-                <Select name="recordId" required>
-                  <option value="">{tj.chooseRecord}</option>
-                  {todayRecords.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {names.get(r.employee_id) ?? r.employee_id.slice(0, 8)} · {r.attendance_date} ·{" "}
-                      {attendanceStatusLabel(r.attendance_status, locale)}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <Field label={tj.checkInLocal}>
-              <Input type="datetime-local" name="checkInAt" />
-            </Field>
-            <Field label={tj.checkOutLocal}>
-              <Input type="datetime-local" name="checkOutAt" />
-            </Field>
+            <AttendanceAdjustFields
+              records={todayRecords.map((r) => ({
+                id: r.id,
+                label: `${names.get(r.employee_id) ?? r.employee_id.slice(0, 8)} · ${r.attendance_date} · ${attendanceStatusLabel(r.attendance_status, locale)}`,
+                checkInLocal: isoToRiyadhLocalInput(r.check_in_at),
+                checkOutLocal: isoToRiyadhLocalInput(r.check_out_at),
+              }))}
+              labels={{
+                record: tj.todayRecord,
+                chooseRecord: tj.chooseRecord,
+                checkIn: tj.checkInLocal,
+                checkOut: tj.checkOutLocal,
+                timeZoneHint: tj.riyadhTimeHint,
+              }}
+            />
             <Field label={tj.statusOptional}>
               <Select name="attendanceStatus" defaultValue="">
                 <option value="">{tj.autoRecalculate}</option>

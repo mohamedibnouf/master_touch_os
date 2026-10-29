@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -86,7 +87,7 @@ export default async function NewGoodsReceiptPage({
 
           <div className="grid gap-4 md:grid-cols-3">
             <Field label={tc.deliveryDate}>
-              <Input name="deliveryDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} data-testid="grn-delivery-date" />
+              <Input name="deliveryDate" type="date" required defaultValue={todayInRiyadh()} data-testid="grn-delivery-date" />
             </Field>
             <Field label={tf.deliveryNoteNumber}>
               <Input name="deliveryNoteNumber" placeholder={tc.optional} dir="ltr" />
@@ -146,7 +147,8 @@ export default async function NewGoodsReceiptPage({
                             type="number"
                             step="0.0001"
                             min="0"
-                            defaultValue="0"
+                            placeholder={tf.acceptedPlaceholder}
+                            aria-describedby="grn-split-hint"
                             className="w-24"
                             disabled={remaining <= 0}
                           />
@@ -157,7 +159,7 @@ export default async function NewGoodsReceiptPage({
                             type="number"
                             step="0.0001"
                             min="0"
-                            defaultValue="0"
+                            placeholder="0"
                             className="w-24"
                             disabled={remaining <= 0}
                           />
@@ -176,6 +178,7 @@ export default async function NewGoodsReceiptPage({
                 </tbody>
               </table>
             </TableScroll>
+            <p id="grn-split-hint" className="mt-2 text-xs text-muted">{tf.splitHint}</p>
           </div>
 
           <Field label={tc.notes}>

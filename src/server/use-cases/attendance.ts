@@ -32,6 +32,7 @@ import {
   parseAttendancePunchRpc,
 } from "@/modules/attendance/geofence";
 import { workplaceUniqueViolationMessage } from "@/modules/attendance/workplace-write";
+import { riyadhLocalInputToIso, todayInRiyadh } from "@/lib/time/riyadh";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
   if (value == null || value === "") return fallback;
@@ -227,10 +228,20 @@ export async function adjustAttendanceRecordAction(
     const checkOutRaw = String(formData.get("checkOutAt") ?? "").trim();
     const statusRaw = String(formData.get("attendanceStatus") ?? "").trim();
 
+    // datetime-local inputs carry no zone: HR types Riyadh wall-clock time.
+    let checkInAt: string | null;
+    let checkOutAt: string | null;
+    try {
+      checkInAt = riyadhLocalInputToIso(checkInRaw);
+      checkOutAt = riyadhLocalInputToIso(checkOutRaw);
+    } catch {
+      throw new ValidationError("صيغة الوقت غير صالحة.", "Invalid date/time value.");
+    }
+
     const parsed = adjustAttendanceSchema.safeParse({
       recordId: formData.get("recordId"),
-      checkInAt: checkInRaw ? new Date(checkInRaw).toISOString() : null,
-      checkOutAt: checkOutRaw ? new Date(checkOutRaw).toISOString() : null,
+      checkInAt,
+      checkOutAt,
       attendanceStatus: statusRaw || undefined,
       notes: String(formData.get("notes") ?? "").trim() || undefined,
       reason: formData.get("reason"),
@@ -242,9 +253,10 @@ export async function adjustAttendanceRecordAction(
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.rpc("adjust_attendance_record", {
       p_record_id: parsed.data.recordId,
-      p_check_in_at: parsed.data.checkInAt ?? null,
-      p_check_out_at: parsed.data.checkOutAt ?? null,
-      p_attendance_status: parsed.data.attendanceStatus ?? null,
+      // Named args must match 057 adjust_attendance_record(p_check_in, p_check_out, p_status).
+      p_check_in: parsed.data.checkInAt ?? null,
+      p_check_out: parsed.data.checkOutAt ?? null,
+      p_status: parsed.data.attendanceStatus ?? null,
       p_notes: parsed.data.notes ?? null,
       p_reason: parsed.data.reason,
     });
@@ -501,7 +513,7 @@ export async function endEmployeeWorkplaceAssignmentAction(
   try {
     const ctx = authorize(await getAuthContext(), "attendance.manage_locations");
     const id = String(formData.get("assignmentId") ?? "").trim();
-    const endedOn = String(formData.get("effectiveTo") ?? "").trim() || new Date().toISOString().slice(0, 10);
+    const endedOn = String(formData.get("effectiveTo") ?? "").trim() || todayInRiyadh();
     if (!/^[0-9a-f-]{36}$/i.test(id)) {
       throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
     }
@@ -548,7 +560,7 @@ export async function removeEmployeeWorkplaceAssignmentAction(
     if (!/^[0-9a-f-]{36}$/i.test(id)) {
       throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInRiyadh();
     const supabase = await createServerSupabaseClient();
     const { data: row, error: fetchErr } = await supabase
       .from("employee_workplace_assignments")

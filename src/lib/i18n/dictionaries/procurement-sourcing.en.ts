@@ -230,6 +230,8 @@ export const procurementSourcingEn: Dictionary["procurementSourcing"] = {
     submittedTitle: "Submitted recommendation",
     nextStepTitle: "Next step",
     createPo: "Create purchase order →",
+    viewPo: "View purchase order {number} →",
+    poAlreadyCreated: "A purchase order has already been created for this quotation.",
   },
   quotations: {
     detail: {

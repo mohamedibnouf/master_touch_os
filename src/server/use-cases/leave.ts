@@ -188,7 +188,15 @@ export async function decideLeaveRequestAction(
     p_decision: parsed.data.decision,
     p_comment: parsed.data.comment ?? null,
   });
-  if (error) throw new DatabaseError(error);
+  if (error) {
+    if (String(error.message ?? "").includes("LEAVE_SELF_DECISION")) {
+      throw new ValidationError(
+        "لا يمكنك اعتماد أو رفض طلب إجازتك بنفسك.",
+        "You cannot approve or reject your own leave request.",
+      );
+    }
+    throw new DatabaseError(error);
+  }
 
   const req = data as LeaveRequest;
   // Resolve employee recipient via service role — managers may lack employees SELECT RLS

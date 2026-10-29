@@ -11,6 +11,7 @@ import { attendanceStatusTone } from "@/lib/ui/operational-labels";
 import { formatAttendanceTime } from "@/components/attendance/attendance-format";
 import { format, pickLocalized, type Locale } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { addDaysYmd, todayInRiyadh } from "@/lib/time/riyadh";
 
 async function employeeNameMap(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -43,10 +44,8 @@ export default async function AttendanceTeamPage() {
   const tt = t.attendance.team;
   const tc = t.attendance.common;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const fromDate = new Date(today);
-  fromDate.setUTCDate(fromDate.getUTCDate() - 6);
-  const from = fromDate.toISOString().slice(0, 10);
+  const today = todayInRiyadh();
+  const from = addDaysYmd(today, -6);
 
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);

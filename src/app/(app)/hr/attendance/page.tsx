@@ -14,6 +14,7 @@ import { reconcileAttendanceAction } from "@/server/use-cases/attendance";
 import { formatAttendanceDateTime, formatAttendanceTime } from "@/components/attendance/attendance-format";
 import { format, pickLocalized, type Locale } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 const STATUS_FILTERS = [
   "present",
@@ -62,7 +63,7 @@ export default async function HrAttendancePage({
   const tc = t.attendance.common;
 
   const sp = (await searchParams) ?? {};
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const status = sp.status?.trim() || undefined;
 

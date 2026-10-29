@@ -40,6 +40,8 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
   const tc = t.leave.common;
 
   const isSelf = ctx.employee?.id === req.employee_id;
+  // Segregation of duties: nobody decides their own request (mirrors decide_leave_request in 089).
+  const isRequester = isSelf || (Boolean(emp?.profile_id) && emp?.profile_id === ctx.profile?.id);
   const isDirectManager =
     Boolean(ctx.profile?.id) &&
     req.manager_profile_id === ctx.profile.id &&
@@ -48,9 +50,13 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
     (isSelf && hasPermission(ctx, "leave.cancel_self") && ["draft", "submitted"].includes(req.status)) ||
     (hasPermission(ctx, "leave.manage") && ["submitted", "approved"].includes(req.status));
   const canDecideManager =
-    req.status === "submitted" && req.approval_stage === "manager" && isDirectManager;
+    !isRequester && req.status === "submitted" && req.approval_stage === "manager" && isDirectManager;
   const canDecideHr =
-    req.status === "submitted" && req.approval_stage === "hr" && hasPermission(ctx, "leave.manage");
+    !isRequester && req.status === "submitted" && req.approval_stage === "hr" && hasPermission(ctx, "leave.manage");
+  const showSelfDecisionNote =
+    isRequester &&
+    req.status === "submitted" &&
+    (hasPermission(ctx, "leave.manage") || hasPermission(ctx, "leave.approve_manager"));
 
   const profileRaw = emp?.profiles as ProfileName | ProfileName[] | null | undefined;
   const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
@@ -123,6 +129,12 @@ export default async function LeaveDetailPage({ params }: { params: Promise<{ id
             </div>
           </ServerActionForm>
         </Section>
+      ) : null}
+
+      {showSelfDecisionNote ? (
+        <p className="text-sm text-muted" data-testid="leave-self-decision-note">
+          {td.selfDecisionBlocked}
+        </p>
       ) : null}
 
       {canCancel ? (

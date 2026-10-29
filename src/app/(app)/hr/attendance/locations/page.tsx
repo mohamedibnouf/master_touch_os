@@ -16,6 +16,7 @@ import { WorkplaceSaveForm } from "@/components/attendance/workplace-save-form";
 import { WorkplaceActionForm } from "@/components/attendance/workplace-action-form";
 import { getI18n } from "@/lib/i18n/server";
 import { pickLocalized } from "@/lib/i18n/config";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 type AssignmentStatus = "upcoming" | "active" | "ended";
 
@@ -27,7 +28,7 @@ export default async function HrWorkplaceLocationsPage() {
   const tl = t.attendance.locations;
   const tc = t.attendance.common;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
   const ready = await repo.geofenceSchemaReady();

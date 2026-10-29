@@ -10,6 +10,7 @@ import { leaveStatusLabel } from "@/lib/hr/labels";
 import { leaveRequestTone } from "@/lib/ui/operational-labels";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function LeaveDashboardPage() {
   const ctx = await getAuthContext();
@@ -34,7 +35,7 @@ export default async function LeaveDashboardPage() {
     );
   }
 
-  const year = new Date().getFullYear();
+  const year = Number(todayInRiyadh().slice(0, 4));
   const supabase = await createServerSupabaseClient();
   const repo = new LeaveRepository(supabase);
   const [types, balances, requests] = await Promise.all([

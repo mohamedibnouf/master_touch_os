@@ -9,7 +9,7 @@ import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
-import { authorize, hasPermission } from "@/server/policies/authorize";
+import { authorize, hasPermission, requireUser } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { StorageService } from "@/server/services/storage.service";
@@ -28,6 +28,22 @@ import {
   resolveCreateEmployeeRolePlan,
 } from "@/lib/hr/roles";
 import { assignmentRejectReason } from "@/lib/rbac/custom-roles";
+import {
+  ACCOUNT_STATUS_REJECT_MESSAGES,
+  EMPLOYMENT_OPTIONAL_FORM_FIELDS,
+  PROVISION_LOGIN_REJECT_MESSAGES,
+  accountStatusRejectReason,
+  omitAbsentFormFields,
+  provisionLoginRejectReason,
+  riyadhTerminationTimestamp,
+  terminationPatch,
+} from "@/lib/hr/account-security";
+import {
+  applyAccountAccess,
+  assertDepartmentInOrganization,
+  loadTargetAccountFacts,
+  updateEmployeeProfileFields,
+} from "@/server/hr/account-access";
 import {
   assertCreateEmployeeAuthRequest,
   buildCreateEmployeeAuthRequest,
@@ -118,6 +134,8 @@ export async function createEmployeeAction(
   });
 
   const admin = createAdminSupabaseClient();
+  // Service-role inserts bypass RLS, so the department must be proven in-org first.
+  await assertDepartmentInOrganization(admin, ctx.organization.id, parsed.data.department_id);
   let jobTitleId: string | null = null;
   let jobTitleAr = parsed.data.job_title_ar;
   let jobTitleEn = parsed.data.job_title_en;
@@ -323,7 +341,7 @@ export async function updateEmployeeEmploymentAction(
   const supabase = await createServerSupabaseClient();
   const { data: currentEmp, error: currentErr } = await supabase
     .from("employees")
-    .select("id, job_title_id, job_title_ar, job_title_en")
+    .select("id, job_title_id, job_title_ar, job_title_en, employment_status, terminated_at")
     .eq("id", parsed.data.employeeId)
     .eq("organization_id", ctx.organization.id)
     .maybeSingle<{
@@ -331,11 +349,31 @@ export async function updateEmployeeEmploymentAction(
       job_title_id: string | null;
       job_title_ar: string | null;
       job_title_en: string | null;
+      employment_status: string | null;
+      terminated_at: string | null;
     }>();
   if (currentErr) throw new DatabaseError(currentErr);
   if (!currentEmp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
 
+  const submittedManager = emptyToNull(parsed.data.direct_manager_employee_id);
+  if (submittedManager) {
+    if (submittedManager === currentEmp.id) {
+      throw new ValidationError("لا يمكن أن يكون الموظف مديراً مباشراً لنفسه.", "An employee cannot be their own direct manager.");
+    }
+    const { data: manager, error: managerErr } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("id", submittedManager)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{ id: string }>();
+    if (managerErr) throw new DatabaseError(managerErr);
+    if (!manager) {
+      throw new ValidationError("المدير المباشر المحدد غير صالح.", "The selected direct manager is not valid.");
+    }
+  }
+
   const submittedDept = emptyToNull(parsed.data.department_id ?? undefined);
+  await assertDepartmentInOrganization(supabase, ctx.organization.id, submittedDept);
   if (submittedDept) {
     await supabase
       .from("employee_departments")
@@ -404,10 +442,19 @@ export async function updateEmployeeEmploymentAction(
     gender: emptyToNull(parsed.data.gender),
     direct_manager_employee_id: emptyToNull(parsed.data.direct_manager_employee_id),
   };
+  // A field the form did not carry is left untouched (absent ≠ cleared).
+  const submittedPatch = {
+    ...omitAbsentFormFields(patch, formData, EMPLOYMENT_OPTIONAL_FORM_FIELDS),
+    ...terminationPatch({
+      previousStatus: currentEmp.employment_status,
+      nextStatus: patch.employment_status,
+      previousTerminatedAt: currentEmp.terminated_at,
+    }),
+  };
 
   const { error } = await supabase
     .from("employees")
-    .update(patch)
+    .update(submittedPatch)
     .eq("id", parsed.data.employeeId)
     .eq("organization_id", ctx.organization.id);
   if (error) throw new DatabaseError(error);
@@ -470,11 +517,16 @@ export async function updateEmployeeProfileAction(
     patch.whatsapp_opt_in = false;
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .update(patch)
-    .eq("id", emp.profile_id);
-  if (error) throw new DatabaseError(error);
+  // RLS only lets a user update their own profile; after the employee.manage check the
+  // write runs with the service role, scoped to this org's employee row (087 trigger allows
+  // names/phone/WhatsApp; is_active and identity columns are never in the patch).
+  await updateEmployeeProfileFields(createAdminSupabaseClient(), {
+    organizationId: ctx.organization.id,
+    employeeId: emp.id,
+    profileId: emp.profile_id,
+    actorIsPlatformAdmin: ctx.profile.is_platform_admin,
+    patch,
+  });
 
   await new AuditService(supabase).log({
     organizationId: ctx.organization.id,
@@ -798,32 +850,47 @@ export async function setEmployeeActiveAction(
     .maybeSingle();
   if (empErr) throw new DatabaseError(empErr);
   if (!emp) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
-  if (emp.profile_id === ctx.userId) {
-    throw new ValidationError("لا يمكنك إيقاف حسابك الحالي.", "You cannot disable your own account.");
+
+  // Soft access revocation — never delete auth user or history. RLS has no policy for
+  // updating another user's profile, so the writes run with the service role after the
+  // permission and target checks above/below.
+  const admin = createAdminSupabaseClient();
+  const target = await loadTargetAccountFacts(admin, {
+    organizationId: ctx.organization.id,
+    profileId: emp.profile_id,
+  });
+  const statusReject = accountStatusRejectReason({
+    actorProfileId: ctx.userId,
+    actorIsPlatformAdmin: ctx.profile.is_platform_admin,
+    actorRoleCodes: ctx.grants.map((grant) => grant.roleCode),
+    targetProfileId: emp.profile_id,
+    targetIsPlatformAdmin: target.isPlatformAdmin,
+    targetRoleCodes: target.roleCodes,
+  });
+  if (statusReject) {
+    const message = ACCOUNT_STATUS_REJECT_MESSAGES[statusReject];
+    throw new ValidationError(message.ar, message.en);
   }
 
-  // Soft access revocation — never delete auth user or history.
-  await supabase
-    .from("profiles")
-    .update({ is_active: parsed.data.isActive })
-    .eq("id", emp.profile_id);
+  await applyAccountAccess(admin, {
+    organizationId: ctx.organization.id,
+    profileId: emp.profile_id,
+    isActive: parsed.data.isActive,
+    otherActiveOrganizationMemberships: target.otherActiveOrganizationMemberships,
+  });
 
-  await supabase
-    .from("organization_members")
-    .update({ status: parsed.data.isActive ? "active" : "suspended" })
-    .eq("organization_id", ctx.organization.id)
-    .eq("profile_id", emp.profile_id);
-
-  const { error } = await supabase
+  const { data: updatedRows, error } = await admin
     .from("employees")
     .update({
       is_active: parsed.data.isActive,
       employment_status: parsed.data.isActive ? "active" : "terminated",
-      terminated_at: parsed.data.isActive ? null : new Date().toISOString(),
+      terminated_at: parsed.data.isActive ? null : riyadhTerminationTimestamp(),
     })
     .eq("id", emp.id)
-    .eq("organization_id", ctx.organization.id);
+    .eq("organization_id", ctx.organization.id)
+    .select("id");
   if (error) throw new DatabaseError(error);
+  if (!updatedRows?.length) throw new ValidationError("الموظف غير موجود.", "Employee not found.");
 
   await new AuditService(supabase).log({
     organizationId: ctx.organization.id,
@@ -885,6 +952,28 @@ export async function provisionEmployeeLoginAction(
     const admin = createAdminSupabaseClient();
     const { data: userData, error: getErr } = await admin.auth.admin.getUserById(emp.profile_id);
     if (getErr || !userData.user) throw new DatabaseError(getErr);
+
+    // Provisioning = setting the FIRST password of an unused account. Never a reset:
+    // otherwise employee.create/manage could take over any account in the org.
+    const target = await loadTargetAccountFacts(admin, {
+      organizationId: ctx.organization.id,
+      profileId: emp.profile_id,
+    });
+    const meta = userData.user.user_metadata as Record<string, unknown> | undefined;
+    const provisionReject = provisionLoginRejectReason({
+      loginProvisioned: meta?.login_provisioned === true,
+      hasSignedIn: Boolean(userData.user.last_sign_in_at),
+      targetIsPlatformAdmin: target.isPlatformAdmin,
+      targetRoleCodes: target.roleCodes,
+      otherOrganizationMemberships: target.otherOrganizationMemberships,
+    });
+    if (provisionReject) {
+      const message = PROVISION_LOGIN_REJECT_MESSAGES[provisionReject];
+      throw new ValidationError(message.ar, message.en);
+    }
+    if (target.membershipStatus !== "active") {
+      throw new ValidationError("لا يمكن تفعيل الدخول لموظف موقوف.", "Cannot provision login for an inactive employee.");
+    }
 
     const { error: updErr } = await admin.auth.admin.updateUserById(emp.profile_id, {
       password: parsed.data.password,
@@ -1199,8 +1288,8 @@ export async function getEmployeeDocumentDownloadUrlAction(input: {
   employeeId: string;
   documentId: string;
 }): Promise<string> {
-  const ctx = await getAuthContext();
-  if (!ctx) throw new ForbiddenError();
+  // requireUser also rejects disabled accounts and suspended memberships.
+  const ctx = requireUser(await getAuthContext());
 
   const supabase = await createServerSupabaseClient();
   const { data: link, error } = await supabase

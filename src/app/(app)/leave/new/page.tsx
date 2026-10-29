@@ -9,12 +9,13 @@ import { LeaveRequestForm } from "@/components/leave/leave-request-form";
 import type { LeaveDayBasis } from "@/lib/leave/days";
 import { pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function NewLeavePage() {
   const ctx = authorize(await getAuthContext(), "leave.request");
   if (!ctx.employee) redirect("/leave");
 
-  const year = new Date().getFullYear();
+  const year = Number(todayInRiyadh().slice(0, 4));
   const supabase = await createServerSupabaseClient();
   const repo = new LeaveRepository(supabase);
   const [types, balances, { t, locale }] = await Promise.all([

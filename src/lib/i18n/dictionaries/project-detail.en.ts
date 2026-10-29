@@ -59,6 +59,7 @@ export const projectDetailEn: Dictionary["projectDetail"] = {
     template: "Template",
     startButton: "Start workflow",
     startShort: "Start",
+    restartAfterCancel: "The previous workflow was cancelled. You can start a new workflow for this project.",
   },
   team: {
     members: "Team members",

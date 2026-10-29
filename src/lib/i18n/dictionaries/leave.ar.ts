@@ -68,6 +68,7 @@ export const leaveAr = {
     approve: "اعتماد",
     reject: "رفض",
     cancel: "إلغاء الطلب",
+    selfDecisionBlocked: "لا يمكنك اعتماد أو رفض طلب إجازتك بنفسك. يجب أن يقرره معتمد آخر.",
     stages: {
       none: "لا يوجد",
       manager: "المدير المباشر",

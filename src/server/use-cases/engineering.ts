@@ -1,4 +1,5 @@
 "use server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
@@ -13,6 +14,42 @@ import { createNotificationService } from "@/server/services/notification.servic
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
 import { generateCorrelationId } from "@/lib/utils";
+import { isPostgresUuid } from "@/lib/postgres-uuid";
+
+// Server-side state guards (the UI hides these actions, but a crafted POST must not bypass them).
+// Values match the enums in migrations 017 (rfi_status), 021 (inspection_status), 022 (ncr_status).
+const RFI_RESPONDABLE_STATUSES: string[] = ["submitted", "under_review"];
+const INSPECTION_RESULTABLE_STATUSES: string[] = ["ready", "submitted", "scheduled", "inspected"];
+const NCR_CLOSABLE_STATUSES: string[] = [
+  "open",
+  "under_investigation",
+  "corrective_action",
+  "waiting_verification",
+  "reopened",
+];
+const RFI_NOT_RESPONDABLE = {
+  ar: "لا يمكن الرد على طلب الاستفسار في حالته الحالية.",
+  en: "This RFI cannot be answered in its current status.",
+};
+const INSPECTION_NOT_RESULTABLE = {
+  ar: "تم تسجيل نتيجة هذا الفحص مسبقاً أو أنه غير جاهز للفحص.",
+  en: "This inspection already has a result or is not ready for inspection.",
+};
+const NCR_NOT_CLOSABLE = {
+  ar: "تقرير عدم المطابقة مغلق مسبقاً.",
+  en: "This NCR is already closed.",
+};
+const TRANSMITTAL_PURPOSES: string[] = [
+  "for_approval",
+  "for_review",
+  "for_information",
+  "for_construction",
+  "for_record",
+];
+const TRANSMITTAL_DOCS_INVALID = {
+  ar: "بعض المستندات المحددة غير موجودة أو لا تتبع هذا المشروع.",
+  en: "Some selected documents do not exist or do not belong to this project.",
+};
 
 const createRfiSchema = z.object({
   projectId: z.string().uuid(),
@@ -122,13 +159,15 @@ export async function respondRfiAction(
     .from("rfis")
     .select("id, status, question, project_id, organization_id")
     .eq("id", rfiId)
+    .eq("organization_id", ctx.organization.id)
     .maybeSingle();
   if (!existing) throw new ValidationError("طلب الاستفسار غير موجود.", "RFI not found.");
-  if (existing.status === "closed" || existing.status === "cancelled") {
-    throw new ConflictError("لا يمكن تعديل طلب مغلق.", "Closed RFI cannot be updated.");
+  if (!RFI_RESPONDABLE_STATUSES.includes(existing.status)) {
+    throw new ConflictError(RFI_NOT_RESPONDABLE.ar, RFI_NOT_RESPONDABLE.en);
   }
 
-  const { error } = await supabase
+  // Guarded write: only a submitted / under-review RFI can be answered (race-safe).
+  const { data: answered, error } = await supabase
     .from("rfis")
     .update({
       response,
@@ -136,8 +175,14 @@ export async function respondRfiAction(
       response_date: new Date().toISOString(),
       status: "answered",
     })
-    .eq("id", rfiId);
+    .eq("id", rfiId)
+    .eq("organization_id", ctx.organization.id)
+    .in("status", RFI_RESPONDABLE_STATUSES)
+    .select("id");
   if (error) throw new DatabaseError(error);
+  if (!answered || answered.length === 0) {
+    throw new ConflictError(RFI_NOT_RESPONDABLE.ar, RFI_NOT_RESPONDABLE.en);
+  }
 
   // Original question must remain (DB trigger also enforces when closed)
   await new AuditService(supabase).log({
@@ -602,10 +647,14 @@ export async function recordInspectionResultAction(
   const supabase = await createServerSupabaseClient();
   const { data: existing } = await supabase
     .from("inspection_requests")
-    .select("id, project_id, organization_id, ir_number, status")
+    .select("id, project_id, organization_id, ir_number, status, requested_by, site_engineer_id")
     .eq("id", inspectionId)
+    .eq("organization_id", ctx.organization.id)
     .maybeSingle();
   if (!existing) throw new ValidationError("طلب الفحص غير موجود.", "Inspection not found.");
+  if (!INSPECTION_RESULTABLE_STATUSES.includes(existing.status)) {
+    throw new ConflictError(INSPECTION_NOT_RESULTABLE.ar, INSPECTION_NOT_RESULTABLE.en);
+  }
 
   const status =
     result === "failed"
@@ -614,7 +663,8 @@ export async function recordInspectionResultAction(
         ? "passed_with_comments"
         : "passed";
 
-  const { error } = await supabase
+  // Guarded write: never overwrite a recorded result (race-safe).
+  const { data: recorded, error } = await supabase
     .from("inspection_requests")
     .update({
       inspection_result: result,
@@ -622,8 +672,14 @@ export async function recordInspectionResultAction(
       status,
       quality_engineer_id: ctx.userId,
     })
-    .eq("id", inspectionId);
+    .eq("id", inspectionId)
+    .eq("organization_id", ctx.organization.id)
+    .in("status", INSPECTION_RESULTABLE_STATUSES)
+    .select("id");
   if (error) throw new DatabaseError(error);
+  if (!recorded || recorded.length === 0) {
+    throw new ConflictError(INSPECTION_NOT_RESULTABLE.ar, INSPECTION_NOT_RESULTABLE.en);
+  }
 
   const events = new EventService(supabase);
   await events.publish({
@@ -638,18 +694,29 @@ export async function recordInspectionResultAction(
   });
 
   if (result === "failed") {
-    await createNotificationService(supabase).notify({
-      organizationId: ctx.organization.id,
-      recipientProfileId: ctx.userId,
-      type: "inspection.failed",
-      title: "فشل فحص",
-      message: `فشل الفحص: ${existing.ir_number}`,
-      titleEn: "Inspection failed",
-      messageEn: `Inspection failed: ${existing.ir_number}`,
-      entityType: "inspection_request",
-      entityId: inspectionId,
-      priority: "high",
-    });
+    // The site engineer / requester must act on a failed inspection — not the inspector who recorded it.
+    const recipients = [
+      ...new Set(
+        [existing.site_engineer_id as string | null, existing.requested_by as string | null].filter(
+          (id): id is string => Boolean(id) && id !== ctx.userId,
+        ),
+      ),
+    ];
+    const notifications = createNotificationService(supabase);
+    for (const recipientProfileId of recipients) {
+      await notifications.notify({
+        organizationId: ctx.organization.id,
+        recipientProfileId,
+        type: "inspection.failed",
+        title: "فشل فحص",
+        message: `فشل الفحص: ${existing.ir_number}`,
+        titleEn: "Inspection failed",
+        messageEn: `Inspection failed: ${existing.ir_number}`,
+        entityType: "inspection_request",
+        entityId: inspectionId,
+        priority: "high",
+      });
+    }
   }
 
   revalidatePath("/engineering");
@@ -735,20 +802,31 @@ export async function closeNcrAction(
     .from("ncrs")
     .select("id, project_id, ncr_number, status")
     .eq("id", ncrId)
+    .eq("organization_id", ctx.organization.id)
     .maybeSingle();
   if (!existing) throw new ValidationError("التقرير غير موجود.", "NCR not found.");
+  if (!NCR_CLOSABLE_STATUSES.includes(existing.status)) {
+    throw new ConflictError(NCR_NOT_CLOSABLE.ar, NCR_NOT_CLOSABLE.en);
+  }
 
-  const { error } = await supabase
+  // Guarded write: an already-closed NCR keeps its original verification (race-safe).
+  const { data: closed, error } = await supabase
     .from("ncrs")
     .update({
       status: "closed",
       verification,
       verified_by: ctx.userId,
       verified_at: new Date().toISOString(),
-      actual_closure_date: new Date().toISOString().slice(0, 10),
+      actual_closure_date: todayInRiyadh(),
     })
-    .eq("id", ncrId);
+    .eq("id", ncrId)
+    .eq("organization_id", ctx.organization.id)
+    .in("status", NCR_CLOSABLE_STATUSES)
+    .select("id");
   if (error) throw new DatabaseError(error);
+  if (!closed || closed.length === 0) {
+    throw new ConflictError(NCR_NOT_CLOSABLE.ar, NCR_NOT_CLOSABLE.en);
+  }
 
   await new EventService(supabase).publish({
     type: "ncr.closed",
@@ -923,6 +1001,72 @@ export async function createTransmittalAction(
   if (!projectId || !recipient || !subject || documentIds.length === 0) {
     throw new ValidationError("بيانات الإرسالية غير مكتملة.", "Transmittal data incomplete.");
   }
+  if (!TRANSMITTAL_PURPOSES.includes(purpose)) {
+    throw new ValidationError("غرض الإرسالية غير صالح.", "Invalid transmittal purpose.");
+  }
+
+  // Validate everything BEFORE writing anything, so a bad id never leaves an orphan
+  // transmittal header or consumes a TRN document number.
+  const uniqueDocumentIds = [...new Set(documentIds)];
+  if (!isPostgresUuid(projectId) || uniqueDocumentIds.some((id) => !isPostgresUuid(id))) {
+    throw new ValidationError(TRANSMITTAL_DOCS_INVALID.ar, TRANSMITTAL_DOCS_INVALID.en);
+  }
+  const validation = await createServerSupabaseClient();
+  const { data: project } = await validation
+    .from("projects")
+    .select("id, organization_id")
+    .eq("id", projectId)
+    .eq("organization_id", ctx.organization.id)
+    .maybeSingle<{ id: string; organization_id: string }>();
+  if (!project) {
+    throw new ValidationError("المشروع المحدد غير صالح.", "The selected project is not valid.");
+  }
+  const { data: docs, error: docsError } = await validation
+    .from("documents")
+    .select("id, organization_id, project_id, status, archived_at")
+    .eq("organization_id", ctx.organization.id)
+    .in("id", uniqueDocumentIds);
+  if (docsError) throw new DatabaseError(docsError);
+  const docRows = (docs ?? []) as {
+    id: string;
+    organization_id: string;
+    project_id: string | null;
+    status: string;
+    archived_at: string | null;
+  }[];
+  if (
+    docRows.length !== uniqueDocumentIds.length ||
+    docRows.some((d) => d.project_id !== projectId)
+  ) {
+    throw new ValidationError(TRANSMITTAL_DOCS_INVALID.ar, TRANSMITTAL_DOCS_INVALID.en);
+  }
+  if (docRows.some((d) => d.archived_at !== null || d.status === "archived")) {
+    throw new ValidationError(
+      "لا يمكن إرسال مستند مؤرشف ضمن إرسالية.",
+      "An archived document cannot be included in a transmittal.",
+    );
+  }
+  const { data: versions, error: versionsError } = await validation
+    .from("document_versions")
+    .select("id, document_id, is_current, created_at")
+    .eq("organization_id", ctx.organization.id)
+    .in("document_id", uniqueDocumentIds)
+    .order("created_at", { ascending: false });
+  if (versionsError) throw new DatabaseError(versionsError);
+  const versionByDocument = new Map<string, string>();
+  for (const row of (versions ?? []) as { id: string; document_id: string; is_current: boolean }[]) {
+    // Prefer the current version; otherwise fall back to the latest one (legacy documents).
+    if (row.is_current) versionByDocument.set(row.document_id, row.id);
+  }
+  for (const row of (versions ?? []) as { id: string; document_id: string }[]) {
+    if (!versionByDocument.has(row.document_id)) versionByDocument.set(row.document_id, row.id);
+  }
+  if (uniqueDocumentIds.some((id) => !versionByDocument.has(id))) {
+    throw new ValidationError(
+      "لا توجد مراجعة للمستند المحدد.",
+      "Selected document has no revision to attach.",
+    );
+  }
 
   const { supabase, doc: headerDoc } = await registerDoc({
     organizationId: ctx.organization.id,
@@ -951,47 +1095,17 @@ export async function createTransmittalAction(
     .single();
   if (error || !transmittal) throw new DatabaseError(error);
 
-  for (const documentId of documentIds) {
-    const { data: version } = await supabase
-      .from("document_versions")
-      .select("id")
-      .eq("document_id", documentId)
-      .eq("is_current", true)
-      .maybeSingle();
-    if (!version) {
-      // Fallback: use document current revision row if versions table empty for legacy docs
-      const { data: anyVersion } = await supabase
-        .from("document_versions")
-        .select("id")
-        .eq("document_id", documentId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!anyVersion) {
-        throw new ValidationError(
-          "لا توجد مراجعة للمستند المحدد.",
-          "Selected document has no revision to attach.",
-        );
-      }
-      const { error: itemErr } = await supabase.from("transmittal_items").insert({
-        organization_id: ctx.organization.id,
-        transmittal_id: transmittal.id,
-        document_id: documentId,
-        document_version_id: anyVersion.id,
-        purpose,
-      });
-      if (itemErr) throw new DatabaseError(itemErr);
-      continue;
-    }
-    const { error: itemErr } = await supabase.from("transmittal_items").insert({
+  // One multi-row insert: all items land together or none do.
+  const { error: itemErr } = await supabase.from("transmittal_items").insert(
+    uniqueDocumentIds.map((documentId) => ({
       organization_id: ctx.organization.id,
       transmittal_id: transmittal.id,
       document_id: documentId,
-      document_version_id: version.id,
+      document_version_id: versionByDocument.get(documentId) as string,
       purpose,
-    });
-    if (itemErr) throw new DatabaseError(itemErr);
-  }
+    })),
+  );
+  if (itemErr) throw new DatabaseError(itemErr);
 
   revalidatePath("/document-control");
   revalidatePath(`/projects/${projectId}`);

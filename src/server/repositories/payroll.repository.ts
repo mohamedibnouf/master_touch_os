@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DatabaseError } from "@/lib/errors";
 import { PAYROLL_PERIOD_LIST_COLUMNS } from "@/lib/query-projections";
+import { PAYSLIP_VISIBLE_PERIOD_STATUSES } from "@/lib/payroll/payslip-visibility";
 import type {
   PayrollDeduction,
   PayrollEarning,
@@ -73,15 +74,25 @@ export class PayrollRepository {
     return (data as PayrollEntry | null) ?? null;
   }
 
+  /**
+   * Own payslips only once the period is final (locked/paid). RLS already enforces
+   * this for plain employees, but HR/finance users with payroll.view_all would
+   * otherwise see draft, calculated or cancelled runs on /my/payslips.
+   */
   async listMyEntries(employeeId: string): Promise<PayrollEntry[]> {
     const { data, error } = await this.supabase
       .from("payroll_entries")
-      .select("*")
+      .select("*, payroll_periods!inner(status)")
       .eq("employee_id", employeeId)
+      .in("payroll_periods.status", [...PAYSLIP_VISIBLE_PERIOD_STATUSES])
       .order("created_at", { ascending: false })
       .limit(48);
     if (error) fail(error);
-    return (data ?? []) as PayrollEntry[];
+    return ((data ?? []) as (PayrollEntry & { payroll_periods?: unknown })[]).map((row) => {
+      const { payroll_periods: _period, ...entry } = row;
+      void _period;
+      return entry as PayrollEntry;
+    });
   }
 
   async listSegments(entryId: string): Promise<PayrollEntrySegment[]> {

@@ -14,12 +14,13 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import type { AuthContext } from "@/types/models";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
   const { locale, t } = await getI18n();
   const supabase = await createServerSupabaseClient();
   const todayYmd = riyadhTodayYmd();
-  const attendanceToday = new Date().toISOString().slice(0, 10);
+  const attendanceToday = todayInRiyadh();
   const attRepo = new AttendanceRepository(supabase);
 
   const canViewAttendance = homeShowsSelfServiceCard({

@@ -1,4 +1,5 @@
 "use server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
@@ -67,6 +68,18 @@ import { setApprovalRequestTitleEn } from "@/lib/approvals/title-en";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { generateCorrelationId } from "@/lib/utils";
 import { assignmentRejectReason, canUnassignUserRole } from "@/lib/rbac/custom-roles";
+import {
+  ACCOUNT_STATUS_REJECT_MESSAGES,
+  accountStatusRejectReason,
+  riyadhTerminationTimestamp,
+} from "@/lib/hr/account-security";
+import {
+  applyAccountAccess,
+  assertActiveOrganizationMember,
+  assertDepartmentInOrganization,
+  assertRoleAssignableInOrganization,
+  loadTargetAccountFacts,
+} from "@/server/hr/account-access";
 import { unassignRoleSchema } from "@/modules/roles/schemas";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -256,26 +269,43 @@ export async function assignProjectMemberAction(
     .eq("profile_id", profileId)
     .maybeSingle<{ id: string }>();
 
-  const { error } = await supabase.from("project_members").upsert({
-    organization_id: ctx.organization.id,
-    project_id: projectId,
-    profile_id: profileId,
-    employee_id: employee?.id ?? null,
-    role_label: roleLabel,
-    is_active: true,
-    unassigned_at: null,
-  });
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, organization_id")
+    .eq("id", projectId)
+    .eq("organization_id", ctx.organization.id)
+    .maybeSingle<{ id: string; organization_id: string }>();
+  assertProjectBelongsToOrganization(project, ctx.organization.id);
+
+  // unique (project_id, profile_id): re-adding a previously removed member reactivates the row.
+  const { error } = await supabase.from("project_members").upsert(
+    {
+      organization_id: ctx.organization.id,
+      project_id: projectId,
+      profile_id: profileId,
+      employee_id: employee?.id ?? null,
+      role_label: roleLabel,
+      is_active: true,
+      unassigned_at: null,
+    },
+    { onConflict: "project_id,profile_id" },
+  );
   if (error) throw new DatabaseError(error);
 
   if (employee) {
-    await supabase.from("employee_project_assignments").upsert({
-      organization_id: ctx.organization.id,
-      employee_id: employee.id,
-      project_id: projectId,
-      role_title: roleLabel,
-      is_active: true,
-      unassigned_at: null,
-    });
+    // unique (employee_id, project_id)
+    const { error: assignmentError } = await supabase.from("employee_project_assignments").upsert(
+      {
+        organization_id: ctx.organization.id,
+        employee_id: employee.id,
+        project_id: projectId,
+        role_title: roleLabel,
+        is_active: true,
+        unassigned_at: null,
+      },
+      { onConflict: "employee_id,project_id" },
+    );
+    if (assignmentError) throw new DatabaseError(assignmentError);
   }
 
   const events = new EventService(supabase);
@@ -306,10 +336,10 @@ export async function updateProjectStageAction(
 
   const patch: Record<string, unknown> = { status };
   if (status === "in_progress") {
-    patch.actual_start = new Date().toISOString().slice(0, 10);
+    patch.actual_start = todayInRiyadh();
   }
   if (status === "completed") {
-    patch.actual_end = new Date().toISOString().slice(0, 10);
+    patch.actual_end = todayInRiyadh();
     patch.progress_percentage = 100;
   }
 
@@ -823,6 +853,16 @@ export async function createApprovalAction(
     throw new ValidationError("بيانات الموافقة غير مكتملة.", "Approval data is incomplete.");
   }
 
+  // Workflow gate approvals must go through create_current_workflow_gate_approval
+  // (requires_approval check, frozen documents, current actionable step). A crafted
+  // POST must never create a gate approval through this generic path.
+  if (parsed.data.entityType === "workflow_instance_step") {
+    throw new ValidationError(
+      "طلبات اعتماد مراحل مسار العمل تُرسل من نموذج اعتماد المرحلة فقط.",
+      "Workflow stage approvals can only be submitted from the stage approval form.",
+    );
+  }
+
   const projectIdRaw = String(formData.get("projectId") ?? "");
   const projectId = projectIdRaw.length > 0 ? projectIdRaw : null;
   const supabase = await createServerSupabaseClient();
@@ -838,39 +878,6 @@ export async function createApprovalAction(
     .maybeSingle<{ id: string }>();
   if (existingOpen) {
     throw new ConflictError("يوجد طلب اعتماد مفتوح لهذه المرحلة.", "An open approval already exists.");
-  }
-
-  if (parsed.data.entityType === "workflow_instance_step") {
-    const { data: wfStep } = await supabase
-      .from("workflow_instance_steps")
-      .select("id, organization_id, status, instance_id")
-      .eq("id", parsed.data.entityId)
-      .eq("organization_id", ctx.organization.id)
-      .maybeSingle<{ id: string; organization_id: string; status: string; instance_id: string }>();
-    if (!wfStep) {
-      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
-    }
-    const { data: instance } = await supabase
-      .from("workflow_instances")
-      .select("id, organization_id, status, entity_type, entity_id")
-      .eq("id", wfStep.instance_id)
-      .eq("organization_id", ctx.organization.id)
-      .maybeSingle<{
-        id: string;
-        organization_id: string;
-        status: string;
-        entity_type: string;
-        entity_id: string;
-      }>();
-    if (!instance || instance.status === "completed" || instance.status === "cancelled") {
-      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
-    }
-    if (projectId && (instance.entity_type !== "project" || instance.entity_id !== projectId)) {
-      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
-    }
-    if (!["ready", "in_progress"].includes(wfStep.status)) {
-      throw new ValidationError("ارتباط الاعتماد بمسار العمل غير صالح.", "The approval is not validly linked to this workflow step.");
-    }
   }
 
   const { data: member } = await supabase
@@ -1485,6 +1492,20 @@ export async function createUserAction(
   }
 
   const admin = createAdminSupabaseClient();
+  // Service-role writes bypass RLS: prove the department and role are valid for this
+  // organization (same checks as assignRoleAction) before creating the auth user.
+  await assertDepartmentInOrganization(admin, ctx.organization.id, parsed.data.department_id);
+  if (parsed.data.role_id) {
+    if (!hasPermission(ctx, "role.assign")) {
+      throw new ForbiddenError({ permission: "role.assign" });
+    }
+    await assertRoleAssignableInOrganization(admin, {
+      roleId: parsed.data.role_id,
+      organizationId: ctx.organization.id,
+      allowPrivileged: ctx.profile.is_platform_admin,
+    });
+  }
+
   const { data: created, error } = await admin.auth.admin.createUser({
     email: parsed.data.email,
     email_confirm: true,
@@ -1529,13 +1550,14 @@ export async function createUserAction(
   }
 
   if (parsed.data.role_id) {
-    await admin.from("user_roles").insert({
+    const { error: roleError } = await admin.from("user_roles").insert({
       organization_id: ctx.organization.id,
       profile_id: created.user.id,
       role_id: parsed.data.role_id,
       scope_type: "organization",
       granted_by: ctx.userId,
     });
+    if (roleError) throw new DatabaseError(roleError);
   }
 
   const supabase = await createServerSupabaseClient();
@@ -1606,6 +1628,7 @@ export async function assignRoleAction(
   if (reject === "cross_org") {
     throw new ValidationError("لا يمكن تعيين دور من منشأة أخرى.", "Roles cannot be assigned across organizations.");
   }
+  await assertActiveOrganizationMember(supabase, ctx.organization.id, parsed.data.profileId);
 
   const { error } = await supabase.from("user_roles").insert({
     organization_id: ctx.organization.id,
@@ -1742,29 +1765,48 @@ export async function setUserActiveAction(
     throw new ValidationError("لا يمكنك إيقاف حسابك الحالي.", "You cannot disable your own account.");
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ is_active: parsed.data.isActive })
-    .eq("id", parsed.data.profileId);
-  if (error) throw new DatabaseError(error);
+  // RLS has no policy for updating another user's profile; after the user.disable check
+  // the writes run with the service role, scoped to this organization's membership.
+  const admin = createAdminSupabaseClient();
+  const target = await loadTargetAccountFacts(admin, {
+    organizationId: ctx.organization.id,
+    profileId: parsed.data.profileId,
+  });
+  if (!target.profileExists || !target.membershipStatus) {
+    throw new ValidationError("المستخدم ليس عضواً في هذه المنشأة.", "The user is not a member of this organization.");
+  }
+  const statusReject = accountStatusRejectReason({
+    actorProfileId: ctx.userId,
+    actorIsPlatformAdmin: ctx.profile.is_platform_admin,
+    actorRoleCodes: ctx.grants.map((grant) => grant.roleCode),
+    targetProfileId: parsed.data.profileId,
+    targetIsPlatformAdmin: target.isPlatformAdmin,
+    targetRoleCodes: target.roleCodes,
+  });
+  if (statusReject) {
+    const message = ACCOUNT_STATUS_REJECT_MESSAGES[statusReject];
+    throw new ValidationError(message.ar, message.en);
+  }
 
-  await supabase
-    .from("organization_members")
-    .update({ status: parsed.data.isActive ? "active" : "suspended" })
-    .eq("organization_id", ctx.organization.id)
-    .eq("profile_id", parsed.data.profileId);
+  await applyAccountAccess(admin, {
+    organizationId: ctx.organization.id,
+    profileId: parsed.data.profileId,
+    isActive: parsed.data.isActive,
+    otherActiveOrganizationMemberships: target.otherActiveOrganizationMemberships,
+  });
 
-  await supabase
+  const { error: employeeError } = await admin
     .from("employees")
     .update({
       is_active: parsed.data.isActive,
       employment_status: parsed.data.isActive ? "active" : "terminated",
-      terminated_at: parsed.data.isActive ? null : new Date().toISOString(),
+      terminated_at: parsed.data.isActive ? null : riyadhTerminationTimestamp(),
     })
     .eq("organization_id", ctx.organization.id)
     .eq("profile_id", parsed.data.profileId);
+  if (employeeError) throw new DatabaseError(employeeError);
 
+  const supabase = await createServerSupabaseClient();
   const audit = new AuditService(supabase);
   await audit.log({
     organizationId: ctx.organization.id,

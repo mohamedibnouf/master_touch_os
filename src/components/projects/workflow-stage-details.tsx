@@ -187,6 +187,7 @@ export async function WorkflowStageDetails({
           projectId={projectId}
           projectCode={projectCode}
           stageNameAr={node.nameAr}
+          stageNameEn={node.nameEn}
           approvers={approvers}
           documents={documents}
         />

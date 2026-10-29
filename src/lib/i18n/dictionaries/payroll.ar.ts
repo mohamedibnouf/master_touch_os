@@ -12,6 +12,10 @@ export const payrollAr = {
     deductions: "الخصومات",
     net: "الصافي",
     manual: "يدوي",
+    reviewed: "تمت المراجعة",
+    approveNeedsReview: "يتاح الاعتماد بعد إكمال مراجعة المسير.",
+    approveNeedsOtherUser: "أنت من راجع هذا المسير، لذا يجب أن يعتمده مستخدم آخر.",
+    adjustmentResetsReview: "إضافة تعديل على مسير تمت مراجعته تُلغي المراجعة، ويجب مراجعته من جديد قبل الاعتماد.",
     periodRange: "{start} ← {end}",
     paymentStatus: {
       unpaid: "غير مصروف",
@@ -138,6 +142,7 @@ export const payrollAr = {
     amount: "المبلغ",
     notes: "ملاحظات",
     recordPayment: "تسجيل الصرف",
+    zeroNetHint: "صافي الراتب صفر. سجّل صرفًا بمبلغ 0.00 لإقفال هذا البند حتى يمكن اعتبار المسير مصروفًا.",
   },
   my: {
     noEmployeeTitle: "قسائم الرواتب",

@@ -9,7 +9,8 @@ export function projectNeedsOrgUserDirectory(tab: string): boolean {
 }
 
 export function projectNeedsDocumentCatalog(tab: string): boolean {
-  return tab === "documents" || tab === "stages";
+  // approvals renders WorkflowGateApprovalCard, which needs the supporting-document options.
+  return tab === "documents" || tab === "stages" || tab === "approvals";
 }
 
 export function projectNeedsActivity(tab: string): boolean {

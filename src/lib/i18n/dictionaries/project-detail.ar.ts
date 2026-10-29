@@ -58,6 +58,7 @@ export const projectDetailAr = {
     template: "القالب",
     startButton: "بدء المسار",
     startShort: "بدء",
+    restartAfterCancel: "أُلغي مسار العمل السابق. يمكنك بدء مسار عمل جديد لهذا المشروع.",
   },
   team: {
     members: "أعضاء الفريق",

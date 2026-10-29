@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -78,7 +79,7 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
       : "matched";
   const grnLeg: LegState = flagCodes.has("missing_po")
     ? "notChecked"
-    : flagCodes.has("invoice_without_receipt")
+    : flagCodes.has("invoice_without_receipt") || flagCodes.has("invoice_exceeds_receipt")
       ? "discrepancy"
       : "matched";
   const invoiceLeg: LegState = hasDiscrepancy || matchFlags.length > 0 ? "discrepancy" : "matched";
@@ -343,7 +344,7 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
                 />
               </Field>
               <Field label={td.paymentDate} required>
-                <Input name="paymentDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} data-testid="payment-date" />
+                <Input name="paymentDate" type="date" required defaultValue={todayInRiyadh()} data-testid="payment-date" />
               </Field>
               <Field label={td.paymentReference} required>
                 <Input name="paymentReference" required placeholder={td.paymentReferencePlaceholder} data-testid="payment-reference" />

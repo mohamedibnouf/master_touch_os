@@ -95,8 +95,9 @@ export const financePayablesEn: Dictionary["financePayables"] = {
       },
       flags: {
         missing_po: "Invoice is not linked to a purchase order",
-        invoice_gt_po: "Invoice total exceeds the purchase order value",
+        invoice_gt_po: "Total invoiced on this purchase order (including this invoice) exceeds the purchase order value",
         invoice_without_receipt: "No goods/services receipt recorded against the purchase order",
+        invoice_exceeds_receipt: "Total invoiced on this purchase order exceeds the value actually received",
       },
       reviewNotes: "Review notes",
     },

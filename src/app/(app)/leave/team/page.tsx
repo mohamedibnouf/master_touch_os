@@ -10,6 +10,7 @@ import { leaveStatusLabel } from "@/lib/hr/labels";
 import { leaveRequestTone } from "@/lib/ui/operational-labels";
 import { format, pickLocalized, type Locale } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { addDaysYmd, todayInRiyadh } from "@/lib/time/riyadh";
 
 async function employeeNameMap(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -47,10 +48,8 @@ export default async function LeaveTeamPage() {
 
   const supabase = await createServerSupabaseClient();
   const repo = new LeaveRepository(supabase);
-  const today = new Date().toISOString().slice(0, 10);
-  const in30Date = new Date(today);
-  in30Date.setUTCDate(in30Date.getUTCDate() + 30);
-  const in30 = in30Date.toISOString().slice(0, 10);
+  const today = todayInRiyadh();
+  const in30 = addDaysYmd(today, 30);
 
   const [pending, types, calendar] = await Promise.all([
     repo.listTeamPending(ctx.organization.id),

@@ -1,11 +1,17 @@
 "use server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import {
+  COMMERCIAL_INTEGRITY_ERROR as INTEGRITY_ERROR,
+  isVariationApprovable,
+  isVariationSubmittable,
+} from "@/modules/procurement/integrity";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -427,13 +433,22 @@ export async function submitClientValuationForReviewAction(
     .maybeSingle();
   if (valErr) throw new DatabaseError(valErr);
   if (!val) throw new NotFoundError("المستخلص", "Valuation");
+  if (val.status !== "draft") {
+    throw new ConflictError(INTEGRITY_ERROR.VALUATION_NOT_DRAFT.ar, INTEGRITY_ERROR.VALUATION_NOT_DRAFT.en);
+  }
 
-  const { error } = await supabase
+  // Only open a review request when this call actually moved the valuation out of draft
+  // (a concurrent submit or a non-draft row matches 0 rows).
+  const { data: moved, error } = await supabase
     .from("client_valuations")
     .update({ status: "internal_review" })
     .eq("id", valuationId)
-    .eq("status", "draft");
+    .eq("status", "draft")
+    .select("id");
   if (error) throw new DatabaseError(error);
+  if (!moved || moved.length === 0) {
+    throw new ConflictError(INTEGRITY_ERROR.VALUATION_NOT_DRAFT.ar, INTEGRITY_ERROR.VALUATION_NOT_DRAFT.en);
+  }
 
   const dueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { data: request, error: reqErr } = await supabase
@@ -453,7 +468,7 @@ export async function submitClientValuationForReviewAction(
     .single();
   if (reqErr || !request) throw new DatabaseError(reqErr);
 
-  await supabase.from("approval_steps").insert({
+  const { error: stepErr } = await supabase.from("approval_steps").insert({
     organization_id: ctx.organization.id,
     request_id: request.id,
     sequence: 1,
@@ -463,6 +478,7 @@ export async function submitClientValuationForReviewAction(
     due_at: dueAt,
     warning_at: new Date(Date.parse(dueAt) - 24 * 60 * 60 * 1000).toISOString(),
   });
+  if (stepErr) throw new DatabaseError(stepErr);
 
   await createNotificationService(supabase).notify({
     organizationId: ctx.organization.id,
@@ -492,10 +508,13 @@ export async function approveClientValuationInternalAction(
   const supabase = await createServerSupabaseClient();
   const { data: val } = await supabase
     .from("client_valuations")
-    .select("valuation_number")
+    .select("valuation_number, status")
     .eq("id", valuationId)
     .maybeSingle();
   if (!val) throw new NotFoundError("المستخلص", "Valuation");
+  if (val.status !== "internal_review") {
+    throw new ConflictError(INTEGRITY_ERROR.VALUATION_NOT_IN_REVIEW.ar, INTEGRITY_ERROR.VALUATION_NOT_IN_REVIEW.en);
+  }
 
   await ensureApprovalAndDecide(supabase, ctx, {
     entityType: "client_valuation",
@@ -743,19 +762,28 @@ export async function submitVariationAction(
 
   const { data: vo } = await supabase
     .from("variations")
-    .select("vo_number, submitted_amount, cost_impact")
+    .select("vo_number, status, submitted_amount, cost_impact")
     .eq("id", variationId)
     .maybeSingle();
   if (!vo) throw new NotFoundError("أمر التغيير", "Variation");
+  if (!isVariationSubmittable(vo.status)) {
+    throw new ConflictError(INTEGRITY_ERROR.VARIATION_NOT_SUBMITTABLE.ar, INTEGRITY_ERROR.VARIATION_NOT_SUBMITTABLE.en);
+  }
 
-  await supabase
+  const { data: moved, error: moveErr } = await supabase
     .from("variations")
     .update({
       status: "under_review",
-      submitted_date: new Date().toISOString().slice(0, 10),
+      submitted_date: todayInRiyadh(),
       submitted_amount: roundMoney(Number(vo.submitted_amount || vo.cost_impact || 0)),
     })
-    .eq("id", variationId);
+    .eq("id", variationId)
+    .eq("status", "draft")
+    .select("id");
+  if (moveErr) throw new DatabaseError(moveErr);
+  if (!moved || moved.length === 0) {
+    throw new ConflictError(INTEGRITY_ERROR.VARIATION_NOT_SUBMITTABLE.ar, INTEGRITY_ERROR.VARIATION_NOT_SUBMITTABLE.en);
+  }
 
   const dueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { data: request, error: reqErr } = await supabase
@@ -775,7 +803,7 @@ export async function submitVariationAction(
     .single();
   if (reqErr || !request) throw new DatabaseError(reqErr);
 
-  await supabase.from("approval_steps").insert({
+  const { error: stepErr } = await supabase.from("approval_steps").insert({
     organization_id: ctx.organization.id,
     request_id: request.id,
     sequence: 1,
@@ -785,6 +813,7 @@ export async function submitVariationAction(
     due_at: dueAt,
     warning_at: new Date(Date.parse(dueAt) - 24 * 60 * 60 * 1000).toISOString(),
   });
+  if (stepErr) throw new DatabaseError(stepErr);
 
   revalidatePath(`/finance/variations/${variationId}`);
   });
@@ -799,11 +828,18 @@ export async function approveVariationWithAmountAction(
   const variationId = String(formData.get("variationId") ?? "");
   const approvedAmount = Number(formData.get("approvedAmount") ?? 0);
   const supabase = await createServerSupabaseClient();
+  const { data: vo } = await supabase.from("variations").select("id, status").eq("id", variationId).maybeSingle();
+  if (!vo) throw new NotFoundError("أمر التغيير", "Variation");
+  if (!isVariationApprovable(vo.status)) {
+    throw new ConflictError(INTEGRITY_ERROR.VARIATION_NOT_APPROVABLE.ar, INTEGRITY_ERROR.VARIATION_NOT_APPROVABLE.en);
+  }
   const { error } = await supabase.rpc("approve_variation", {
     p_variation_id: variationId,
     p_approved_amount: approvedAmount,
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/variations/${variationId}`);
+  revalidatePath("/finance/variations");
+  revalidatePath("/approvals");
   });
 }

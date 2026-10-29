@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { cache } from "react";
 import Link from "next/link";
 import {
@@ -42,7 +43,7 @@ const loadHomeOps = cache(async (ctx: AuthContext) => {
   });
 
   const procActions: ProcAction[] = [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
 
   // Sequential on purpose: these are permission-gated authenticated RLS reads.
   // Running them all in one Promise.all previously contributed to 57014 contention.

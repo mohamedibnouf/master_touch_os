@@ -4,7 +4,8 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -12,6 +13,13 @@ import { authorize } from "@/server/policies/authorize";
 import { AuditService } from "@/server/services/audit.service";
 import { createNotificationService } from "@/server/services/notification.service";
 import { grossWithVat, vatAmount } from "@/server/domain/commercial";
+import {
+  COMMERCIAL_INTEGRITY_ERROR as INTEGRITY_ERROR,
+  checkSupplierInvoiceAgainstPo,
+  isSupplierInvoiceApprovable,
+  isSupplierInvoicePayable,
+  isVariationApprovable,
+} from "@/modules/procurement/integrity";
 
 export async function createSupplierInvoiceAction(
   _prev: FormActionState,
@@ -46,6 +54,26 @@ export async function createSupplierInvoiceAction(
   const total = grossWithVat(parsed.data.subtotal, parsed.data.vatRate);
 
   const supabase = await createServerSupabaseClient();
+
+  if (parsed.data.purchaseOrderId) {
+    const { data: po, error: poErr } = await supabase
+      .from("purchase_orders")
+      .select("id, supplier_id, project_id, status")
+      .eq("id", parsed.data.purchaseOrderId)
+      .eq("organization_id", ctx.organization.id)
+      .maybeSingle<{ id: string; supplier_id: string; project_id: string; status: string }>();
+    if (poErr) throw new DatabaseError(poErr);
+    if (!po) throw new NotFoundError("أمر الشراء", "Purchase order");
+    const link = checkSupplierInvoiceAgainstPo({
+      invoiceSupplierId: parsed.data.supplierId,
+      invoiceProjectId: parsed.data.projectId,
+      po,
+    });
+    if (!link.ok) {
+      throw new ValidationError(INTEGRITY_ERROR[link.code].ar, INTEGRITY_ERROR[link.code].en);
+    }
+  }
+
   const { data: inv, error } = await supabase
     .from("supplier_invoices")
     .insert({
@@ -66,7 +94,11 @@ export async function createSupplierInvoiceAction(
     .single();
   if (error || !inv) throw new DatabaseError(error);
 
-  await supabase.rpc("evaluate_supplier_invoice_match", { p_invoice_id: inv.id });
+  // The invoice is saved either way; a failed evaluation leaves it in "received" for manual review.
+  const { error: matchErr } = await supabase.rpc("evaluate_supplier_invoice_match", { p_invoice_id: inv.id });
+  if (matchErr) {
+    logger.error("supplier invoice match evaluation failed", { invoiceId: inv.id, code: matchErr.code });
+  }
 
   revalidatePath("/finance/supplier-invoices");
   revalidatePath(`/finance/supplier-invoices/${inv.id}`);
@@ -91,6 +123,9 @@ export async function approveSupplierInvoiceForPaymentAction(
   if (invoice.status === "approved_for_payment" || invoice.status === "paid" || invoice.status === "partially_paid") {
     revalidatePath(`/finance/supplier-invoices/${invoiceId}`);
     return;
+  }
+  if (!isSupplierInvoiceApprovable(invoice.status)) {
+    throw new ConflictError(INTEGRITY_ERROR.INVOICE_NOT_APPROVABLE.ar, INTEGRITY_ERROR.INVOICE_NOT_APPROVABLE.en);
   }
 
   const { data: existingRequest, error: requestError } = await supabase
@@ -193,6 +228,17 @@ export async function recordSupplierPaymentAction(
   if (!parsed.success) throw new ValidationError("بيانات الدفعة غير مكتملة.", "Payment incomplete.");
 
   const supabase = await createServerSupabaseClient();
+  const { data: invoice, error: invoiceErr } = await supabase
+    .from("supplier_invoices")
+    .select("id, status, project_id, purchase_order_id")
+    .eq("id", parsed.data.invoiceId)
+    .maybeSingle<{ id: string; status: string; project_id: string; purchase_order_id: string | null }>();
+  if (invoiceErr) throw new DatabaseError(invoiceErr);
+  if (!invoice) throw new NotFoundError("فاتورة المورد", "Supplier invoice");
+  if (!isSupplierInvoicePayable(invoice.status)) {
+    throw new ConflictError(INTEGRITY_ERROR.INVOICE_NOT_PAYABLE.ar, INTEGRITY_ERROR.INVOICE_NOT_PAYABLE.en);
+  }
+
   const { error } = await supabase.rpc("record_supplier_payment", {
     p_invoice_id: parsed.data.invoiceId,
     p_amount: parsed.data.amount,
@@ -213,6 +259,10 @@ export async function recordSupplierPaymentAction(
   });
 
   revalidatePath(`/finance/supplier-invoices/${parsed.data.invoiceId}`);
+  revalidatePath("/finance/supplier-invoices");
+  revalidatePath("/finance");
+  revalidatePath(`/projects/${invoice.project_id}`);
+  if (invoice.purchase_order_id) revalidatePath(`/procurement/purchase-orders/${invoice.purchase_order_id}`);
   });
 }
 
@@ -225,12 +275,19 @@ export async function approveVariationAction(
   const variationId = String(formData.get("variationId") ?? "");
   const approvedAmount = Number(formData.get("approvedAmount") ?? 0);
   const supabase = await createServerSupabaseClient();
+  const { data: vo } = await supabase.from("variations").select("id, status").eq("id", variationId).maybeSingle();
+  if (!vo) throw new NotFoundError("أمر التغيير", "Variation");
+  if (!isVariationApprovable(vo.status)) {
+    throw new ConflictError(INTEGRITY_ERROR.VARIATION_NOT_APPROVABLE.ar, INTEGRITY_ERROR.VARIATION_NOT_APPROVABLE.en);
+  }
   const { error } = await supabase.rpc("approve_variation", {
     p_variation_id: variationId,
     p_approved_amount: approvedAmount,
   });
   if (error) throw new DatabaseError(error);
   revalidatePath(`/finance/variations/${variationId}`);
+  revalidatePath("/finance/variations");
+  revalidatePath("/approvals");
   });
 }
 

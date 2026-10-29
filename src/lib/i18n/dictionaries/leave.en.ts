@@ -69,6 +69,7 @@ export const leaveEn: Dictionary["leave"] = {
     approve: "Approve",
     reject: "Reject",
     cancel: "Cancel request",
+    selfDecisionBlocked: "You cannot approve or reject your own leave request. Another approver must decide it.",
     stages: {
       none: "None",
       manager: "Direct manager",

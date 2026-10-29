@@ -1,10 +1,11 @@
 "use server";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { DatabaseError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
+import { ConflictError, DatabaseError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { runFormAction, type FormActionState } from "@/server/forms/form-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/server/context";
@@ -15,6 +16,13 @@ import {
   parseSupplierId,
   RFQ_INVITE_ERROR,
 } from "@/modules/procurement/rfq-invitation";
+import {
+  COMMERCIAL_INTEGRITY_ERROR as INTEGRITY_ERROR,
+  isQuotationAlreadyOrdered,
+  parseOptionalNumber,
+  parseVatRate,
+  resolveGoodsReceiptLine,
+} from "@/modules/procurement/integrity";
 import type { AuthContext } from "@/types/models";
 import { AuditService } from "@/server/services/audit.service";
 import { EventService } from "@/server/services/event.service";
@@ -436,7 +444,7 @@ export async function createRfqFromPrAction(
   const used = selected.length ? items.filter((item) => selected.includes(String(item.id))) : items;
   for (let i = 0; i < used.length; i++) {
     const item = used[i];
-    await supabase.from("rfq_items").insert({
+    const { error: itemErr } = await supabase.from("rfq_items").insert({
       organization_id: ctx.organization.id,
       rfq_id: rfq.id,
       purchase_request_item_id: item.id as string,
@@ -446,6 +454,7 @@ export async function createRfqFromPrAction(
       quantity: item.quantity as number,
       unit: (item.unit as string) ?? null,
     });
+    if (itemErr) throw new DatabaseError(itemErr);
   }
 
   const uniqueSupplierIds = [...new Set(supplierIds.map((id) => parseSupplierId(id)).filter((id): id is string => Boolean(id)))];
@@ -464,15 +473,20 @@ export async function createRfqFromPrAction(
     if (!eligibility.ok) {
       throw new ValidationError(RFQ_INVITE_ERROR[eligibility.code].ar, RFQ_INVITE_ERROR[eligibility.code].en);
     }
-    await supabase.from("rfq_suppliers").insert({
+    const { error: inviteErr } = await supabase.from("rfq_suppliers").insert({
       organization_id: ctx.organization.id,
       rfq_id: rfq.id,
       supplier_id: supplierId,
       sent_by: ctx.userId,
     });
+    if (inviteErr) throw new DatabaseError(inviteErr);
   }
 
-  await supabase.from("purchase_requests").update({ status: "converted_to_rfq" }).eq("id", pr.id);
+  const { error: prErr } = await supabase
+    .from("purchase_requests")
+    .update({ status: "converted_to_rfq" })
+    .eq("id", pr.id);
+  if (prErr) throw new DatabaseError(prErr);
   revalidateCommercial(`/procurement/rfqs/${rfq.id}`, "/procurement/rfqs", `/procurement/purchase-requests/${prId}`);
   });
 }
@@ -501,7 +515,7 @@ export async function issueRfqAction(
     .eq("rfq_id", rfqId);
   if (!count) throw new ValidationError("أضف مورداً واحداً على الأقل قبل الإصدار.", "Invite at least one supplier.");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInRiyadh();
   const { error } = await supabase
     .from("rfqs")
     .update({
@@ -674,26 +688,56 @@ export async function createQuotationAction(
   const rfqId = String(formData.get("rfqId") ?? "");
   const supplierId = String(formData.get("supplierId") ?? "");
   const quotationNumber = String(formData.get("quotationNumber") ?? "").trim();
-  const quotationDate = String(formData.get("quotationDate") ?? "") || new Date().toISOString().slice(0, 10);
+  const quotationDate = String(formData.get("quotationDate") ?? "") || todayInRiyadh();
   const validityDate = String(formData.get("validityDate") ?? "") || null;
   const paymentTerms = String(formData.get("paymentTerms") ?? "") || null;
   const warranty = String(formData.get("warranty") ?? "") || null;
   const commercialNotes = String(formData.get("commercialNotes") ?? "") || null;
   const leadTimeDays = Number(formData.get("leadTimeDays") ?? 0) || null;
   const discount = roundMoney(Number(formData.get("discount") ?? 0));
-  const vatRate = Number(formData.get("vatRate") ?? 15);
+  const vatRate = parseVatRate(formData.get("vatRate"));
 
   if (!quotationNumber) throw new ValidationError("رقم عرض السعر مطلوب.", "Quotation number required.");
+  if (vatRate == null) {
+    throw new ValidationError(INTEGRITY_ERROR.INVALID_VAT_RATE.ar, INTEGRITY_ERROR.INVALID_VAT_RATE.en);
+  }
+  if (!parseSupplierId(supplierId)) {
+    throw new ValidationError(RFQ_INVITE_ERROR.INVALID_ID.ar, RFQ_INVITE_ERROR.INVALID_ID.en);
+  }
 
   const supabase = await createServerSupabaseClient();
   const { data: rfq } = await supabase
     .from("rfqs")
-    .select("id, project_id, status, rfq_items(*)")
+    .select("id, organization_id, project_id, status, rfq_items(*)")
     .eq("id", rfqId)
     .maybeSingle();
   if (!rfq) throw new NotFoundError("طلب عرض السعر", "RFQ");
+  if (rfq.organization_id !== ctx.organization.id) throw new ForbiddenError();
   if (!["issued", "responses_received", "under_comparison"].includes(rfq.status)) {
     throw new ValidationError("لا يمكن تسجيل عرض إلا بعد إصدار طلب العرض.", "RFQ must be issued.");
+  }
+
+  const [{ data: invitation }, { data: supplier }] = await Promise.all([
+    supabase
+      .from("rfq_suppliers")
+      .select("id")
+      .eq("rfq_id", rfqId)
+      .eq("supplier_id", supplierId)
+      .maybeSingle<{ id: string }>(),
+    supabase
+      .from("suppliers")
+      .select("id, organization_id")
+      .eq("id", supplierId)
+      .maybeSingle<{ id: string; organization_id: string }>(),
+  ]);
+  if (!supplier || supplier.organization_id !== ctx.organization.id) {
+    throw new ValidationError(RFQ_INVITE_ERROR.ORG_MISMATCH.ar, RFQ_INVITE_ERROR.ORG_MISMATCH.en);
+  }
+  if (!invitation) {
+    throw new ValidationError(
+      INTEGRITY_ERROR.QUOTATION_SUPPLIER_NOT_INVITED.ar,
+      INTEGRITY_ERROR.QUOTATION_SUPPLIER_NOT_INVITED.en,
+    );
   }
 
   const items = (rfq.rfq_items as Array<Record<string, unknown>>) ?? [];
@@ -884,6 +928,16 @@ export async function createPoFromQuotationAction(
     throw new ValidationError("لا يمكن إنشاء أمر شراء إلا بعد اعتماد الترسية.", "Award must be approved first.");
   }
 
+  // One awarded quotation → one active PO (DB: purchase_orders_quotation_active_uidx, 090).
+  const { data: existingPos, error: existingErr } = await supabase
+    .from("purchase_orders")
+    .select("id, status")
+    .eq("quotation_id", quotationId);
+  if (existingErr) throw new DatabaseError(existingErr);
+  if (isQuotationAlreadyOrdered((existingPos ?? []).map((p) => p.status as string))) {
+    throw new ConflictError(INTEGRITY_ERROR.QUOTATION_ALREADY_ORDERED.ar, INTEGRITY_ERROR.QUOTATION_ALREADY_ORDERED.en);
+  }
+
   const { data: poNum, error: numErr } = await supabase.rpc("generate_commercial_number", {
     p_organization_id: ctx.organization.id,
     p_project_id: quote.project_id,
@@ -914,6 +968,9 @@ export async function createPoFromQuotationAction(
     })
     .select("id")
     .single();
+  if (error?.code === "23505" && /quotation/i.test(error.message ?? "")) {
+    throw new ConflictError(INTEGRITY_ERROR.QUOTATION_ALREADY_ORDERED.ar, INTEGRITY_ERROR.QUOTATION_ALREADY_ORDERED.en);
+  }
   if (error || !po) throw new DatabaseError(error);
 
   const lines = (quote.supplier_quotation_items as Array<Record<string, unknown>>) ?? [];
@@ -934,7 +991,13 @@ export async function createPoFromQuotationAction(
     if (lineErr) throw new DatabaseError(lineErr);
   }
 
-  revalidateCommercial(`/procurement/purchase-orders/${po.id}`, "/procurement/purchase-orders");
+  revalidateCommercial(
+    `/procurement/purchase-orders/${po.id}`,
+    "/procurement/purchase-orders",
+    "/procurement/purchase-orders/new",
+    `/procurement/rfqs/${quote.rfq_id}/comparison`,
+    "/procurement",
+  );
   });
 }
 
@@ -975,6 +1038,11 @@ export async function issuePurchaseOrderAction(
   authorize(await getAuthContext(), "purchase_order.issue");
   const poId = String(formData.get("poId") ?? "");
   const supabase = await createServerSupabaseClient();
+  const { data: po } = await supabase.from("purchase_orders").select("id, status").eq("id", poId).maybeSingle();
+  if (!po) throw new NotFoundError("أمر الشراء", "Purchase order");
+  if (po.status !== "approved") {
+    throw new ValidationError(INTEGRITY_ERROR.PO_NOT_APPROVED.ar, INTEGRITY_ERROR.PO_NOT_APPROVED.en);
+  }
   const { error } = await supabase.rpc("issue_purchase_order", { p_po_id: poId });
   if (error) throw new DatabaseError(error);
   revalidateCommercial(`/procurement/purchase-orders/${poId}`, "/procurement/purchase-orders", "/procurement");
@@ -988,7 +1056,7 @@ export async function createAndPostGoodsReceiptAction(
   return runFormAction("تعذر إتمام عملية المشتريات. حاول مرة أخرى.", async () => {
   const ctx = authorize(await getAuthContext(), "goods_receipt.create");
   const poId = String(formData.get("poId") ?? "");
-  const deliveryDate = String(formData.get("deliveryDate") ?? "") || new Date().toISOString().slice(0, 10);
+  const deliveryDate = String(formData.get("deliveryDate") ?? "") || todayInRiyadh();
   const deliveryNoteNumber = String(formData.get("deliveryNoteNumber") ?? "") || null;
   const notes = String(formData.get("notes") ?? "") || null;
   const location = String(formData.get("location") ?? "") || null;
@@ -1001,6 +1069,33 @@ export async function createAndPostGoodsReceiptAction(
     .maybeSingle();
   if (!po || !["issued", "partially_delivered"].includes(po.status)) {
     throw new ValidationError("يمكن الاستلام فقط لأمر شراء صادر أو جزئي.", "PO must be issued.");
+  }
+
+  // Validate every line before creating the receipt so a bad line leaves no orphan draft GRN.
+  const items = (po.purchase_order_items as Array<Record<string, unknown>>) ?? [];
+  const lines: Array<{ itemId: string; received: number; accepted: number; rejected: number; reason: string | null }> = [];
+  for (const item of items) {
+    const resolved = resolveGoodsReceiptLine({
+      remaining: Number(item.quantity) - Number(item.received_quantity ?? 0),
+      received: parseOptionalNumber(formData.get(`received_${item.id}`)),
+      accepted: parseOptionalNumber(formData.get(`accepted_${item.id}`)),
+      rejected: parseOptionalNumber(formData.get(`rejected_${item.id}`)),
+    });
+    if (!resolved.ok) {
+      const message = INTEGRITY_ERROR[`GRN_${resolved.code}`];
+      throw new ValidationError(message.ar, message.en);
+    }
+    if (resolved.skip) continue;
+    lines.push({
+      itemId: item.id as string,
+      received: resolved.received,
+      accepted: resolved.accepted,
+      rejected: resolved.rejected,
+      reason: String(formData.get(`reason_${item.id}`) ?? "") || null,
+    });
+  }
+  if (lines.length === 0) {
+    throw new ValidationError(INTEGRITY_ERROR.GRN_EMPTY.ar, INTEGRITY_ERROR.GRN_EMPTY.en);
   }
 
   const { data: receiptNum, error: numErr } = await supabase.rpc("generate_commercial_number", {
@@ -1030,24 +1125,15 @@ export async function createAndPostGoodsReceiptAction(
     .single();
   if (error || !receipt) throw new DatabaseError(error);
 
-  const items = (po.purchase_order_items as Array<Record<string, unknown>>) ?? [];
-  for (const item of items) {
-    const remaining = Number(item.quantity) - Number(item.received_quantity ?? 0);
-    const receivedNow = Number(formData.get(`received_${item.id}`) ?? 0);
-    const accepted = Number(formData.get(`accepted_${item.id}`) ?? receivedNow);
-    const rejected = Number(formData.get(`rejected_${item.id}`) ?? 0);
-    if (receivedNow <= 0 && accepted <= 0 && rejected <= 0) continue;
-    if (receivedNow > remaining + 0.0001) {
-      throw new ValidationError("الكمية المستلمة تتجاوز المتبقي.", "Received quantity exceeds remaining.");
-    }
+  for (const line of lines) {
     const { error: itemErr } = await supabase.from("goods_receipt_items").insert({
       organization_id: ctx.organization.id,
       goods_receipt_id: receipt.id,
-      purchase_order_item_id: item.id as string,
-      received_quantity: receivedNow,
-      accepted_quantity: accepted,
-      rejected_quantity: rejected,
-      rejection_reason: String(formData.get(`reason_${item.id}`) ?? "") || null,
+      purchase_order_item_id: line.itemId,
+      received_quantity: line.received,
+      accepted_quantity: line.accepted,
+      rejected_quantity: line.rejected,
+      rejection_reason: line.reason,
     });
     if (itemErr) throw new DatabaseError(itemErr);
   }
@@ -1059,6 +1145,8 @@ export async function createAndPostGoodsReceiptAction(
     `/procurement/goods-receipts/${receipt.id}`,
     `/procurement/purchase-orders/${poId}`,
     "/procurement/goods-receipts",
+    "/procurement/purchase-orders",
+    "/procurement",
   );
   });
 }

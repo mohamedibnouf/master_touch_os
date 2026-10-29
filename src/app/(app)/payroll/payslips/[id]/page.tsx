@@ -12,6 +12,7 @@ import { formatPeriodLabel } from "@/lib/payroll/format";
 import { format } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 import { PayslipDocument } from "../../_components/payslip-document";
+import { todayInRiyadh } from "@/lib/time/riyadh";
 
 export default async function PayrollPayslipPage({
   params,
@@ -47,7 +48,8 @@ export default async function PayrollPayslipPage({
   const canPay =
     hasPermission(ctx, "payroll.record_payment") &&
     period != null &&
-    (period.status === "locked" || period.status === "approved" || period.status === "paid") &&
+    // record_payroll_payment only accepts entries of a locked period.
+    period.status === "locked" &&
     entry.payment_status !== "paid";
 
   return (
@@ -90,7 +92,7 @@ export default async function PayrollPayslipPage({
             <div className="grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="entryId" value={entry.id} />
               <Field label={tp.paymentDate}>
-                <Input type="date" name="paymentDate" defaultValue={new Date().toISOString().slice(0, 10)} required />
+                <Input type="date" name="paymentDate" defaultValue={todayInRiyadh()} required />
               </Field>
               <Field label={tp.paymentMethod}>
                 <Select name="paymentMethod" defaultValue="bank_transfer">
@@ -108,11 +110,16 @@ export default async function PayrollPayslipPage({
                   name="amount"
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   defaultValue={Number(entry.net_pay).toFixed(2)}
                   required
                 />
               </Field>
+              {Number(entry.net_pay) === 0 ? (
+                <p className="text-xs text-muted sm:col-span-2" data-testid="payroll-zero-net-hint">
+                  {tp.zeroNetHint}
+                </p>
+              ) : null}
               <Field label={tp.notes}>
                 <Input name="notes" />
               </Field>

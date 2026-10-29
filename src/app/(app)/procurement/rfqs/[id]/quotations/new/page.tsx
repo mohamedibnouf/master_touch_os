@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -71,7 +72,7 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
               <Input name="quotationNumber" required placeholder={tc.quotationNumberPlaceholder} data-testid="quotation-number" />
             </Field>
             <Field label={tc.quotationDate} required>
-              <Input name="quotationDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+              <Input name="quotationDate" type="date" required defaultValue={todayInRiyadh()} />
             </Field>
             <Field label={tc.validityDate}>
               <Input name="validityDate" type="date" />

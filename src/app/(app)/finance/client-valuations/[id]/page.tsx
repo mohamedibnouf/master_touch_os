@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import type { ReactNode } from "react";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
@@ -83,9 +84,12 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
     hasPermission(ctx, "client_valuation.approve") && valuation.status === "internal_review";
   const canMarkClientReview =
     hasPermission(ctx, "client_valuation.submit") && valuation.status === "submitted";
+  // Matches record_client_valuation_certification: certification is recorded once, from
+  // submitted / under_client_review (re-certifying would overwrite the certified amount
+  // that client invoices are already issued against).
   const canCertify =
     hasPermission(ctx, "client_valuation.approve") &&
-    ["submitted", "under_client_review", "partially_certified"].includes(valuation.status);
+    ["submitted", "under_client_review"].includes(valuation.status);
   const canAttach = hasPermission(ctx, "document.upload");
 
   const money = (amount: number | string | null | undefined) => (
@@ -262,7 +266,7 @@ export default async function ClientValuationDetailPage({ params }: { params: Pr
                   <Input
                     name="certificationDate"
                     type="date"
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    defaultValue={todayInRiyadh()}
                     data-testid="cert-date"
                   />
                 </Field>

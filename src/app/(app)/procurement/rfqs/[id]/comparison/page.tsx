@@ -68,6 +68,21 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
         .maybeSingle()
     : { data: null };
 
+  // An awarded quotation yields one active PO; once it exists, link to it instead of offering a new one.
+  const existingPo =
+    comparison?.status === "awarded" && comparison.recommended_quotation_id
+      ? (
+          await supabase
+            .from("purchase_orders")
+            .select("id, po_number")
+            .eq("quotation_id", comparison.recommended_quotation_id)
+            .neq("status", "cancelled")
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle<{ id: string; po_number: string }>()
+        ).data
+      : null;
+
   const rfqItems = (rfq.rfq_items as Array<Record<string, unknown>>) ?? [];
   const quotes = quotesResult.data ?? [];
   const pageTitle = format(tc.title, { number: rfq.rfq_number });
@@ -426,12 +441,24 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
       {isAwarded && comparison?.recommended_quotation_id ? (
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-ink">{tc.nextStepTitle}</h2>
-          <Link
-            href={`/procurement/purchase-orders/new?quotationId=${comparison.recommended_quotation_id}`}
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
-            {tc.createPo}
-          </Link>
+          {existingPo ? (
+            <>
+              <p className="mb-3 text-sm text-muted">{tc.poAlreadyCreated}</p>
+              <Link
+                href={`/procurement/purchase-orders/${existingPo.id}`}
+                className="inline-flex items-center rounded-md border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary-soft"
+              >
+                {format(tc.viewPo, { number: existingPo.po_number })}
+              </Link>
+            </>
+          ) : (
+            <Link
+              href={`/procurement/purchase-orders/new?quotationId=${comparison.recommended_quotation_id}`}
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              {tc.createPo}
+            </Link>
+          )}
         </Card>
       ) : null}
     </PageContainer>

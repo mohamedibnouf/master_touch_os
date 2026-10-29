@@ -118,6 +118,8 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
   let admin: SupabaseClient;
   let hrClient: SupabaseClient;
   let finClient: SupabaseClient;
+  // 089: payroll maker-checker — the reviewer must differ from the approver.
+  let reviewerClient: SupabaseClient;
   let empClient: SupabaseClient;
   let peerClient: SupabaseClient;
   let crossClient: SupabaseClient;
@@ -192,7 +194,7 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
       email: string,
       password: string,
       roleCode: string,
-      empTag: "HR" | "FIN" | "EMP" | "PEER",
+      empTag: "HR" | "FIN" | "REV" | "EMP" | "PEER",
       orgId: string,
     ) {
       const { data: created, error } = await admin.auth.admin.createUser({
@@ -257,6 +259,13 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
       `${prefix}fin45`,
       "finance_manager",
       "FIN",
+      fx.orgAId,
+    );
+    await createWithRole(
+      `mt-live-rev45-${runSuffix}@test.local`,
+      `${prefix}rev45`,
+      "finance_officer",
+      "REV",
       fx.orgAId,
     );
     const emp = await createWithRole(
@@ -438,6 +447,7 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
 
     hrClient = await signInAs(`mt-live-hr45-${runSuffix}@test.local`, `${prefix}hr45`);
     finClient = await signInAs(`mt-live-fin45-${runSuffix}@test.local`, `${prefix}fin45`);
+    reviewerClient = await signInAs(`mt-live-rev45-${runSuffix}@test.local`, `${prefix}rev45`);
     empClient = await signInAs(`mt-live-emp45-${runSuffix}@test.local`, `${prefix}emp45`);
     peerClient = await signInAs(`mt-live-peer45-${runSuffix}@test.local`, `${prefix}peer45`);
     crossClient = await signInAs(`mt-live-xorg45-${runSuffix}@test.local`, `${prefix}xorg45`);
@@ -823,10 +833,28 @@ describe.skipIf(!configured)("live Phase 4.5 payroll management", () => {
     expect(sErr).toBeNull();
     expect(submitted?.status).toBe("under_review");
 
-    const { error: rErr } = await finClient.rpc("mark_payroll_reviewed", {
+    // 089: approving without a review is rejected.
+    const { error: earlyErr } = await finClient.rpc("approve_payroll_period", {
+      p_period_id: periodId,
+    });
+    expect(earlyErr?.message ?? "").toContain("PAYROLL_NOT_REVIEWED");
+
+    const { error: rErr } = await reviewerClient.rpc("mark_payroll_reviewed", {
       p_period_id: periodId,
     });
     expect(rErr).toBeNull();
+
+    // 089: the reviewer cannot also approve.
+    const { error: selfErr } = await finClient.rpc("mark_payroll_reviewed", { p_period_id: periodId });
+    expect(selfErr).toBeNull();
+    const { error: selfApproveErr } = await finClient.rpc("approve_payroll_period", {
+      p_period_id: periodId,
+    });
+    expect(selfApproveErr?.message ?? "").toContain("PAYROLL_SELF_APPROVAL");
+    const { error: reReviewErr } = await reviewerClient.rpc("mark_payroll_reviewed", {
+      p_period_id: periodId,
+    });
+    expect(reReviewErr).toBeNull();
 
     const { data: approved, error: aErr } = await finClient.rpc("approve_payroll_period", {
       p_period_id: periodId,

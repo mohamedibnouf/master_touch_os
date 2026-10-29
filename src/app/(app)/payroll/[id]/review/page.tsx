@@ -16,6 +16,7 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { formatPeriodLabel, formatSar } from "@/lib/payroll/format";
 import { format } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
+import { payrollReviewControls } from "@/lib/payroll/review-controls";
 
 export default async function PayrollReviewPage({
   params,
@@ -43,8 +44,14 @@ export default async function PayrollReviewPage({
 
   const entries = await repo.listEntries(period.id);
   const status = period.status;
-  const canReview = hasPermission(ctx, "payroll.review") && status === "under_review";
-  const canApprove = hasPermission(ctx, "payroll.approve") && status === "under_review";
+  const { canReview, canApprove, approveBlockedReason, isReviewed } = payrollReviewControls({
+    status,
+    reviewedAt: period.reviewed_at,
+    reviewedBy: period.reviewed_by,
+    viewerProfileId: ctx.profile?.id,
+    canReviewPermission: hasPermission(ctx, "payroll.review"),
+    canApprovePermission: hasPermission(ctx, "payroll.approve"),
+  });
   const canLock = hasPermission(ctx, "payroll.lock") && status === "approved";
   const topEntries = [...entries].sort((a, b) => b.net_pay - a.net_pay).slice(0, 10);
 
@@ -109,8 +116,20 @@ export default async function PayrollReviewPage({
               </Button>
             </ServerActionForm>
           ) : null}
-          {!canReview && !canApprove && !canLock ? <p className="text-sm text-muted">{tr.noActions}</p> : null}
+          {!canReview && !canApprove && !canLock && !approveBlockedReason ? (
+            <p className="text-sm text-muted">{tr.noActions}</p>
+          ) : null}
         </div>
+        {isReviewed ? (
+          <p className="mt-3 text-sm text-ink" data-testid="payroll-reviewed-note">
+            {tc.reviewed}
+          </p>
+        ) : null}
+        {approveBlockedReason ? (
+          <p className="mt-2 text-sm text-muted" data-testid="payroll-approve-blocked">
+            {approveBlockedReason === "self_reviewed" ? tc.approveNeedsOtherUser : tc.approveNeedsReview}
+          </p>
+        ) : null}
       </Section>
 
       <Section title={tr.topNetTitle}>

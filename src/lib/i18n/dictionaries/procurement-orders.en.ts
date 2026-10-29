@@ -104,6 +104,8 @@ export const procurementOrdersEn: Dictionary["procurementOrders"] = {
     receivedNow: "Received now",
     notesPlaceholder: "Any additional notes...",
     submit: "Save and post receipt",
+    acceptedPlaceholder: "= received − rejected",
+    splitHint: "Leave Accepted empty to use received − rejected. Accepted + rejected must equal the received quantity; only accepted quantities are added to the purchase order.",
   },
   receiptDetail: {
     subtitle: "Goods receipt — {supplier}",

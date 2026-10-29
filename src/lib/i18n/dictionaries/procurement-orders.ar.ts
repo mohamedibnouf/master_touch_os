@@ -103,6 +103,8 @@ export const procurementOrdersAr = {
     receivedNow: "المستلم الآن",
     notesPlaceholder: "أي ملاحظات إضافية...",
     submit: "حفظ ونشر الاستلام",
+    acceptedPlaceholder: "= المستلم − المرفوض",
+    splitHint: "اترك «المقبول» فارغاً ليُحتسب تلقائياً (المستلم − المرفوض). يجب أن يساوي المقبول + المرفوض الكمية المستلمة، والكمية المقبولة فقط تُضاف إلى أمر الشراء.",
   },
   receiptDetail: {
     subtitle: "استلام بضاعة — {supplier}",

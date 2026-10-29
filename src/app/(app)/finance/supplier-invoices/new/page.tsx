@@ -1,3 +1,4 @@
+import { todayInRiyadh } from "@/lib/time/riyadh";
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -105,7 +106,7 @@ export default async function NewSupplierInvoicePage({
               <Input name="invoiceNumber" required placeholder={tf.invoiceNumberPlaceholder} data-testid="invoice-number" />
             </Field>
             <Field label={tf.invoiceDate} required>
-              <Input name="invoiceDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} data-testid="invoice-date" />
+              <Input name="invoiceDate" type="date" required defaultValue={todayInRiyadh()} data-testid="invoice-date" />
             </Field>
             <Field label={tf.dueDate}>
               <Input name="dueDate" type="date" />

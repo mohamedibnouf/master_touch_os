@@ -4,11 +4,14 @@
 import { describe, expect, it } from "vitest";
 import {
   absenceDeduction,
+  capDeductions,
   computeNetPay,
   dailyRate,
   inclusiveCalendarDays,
   monthlyGross,
+  normalizedUnpaidLeaveDays,
   prorateAmount,
+  proportionalUnpaidLeaveDeduction,
   resolveCompensationSegments,
   resolveEligibleWindow,
   roundMoney,
@@ -191,21 +194,90 @@ describe("payroll leave and attendance deductions", () => {
     ).toBe(0);
   });
 
-  it("attendance deduction enabled avoids double-counting unpaid leave", () => {
+  // Business rule changed in 089: reconciliation (057) already marks approved
+  // leave days as on_leave, so absent days never overlap unpaid leave. The old
+  // "absent - unpaid_leave" subtraction let 5 absences + 5 unpaid days deduct 0.
+  it("absence deduction bills every absent day, independent of unpaid leave", () => {
     expect(
       absenceDeduction({
         absentDays: 5,
-        unpaidLeaveDays: 2,
+        unpaidLeaveDays: 5,
         dailyRate: 400,
         enabled: true,
       }),
-    ).toBe(1200); // 3 * 400
+    ).toBe(2000); // 5 * 400 (was 0 before 089)
+  });
+});
+
+describe("payroll unpaid leave normalisation (089)", () => {
+  const base = { standardPayableDays: 30, payableDays: 30, fullPeriod: true };
+
+  it("a full unpaid 31-day month maps to exactly the 30 payable days", () => {
+    expect(normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 31, periodCalendarDays: 31 })).toBe(30);
+  });
+
+  it("a full unpaid February maps to 30 payable days (no 2 paid days left)", () => {
+    expect(normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 28, periodCalendarDays: 28 })).toBe(30);
+    expect(normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 29, periodCalendarDays: 29 })).toBe(30);
+  });
+
+  it("partial unpaid leave in a full period is scaled to the 30-day basis", () => {
+    expect(normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 15, periodCalendarDays: 30 })).toBe(15);
+    expect(normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 14, periodCalendarDays: 28 })).toBe(15);
+  });
+
+  it("partial-period employees keep calendar days, capped at payable days", () => {
+    expect(
+      normalizedUnpaidLeaveDays({
+        unpaidCalendarDays: 10,
+        fullPeriod: false,
+        periodCalendarDays: 31,
+        standardPayableDays: 30,
+        payableDays: 16,
+      }),
+    ).toBe(10);
+    expect(
+      normalizedUnpaidLeaveDays({
+        unpaidCalendarDays: 20,
+        fullPeriod: false,
+        periodCalendarDays: 31,
+        standardPayableDays: 30,
+        payableDays: 16,
+      }),
+    ).toBe(16);
+  });
+
+  it("full unpaid month deducts exactly the gross, so net is 0 (not negative)", () => {
+    const gross = 9300;
+    const unpaid = normalizedUnpaidLeaveDays({ ...base, unpaidCalendarDays: 31, periodCalendarDays: 31 });
+    const deduction = proportionalUnpaidLeaveDeduction({ grossRecurring: gross, unpaidPayableDays: unpaid, payableDays: 30 });
+    expect(deduction).toBe(gross);
+    expect(computeNetPay({ grossPay: gross, totalDeductions: deduction })).toBe(0);
+  });
+
+  it("proportional deduction for part of the month", () => {
+    expect(proportionalUnpaidLeaveDeduction({ grossRecurring: 9000, unpaidPayableDays: 10, payableDays: 30 })).toBe(3000);
+    expect(proportionalUnpaidLeaveDeduction({ grossRecurring: 9000, unpaidPayableDays: 0, payableDays: 30 })).toBe(0);
+  });
+});
+
+describe("payroll deduction caps (089)", () => {
+  it("caps calculated deductions at the remaining amount, in order", () => {
+    expect(capDeductions(1000, [600, 600, 100])).toEqual([600, 400, 0]);
+  });
+
+  it("never returns negative amounts when nothing is available", () => {
+    expect(capDeductions(-50, [10, 20])).toEqual([0, 0]);
   });
 });
 
 describe("payroll net pay", () => {
   it("computes net from gross and deductions", () => {
     expect(computeNetPay({ grossPay: 10000, totalDeductions: 1500 })).toBe(8500);
+  });
+
+  it("clamps net pay at zero", () => {
+    expect(computeNetPay({ grossPay: 1000, totalDeductions: 1200 })).toBe(0);
   });
 
   it("weighted daily rate across segments", () => {
