@@ -7,12 +7,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getServerEnv } from "@/lib/env";
 import { bootstrapAdminIfNeeded } from "@/server/services/bootstrap-admin.service";
+import { consumeLoginAttempt } from "@/server/services/login-rate-limit.service";
 import {
   EMPLOYEE_LOGIN_FAILURE_AR,
   LOGIN_RATE_LIMIT_AR,
   POST_LOGIN_PATH,
   safePostLoginPath,
-  assertLoginRateLimit,
   isEmailIdentifier,
   isEmployeeLoginAllowed,
   normalizeEmployeeNumber,
@@ -25,12 +25,19 @@ export type SignInState = { error: string | null };
 async function clientIp(): Promise<string> {
   try {
     const h = await headers();
+    // Vercel sets x-real-ip itself; prefer it over the client-influenced x-forwarded-for.
+    const realIp = h.get("x-real-ip")?.trim();
+    if (realIp) return realIp;
     const forwarded = h.get("x-forwarded-for");
     if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
-    return h.get("x-real-ip") ?? "unknown";
+    return "unknown";
   } catch {
     return "unknown";
   }
+}
+
+function normalizeLoginIdentifier(identifier: string): string {
+  return isEmailIdentifier(identifier) ? identifier.toLowerCase() : normalizeEmployeeNumber(identifier);
 }
 
 async function resolveEmployeeAuthEmail(employeeNumber: string): Promise<string | null> {
@@ -84,8 +91,14 @@ export async function signInAction(
     return { error: EMPLOYEE_LOGIN_FAILURE_AR };
   }
 
+  // Both buckets are always charged: per-IP stops spraying, per-identifier stops
+  // distributed guessing against one account.
   const ip = await clientIp();
-  if (!assertLoginRateLimit(ip)) {
+  const [ipAllowed, identifierAllowed] = await Promise.all([
+    consumeLoginAttempt("ip", ip),
+    consumeLoginAttempt("identifier", normalizeLoginIdentifier(identifier)),
+  ]);
+  if (!ipAllowed || !identifierAllowed) {
     return { error: LOGIN_RATE_LIMIT_AR };
   }
 

@@ -118,7 +118,16 @@ const loginBuckets = new Map<string, Bucket>();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 8;
 
-export function assertLoginRateLimit(ipKey: string): boolean {
+export type LoginRateLimitScope = "ip" | "identifier";
+
+/** Shared (DB-backed) limits per 15-minute window. IP is looser because offices share NAT. */
+export const LOGIN_RATE_LIMITS: Record<LoginRateLimitScope, { maxAttempts: number; windowSeconds: number }> = {
+  ip: { maxAttempts: 30, windowSeconds: LOGIN_WINDOW_MS / 1000 },
+  identifier: { maxAttempts: LOGIN_MAX_ATTEMPTS, windowSeconds: LOGIN_WINDOW_MS / 1000 },
+};
+
+/** Per-process fallback limiter, used only when the shared counter is unavailable. */
+export function assertLoginRateLimit(ipKey: string, maxAttempts = LOGIN_MAX_ATTEMPTS): boolean {
   const now = Date.now();
   const key = `login:${ipKey || "unknown"}`;
   let b = loginBuckets.get(key);
@@ -127,7 +136,7 @@ export function assertLoginRateLimit(ipKey: string): boolean {
     loginBuckets.set(key, b);
   }
   b.count += 1;
-  return b.count <= LOGIN_MAX_ATTEMPTS;
+  return b.count <= maxAttempts;
 }
 
 export function resetLoginRateLimitsForTests(): void {
