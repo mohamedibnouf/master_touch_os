@@ -76,7 +76,7 @@ export default async function ProjectsPage({
         <Card className="p-0">
           <TableScroll>
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-paper text-right text-muted">
+            <thead className="bg-paper text-start text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">الرمز</th>
                 <th className="px-4 py-3 font-medium">المشروع</th>

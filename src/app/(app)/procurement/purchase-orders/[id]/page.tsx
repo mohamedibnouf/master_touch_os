@@ -161,7 +161,7 @@ export default async function PurchaseOrderDetailPage({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-paper text-right text-muted">
+              <thead className="bg-paper text-start text-muted">
                 <tr>
                   <th className="px-3 py-2">#</th>
                   <th className="px-3 py-2">الوصف</th>
@@ -278,9 +278,9 @@ export default async function PurchaseOrderDetailPage({
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">الرقم</th>
-                  <th className="py-2 text-right">تاريخ التسليم</th>
-                  <th className="py-2 text-right">الحالة</th>
+                  <th className="py-2 text-start">الرقم</th>
+                  <th className="py-2 text-start">تاريخ التسليم</th>
+                  <th className="py-2 text-start">الحالة</th>
                 </tr>
               </thead>
               <tbody>

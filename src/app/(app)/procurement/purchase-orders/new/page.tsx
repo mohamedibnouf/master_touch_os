@@ -131,7 +131,7 @@ export default async function NewPurchaseOrderPage({
 
               <div className="overflow-x-auto rounded-md border border-line">
                 <table className="w-full text-sm">
-                  <thead className="bg-paper text-right text-muted">
+                  <thead className="bg-paper text-start text-muted">
                     <tr>
                       <th className="px-3 py-2">#</th>
                       <th className="px-3 py-2">الوصف</th>

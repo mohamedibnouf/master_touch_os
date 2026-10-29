@@ -117,7 +117,7 @@ export default async function DocumentsPage({
           </ul>
           <TableScroll className="hidden rounded-lg border border-line bg-white md:block">
             <table className="min-w-full text-sm">
-              <thead className="bg-paper text-right text-muted">
+              <thead className="bg-paper text-start text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">العنوان</th>
                   <th className="px-4 py-3 font-medium">التصنيف</th>

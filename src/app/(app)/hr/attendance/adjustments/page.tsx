@@ -111,9 +111,9 @@ export default async function HrAttendanceAdjustmentsPage() {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الموظف</th>
-                <th className="px-4 py-3 text-right">السبب</th>
-                <th className="px-4 py-3 text-right">الوقت</th>
+                <th className="px-4 py-3 text-start">الموظف</th>
+                <th className="px-4 py-3 text-start">السبب</th>
+                <th className="px-4 py-3 text-start">الوقت</th>
               </tr>
             </thead>
             <tbody>

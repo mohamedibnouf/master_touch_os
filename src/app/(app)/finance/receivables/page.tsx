@@ -131,7 +131,7 @@ export default async function ReceivablesPage({
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm" data-testid="receivables-table">
-              <thead className="bg-paper text-right text-muted">
+              <thead className="bg-paper text-start text-muted">
                 <tr>
                   <th className="px-3 py-2">الفاتورة</th>
                   <th className="px-3 py-2">العميل</th>

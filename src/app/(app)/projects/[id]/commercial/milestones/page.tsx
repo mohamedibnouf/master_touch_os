@@ -75,13 +75,13 @@ export default async function ProjectMilestonesPage({ params }: { params: Promis
                 <table className="w-full text-sm" data-testid="milestones-table">
                   <thead className="text-muted">
                     <tr>
-                      <th className="py-2 text-right">#</th>
-                      <th className="py-2 text-right">الوصف</th>
-                      <th className="py-2 text-right">النسبة</th>
-                      <th className="py-2 text-right">المبلغ</th>
-                      <th className="py-2 text-right">التاريخ المخطط</th>
-                      <th className="py-2 text-right">الحالة</th>
-                      <th className="py-2 text-right">إجراء</th>
+                      <th className="py-2 text-start">#</th>
+                      <th className="py-2 text-start">الوصف</th>
+                      <th className="py-2 text-start">النسبة</th>
+                      <th className="py-2 text-start">المبلغ</th>
+                      <th className="py-2 text-start">التاريخ المخطط</th>
+                      <th className="py-2 text-start">الحالة</th>
+                      <th className="py-2 text-start">إجراء</th>
                     </tr>
                   </thead>
                   <tbody>

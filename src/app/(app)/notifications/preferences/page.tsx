@@ -78,9 +78,9 @@ export default async function NotificationPreferencesPage() {
           <table className="w-full min-w-[520px] text-sm">
             <thead className="text-muted">
               <tr>
-                <th className="px-2 py-2 text-right">الفئة</th>
+                <th className="px-2 py-2 text-start">الفئة</th>
                 {NOTIFICATION_CHANNELS.map((ch) => (
-                  <th key={ch} className="px-2 py-2 text-right">
+                  <th key={ch} className="px-2 py-2 text-start">
                     {ch}
                   </th>
                 ))}

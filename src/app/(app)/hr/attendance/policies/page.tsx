@@ -70,11 +70,11 @@ export default async function HrAttendancePoliciesPage() {
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الرمز</th>
-              <th className="px-4 py-3 text-right">الاسم</th>
-              <th className="px-4 py-3 text-right">سماح التأخير</th>
-              <th className="px-4 py-3 text-right">حد أدنى</th>
-              <th className="px-4 py-3 text-right">نشط</th>
+              <th className="px-4 py-3 text-start">الرمز</th>
+              <th className="px-4 py-3 text-start">الاسم</th>
+              <th className="px-4 py-3 text-start">سماح التأخير</th>
+              <th className="px-4 py-3 text-start">حد أدنى</th>
+              <th className="px-4 py-3 text-start">نشط</th>
             </tr>
           </thead>
           <tbody>

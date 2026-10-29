@@ -23,14 +23,14 @@ export function Button({
   return (
     <Element
       className={cn(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-medium duration-150 transition-[background-color,box-shadow,color,border-color] disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-50 md:min-h-9",
+        "inline-flex min-h-10 select-none items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium duration-150 transition-[background-color,box-shadow,color,border-color,transform] active:scale-[0.98] disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-50 disabled:active:scale-100 md:min-h-9",
         variant === "primary" &&
-          "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-hover",
-        variant === "success" && "bg-success text-white hover:bg-success/90",
+          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(204,65,21,0.35)] hover:bg-primary-hover active:bg-primary-hover",
+        variant === "success" && "bg-success text-white shadow-sm hover:bg-success/90",
         variant === "warning" &&
           "border border-warning-border bg-warning-soft text-warning hover:bg-warning/15",
         variant === "secondary" &&
-          "border border-line bg-surface-muted text-ink hover:border-border-strong hover:bg-surface-strong",
+          "border border-line bg-surface text-ink shadow-card hover:border-border-strong hover:bg-surface-muted",
         variant === "outline" &&
           "border border-line bg-white text-ink hover:border-border-strong hover:bg-surface-muted",
         variant === "ghost" && "text-muted hover:bg-surface-muted hover:text-ink",
@@ -138,21 +138,12 @@ export function StatCard({
   tone?: "neutral" | "info" | "success" | "warning" | "danger";
 }) {
   return (
-    <div
-      className={cn(
-        "mt-surface flex items-start justify-between gap-3 border-s-2 p-4",
-        tone === "neutral" && "border-s-line",
-        tone === "info" && "border-s-primary",
-        tone === "success" && "border-s-success",
-        tone === "warning" && "border-s-warning",
-        tone === "danger" && "border-s-danger",
-      )}
-    >
+    <div className="mt-surface flex items-start justify-between gap-3 p-4 md:p-5">
       <div className="min-w-0">
         <p className="text-xs font-medium text-muted">{label}</p>
         <p
           className={cn(
-            "mt-2 text-2xl font-semibold tabular-nums tracking-tight",
+            "mt-2 text-[1.75rem] font-semibold leading-none tabular-nums tracking-tight",
             tone === "danger" && "text-danger",
             tone === "warning" && "text-warning",
             tone === "success" && "text-success",
@@ -167,8 +158,8 @@ export function StatCard({
       {icon ? (
         <span
           className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-            tone === "info" && "bg-info-soft text-primary",
+            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            tone === "info" && "bg-primary-soft text-primary",
             tone === "success" && "bg-success-soft text-success",
             tone === "warning" && "bg-warning-soft text-warning",
             tone === "danger" && "bg-danger-soft text-danger",
@@ -244,8 +235,8 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">{title}</h1>
-        {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+        <h1 className="text-[1.375rem] font-semibold leading-tight tracking-tight text-ink md:text-2xl">{title}</h1>
+        {description ? <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">{description}</p> : null}
         {meta ? <div className="mt-2 text-xs text-muted">{meta}</div> : null}
       </div>
       {actions ? (

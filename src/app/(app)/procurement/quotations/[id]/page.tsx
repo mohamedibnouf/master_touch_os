@@ -121,7 +121,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-paper text-right text-muted">
+              <thead className="bg-paper text-start text-muted">
                 <tr>
                   <th className="px-3 py-2">#</th>
                   <th className="px-3 py-2">الوصف</th>

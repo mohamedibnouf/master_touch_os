@@ -150,7 +150,7 @@ export function ReportTable({
     <div className="table-scroll overflow-x-auto" data-testid="report-table">
       <table className="w-full min-w-[32rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-line text-right">
+          <tr className="border-b border-line text-start">
             {headers.map((h) => (
               <th key={h} className="px-2 py-2 font-semibold text-navy">
                 {h}

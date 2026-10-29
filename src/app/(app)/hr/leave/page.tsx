@@ -131,11 +131,11 @@ export default async function HrLeavePage() {
         <table className="w-full min-w-[520px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموظف</th>
-              <th className="px-4 py-3 text-right">النوع</th>
-              <th className="px-4 py-3 text-right">من</th>
-              <th className="px-4 py-3 text-right">إلى</th>
-              <th className="px-4 py-3 text-right">الحالة</th>
+              <th className="px-4 py-3 text-start">الموظف</th>
+              <th className="px-4 py-3 text-start">النوع</th>
+              <th className="px-4 py-3 text-start">من</th>
+              <th className="px-4 py-3 text-start">إلى</th>
+              <th className="px-4 py-3 text-start">الحالة</th>
             </tr>
           </thead>
           <tbody>

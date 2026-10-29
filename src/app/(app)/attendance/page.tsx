@@ -211,10 +211,10 @@ export default async function AttendanceDashboardPage() {
           <table className="w-full min-w-[480px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">التاريخ</th>
-                <th className="px-4 py-3 text-right">الدخول</th>
-                <th className="px-4 py-3 text-right">الانصراف</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-start">التاريخ</th>
+                <th className="px-4 py-3 text-start">الدخول</th>
+                <th className="px-4 py-3 text-start">الانصراف</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
               </tr>
             </thead>
             <tbody>

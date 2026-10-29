@@ -60,12 +60,12 @@ export default async function AttendanceHistoryPage() {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">التاريخ</th>
-                <th className="px-4 py-3 text-right">دخول</th>
-                <th className="px-4 py-3 text-right">انصراف</th>
-                <th className="px-4 py-3 text-right">دقائق العمل</th>
-                <th className="px-4 py-3 text-right">تأخير</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-start">التاريخ</th>
+                <th className="px-4 py-3 text-start">دخول</th>
+                <th className="px-4 py-3 text-start">انصراف</th>
+                <th className="px-4 py-3 text-start">دقائق العمل</th>
+                <th className="px-4 py-3 text-start">تأخير</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
               </tr>
             </thead>
             <tbody>

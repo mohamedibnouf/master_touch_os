@@ -152,10 +152,10 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">#</th>
-                  <th className="py-2 text-right">الوصف</th>
-                  <th className="py-2 text-right">الكمية</th>
-                  <th className="py-2 text-right">الوحدة</th>
+                  <th className="py-2 text-start">#</th>
+                  <th className="py-2 text-start">الوصف</th>
+                  <th className="py-2 text-start">الكمية</th>
+                  <th className="py-2 text-start">الوحدة</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,10 +183,10 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">المورد</th>
-                  <th className="py-2 text-right">حالة الرد</th>
-                  {canManageResponse ? <th className="py-2 text-right">تحديث</th> : null}
-                  {canManageInvites ? <th className="py-2 text-right">إزالة</th> : null}
+                  <th className="py-2 text-start">المورد</th>
+                  <th className="py-2 text-start">حالة الرد</th>
+                  {canManageResponse ? <th className="py-2 text-start">تحديث</th> : null}
+                  {canManageInvites ? <th className="py-2 text-start">إزالة</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -249,11 +249,11 @@ export default async function RfqDetailPage({ params }: { params: Promise<{ id: 
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">الرقم</th>
-                  <th className="py-2 text-right">المورد</th>
-                  <th className="py-2 text-right">التاريخ</th>
-                  <th className="py-2 text-right">الإجمالي</th>
-                  <th className="py-2 text-right">الحالة</th>
+                  <th className="py-2 text-start">الرقم</th>
+                  <th className="py-2 text-start">المورد</th>
+                  <th className="py-2 text-start">التاريخ</th>
+                  <th className="py-2 text-start">الإجمالي</th>
+                  <th className="py-2 text-start">الحالة</th>
                 </tr>
               </thead>
               <tbody>

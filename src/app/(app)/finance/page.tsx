@@ -137,7 +137,7 @@ export default async function FinancePage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-paper text-right text-muted">
+                <thead className="bg-paper text-start text-muted">
                   <tr>
                     <th className="px-3 py-2">رقم الفاتورة</th>
                     <th className="px-3 py-2">المبلغ</th>

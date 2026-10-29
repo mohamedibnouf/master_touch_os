@@ -12,8 +12,11 @@ import { GeofencePunchButton } from "@/components/attendance/geofence-punch-butt
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import type { AuthContext } from "@/types/models";
+import { format, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
+  const { locale, t } = await getI18n();
   const supabase = await createServerSupabaseClient();
   const todayYmd = riyadhTodayYmd();
   const attendanceToday = new Date().toISOString().slice(0, 10);
@@ -79,14 +82,14 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
                 <Clock className="h-4 w-4" aria-hidden />
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-muted">الحضور اليوم · {todayYmd}</p>
+                <p className="text-xs font-medium text-muted">{format(t.home.attendanceToday, { date: todayYmd })}</p>
                 <p className="mt-1 text-xl font-semibold leading-snug text-ink">
-                  {attendance ? attendanceStatusLabel(attendance.attendance_status) : "لم يُسجَّل بعد"}
+                  {attendance ? attendanceStatusLabel(attendance.attendance_status) : t.home.notRecordedYet}
                 </p>
-                {shift ? <p className="mt-1 text-sm text-muted">{shift.name_ar}</p> : null}
+                {shift ? <p className="mt-1 text-sm text-muted">{pickLocalized(locale, shift.name_ar, shift.name_en)}</p> : null}
                 {attendance?.check_in_at && !attendance.check_out_at ? (
                   <span className="mt-2 inline-block">
-                    <Badge tone={statusTone}>لم يُسجَّل الانصراف</Badge>
+                    <Badge tone={statusTone}>{t.home.checkoutMissing}</Badge>
                   </span>
                 ) : null}
               </div>
@@ -95,11 +98,11 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
           <div className="flex flex-col gap-2 bg-white px-4 py-3 md:px-5">
             {canCheckIn ? (
               geofenceReady ? (
-                <GeofencePunchButton action="check_in" label="تسجيل الحضور" testId="home-check-in" />
+                <GeofencePunchButton action="check_in" label={t.home.checkIn} testId="home-check-in" />
               ) : (
                 <ServerActionForm action={checkInAction}>
                   <Button type="submit" className="w-full" data-testid="home-check-in">
-                    تسجيل الحضور
+                    {t.home.checkIn}
                   </Button>
                 </ServerActionForm>
               )
@@ -108,23 +111,23 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
               geofenceReady ? (
                 <GeofencePunchButton
                   action="check_out"
-                  label="تسجيل الانصراف"
+                  label={t.home.checkOut}
                   testId="home-check-out"
                   variant="secondary"
                 />
               ) : (
                 <ServerActionForm action={checkOutAction}>
                   <Button type="submit" variant="secondary" className="w-full" data-testid="home-check-out">
-                    تسجيل الانصراف
+                    {t.home.checkOut}
                   </Button>
                 </ServerActionForm>
               )
             ) : null}
             {!canCheckIn && !canCheckOut ? (
-              <p className="text-sm text-muted">لا يوجد إجراء حضور متاح حالياً.</p>
+              <p className="text-sm text-muted">{t.home.noAttendanceAction}</p>
             ) : null}
             <Link href="/attendance" className="text-xs font-medium text-primary duration-150 hover:underline">
-              صفحة الحضور
+              {t.home.attendancePage}
             </Link>
           </div>
         </section>
@@ -137,14 +140,14 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
         >
           <span className="inline-flex min-w-0 items-center gap-2 text-sm text-ink">
             <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
-            <span className="font-medium">الإجازات</span>
+            <span className="font-medium">{t.home.leave}</span>
             <span className="font-semibold tabular-nums">
-              {leaveAvailable == null ? "—" : `${leaveAvailable} يوم`}
+              {leaveAvailable == null ? "—" : format(t.common.days, { count: leaveAvailable })}
             </span>
-            <span className="text-muted">· {leavePendingCount} قيد المعالجة</span>
+            <span className="text-muted">{format(t.home.leavePending, { count: leavePendingCount })}</span>
           </span>
           <Link href="/leave" className="text-xs font-medium text-primary duration-150 hover:underline">
-            إجازاتي
+            {t.home.myLeave}
           </Link>
         </section>
       ) : null}

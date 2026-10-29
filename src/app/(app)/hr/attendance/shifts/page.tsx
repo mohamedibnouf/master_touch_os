@@ -79,11 +79,11 @@ export default async function HrAttendanceShiftsPage() {
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الرمز</th>
-              <th className="px-4 py-3 text-right">الاسم</th>
-              <th className="px-4 py-3 text-right">السياسة</th>
-              <th className="px-4 py-3 text-right">الوقت</th>
-              <th className="px-4 py-3 text-right">نشط</th>
+              <th className="px-4 py-3 text-start">الرمز</th>
+              <th className="px-4 py-3 text-start">الاسم</th>
+              <th className="px-4 py-3 text-start">السياسة</th>
+              <th className="px-4 py-3 text-start">الوقت</th>
+              <th className="px-4 py-3 text-start">نشط</th>
             </tr>
           </thead>
           <tbody>

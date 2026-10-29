@@ -16,11 +16,13 @@ const TONE_VAR: Record<ChartTone, string> = {
 
 export function DonutChart({
   title,
+  emptyLabel = "لا توجد بيانات كافية بعد",
   segments,
   centerValue,
   centerLabel,
 }: {
   title: string;
+  emptyLabel?: string;
   segments: DonutSegment[];
   centerValue: string | number;
   centerLabel: string;
@@ -29,7 +31,7 @@ export function DonutChart({
   if (total <= 0) {
     return (
       <div className="flex min-h-44 flex-col items-center justify-center px-4 py-8 text-center">
-        <p className="text-sm font-medium text-ink">لا توجد بيانات كافية بعد</p>
+        <p className="text-sm font-medium text-ink">{emptyLabel}</p>
         <p className="mt-1 text-xs text-muted">{title}</p>
       </div>
     );
@@ -98,15 +100,17 @@ export function DonutChart({
 
 export function HorizontalBarList({
   title,
+  emptyLabel = "لا توجد بيانات كافية بعد",
   rows,
 }: {
   title: string;
+  emptyLabel?: string;
   rows: Array<{ id: string; label: string; href?: string; percent: number; hint?: string }>;
 }) {
   if (rows.length === 0) {
     return (
       <div className="flex min-h-44 flex-col items-center justify-center px-4 py-8 text-center">
-        <p className="text-sm font-medium text-ink">لا توجد بيانات كافية بعد</p>
+        <p className="text-sm font-medium text-ink">{emptyLabel}</p>
         <p className="mt-1 text-xs text-muted">{title}</p>
       </div>
     );
@@ -159,16 +163,18 @@ export function HorizontalBarList({
 
 export function StackedCountBars({
   title,
+  emptyLabel = "لا توجد بيانات كافية بعد",
   rows,
 }: {
   title: string;
+  emptyLabel?: string;
   rows: Array<{ label: string; value: number; tone: ChartTone }>;
 }) {
   const max = Math.max(...rows.map((r) => r.value), 0);
   if (max <= 0) {
     return (
       <div className="flex min-h-40 flex-col items-center justify-center px-4 py-8 text-center">
-        <p className="text-sm font-medium text-ink">لا توجد بيانات كافية بعد</p>
+        <p className="text-sm font-medium text-ink">{emptyLabel}</p>
         <p className="mt-1 text-xs text-muted">{title}</p>
       </div>
     );

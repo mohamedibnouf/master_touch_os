@@ -165,10 +165,10 @@ export default async function SupplierInvoiceDetailPage({ params }: { params: Pr
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">التاريخ</th>
-                  <th className="py-2 text-right">المبلغ</th>
-                  <th className="py-2 text-right">المرجع</th>
-                  <th className="py-2 text-right">الطريقة</th>
+                  <th className="py-2 text-start">التاريخ</th>
+                  <th className="py-2 text-start">المبلغ</th>
+                  <th className="py-2 text-start">المرجع</th>
+                  <th className="py-2 text-start">الطريقة</th>
                 </tr>
               </thead>
               <tbody>

@@ -78,13 +78,13 @@ export default async function PayrollEmployeesPage({
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الرقم</th>
-                <th className="px-4 py-3 text-right">الموظف</th>
-                <th className="px-4 py-3 text-right">الإجمالي</th>
-                <th className="px-4 py-3 text-right">الخصم</th>
-                <th className="px-4 py-3 text-right">الصافي</th>
-                <th className="px-4 py-3 text-right">الصرف</th>
-                <th className="px-4 py-3 text-right">قسيمة</th>
+                <th className="px-4 py-3 text-start">الرقم</th>
+                <th className="px-4 py-3 text-start">الموظف</th>
+                <th className="px-4 py-3 text-start">الإجمالي</th>
+                <th className="px-4 py-3 text-start">الخصم</th>
+                <th className="px-4 py-3 text-start">الصافي</th>
+                <th className="px-4 py-3 text-start">الصرف</th>
+                <th className="px-4 py-3 text-start">قسيمة</th>
               </tr>
             </thead>
             <tbody>

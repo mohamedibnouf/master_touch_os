@@ -78,12 +78,12 @@ export default async function HrLeaveBalancesPage() {
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموظف</th>
-              <th className="px-4 py-3 text-right">النوع</th>
-              <th className="px-4 py-3 text-right">المتاح</th>
-              <th className="px-4 py-3 text-right">مستخدم</th>
-              <th className="px-4 py-3 text-right">معلّق</th>
-              <th className="px-4 py-3 text-right">تعديل</th>
+              <th className="px-4 py-3 text-start">الموظف</th>
+              <th className="px-4 py-3 text-start">النوع</th>
+              <th className="px-4 py-3 text-start">المتاح</th>
+              <th className="px-4 py-3 text-start">مستخدم</th>
+              <th className="px-4 py-3 text-start">معلّق</th>
+              <th className="px-4 py-3 text-start">تعديل</th>
             </tr>
           </thead>
           <tbody>

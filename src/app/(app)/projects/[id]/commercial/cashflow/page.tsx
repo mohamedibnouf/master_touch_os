@@ -84,10 +84,10 @@ export default async function ProjectCashflowPage({ params }: { params: Promise<
             <table className="w-full text-sm" data-testid="cashflow-aggregate-table">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">الفترة</th>
-                  <th className="py-2 text-right">تحصيل</th>
-                  <th className="py-2 text-right">صرف</th>
-                  <th className="py-2 text-right">صافي</th>
+                  <th className="py-2 text-start">الفترة</th>
+                  <th className="py-2 text-start">تحصيل</th>
+                  <th className="py-2 text-start">صرف</th>
+                  <th className="py-2 text-start">صافي</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,11 +123,11 @@ export default async function ProjectCashflowPage({ params }: { params: Promise<
             <table className="w-full text-sm" data-testid="cashflow-items-table">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">الاتجاه</th>
-                  <th className="py-2 text-right">المصدر</th>
-                  <th className="py-2 text-right">تاريخ الاستحقاق</th>
-                  <th className="py-2 text-right">المبلغ المتبقي</th>
-                  <th className="py-2 text-right">العملة</th>
+                  <th className="py-2 text-start">الاتجاه</th>
+                  <th className="py-2 text-start">المصدر</th>
+                  <th className="py-2 text-start">تاريخ الاستحقاق</th>
+                  <th className="py-2 text-start">المبلغ المتبقي</th>
+                  <th className="py-2 text-start">العملة</th>
                 </tr>
               </thead>
               <tbody>

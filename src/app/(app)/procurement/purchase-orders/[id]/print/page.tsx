@@ -55,7 +55,7 @@ export default async function PurchaseOrderPrintPage({
             <h1 className="text-2xl font-bold text-navy">MASTER TOUCH</h1>
             <p className="text-sm text-muted">General Contracting & Smart Systems</p>
           </div>
-          <div className="text-left">
+          <div className="text-end">
             <h2 className="text-xl font-bold text-navy">أمر شراء — Purchase Order</h2>
             <p className="mt-1 text-lg font-semibold">{po.po_number}</p>
             {po.issue_date ? (
@@ -116,12 +116,12 @@ export default async function PurchaseOrderPrintPage({
         <table className="mb-6 w-full text-sm">
           <thead>
             <tr className="bg-primary text-white">
-              <th className="px-3 py-2 text-right">#</th>
-              <th className="px-3 py-2 text-right">الوصف</th>
-              <th className="px-3 py-2 text-right">الكمية</th>
-              <th className="px-3 py-2 text-right">الوحدة</th>
-              <th className="px-3 py-2 text-right">سعر الوحدة</th>
-              <th className="px-3 py-2 text-right">الإجمالي</th>
+              <th className="px-3 py-2 text-start">#</th>
+              <th className="px-3 py-2 text-start">الوصف</th>
+              <th className="px-3 py-2 text-start">الكمية</th>
+              <th className="px-3 py-2 text-start">الوحدة</th>
+              <th className="px-3 py-2 text-start">سعر الوحدة</th>
+              <th className="px-3 py-2 text-start">الإجمالي</th>
             </tr>
           </thead>
           <tbody>
@@ -142,21 +142,21 @@ export default async function PurchaseOrderPrintPage({
           </tbody>
           <tfoot>
             <tr className="border-t border-line">
-              <td colSpan={5} className="px-3 py-2 text-left font-medium text-muted">الإجمالي قبل الخصم</td>
+              <td colSpan={5} className="px-3 py-2 text-end font-medium text-muted">الإجمالي قبل الخصم</td>
               <td className="px-3 py-2 tabular-nums font-medium">
                 <MoneyDisplay amount={po.subtotal} currency={po.currency} />
               </td>
             </tr>
             {Number(po.discount) > 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-2 text-left text-muted">الخصم</td>
+                <td colSpan={5} className="px-3 py-2 text-end text-muted">الخصم</td>
                 <td className="px-3 py-2 tabular-nums text-danger">
                   - <MoneyDisplay amount={po.discount} currency={po.currency} />
                 </td>
               </tr>
             ) : null}
             <tr>
-              <td colSpan={5} className="px-3 py-2 text-left text-muted">
+              <td colSpan={5} className="px-3 py-2 text-end text-muted">
                 ضريبة القيمة المضافة ({po.vat_rate_percent}%)
               </td>
               <td className="px-3 py-2 tabular-nums">
@@ -164,7 +164,7 @@ export default async function PurchaseOrderPrintPage({
               </td>
             </tr>
             <tr className="bg-paper font-bold">
-              <td colSpan={5} className="px-3 py-3 text-left text-navy">الإجمالي الكلي</td>
+              <td colSpan={5} className="px-3 py-3 text-end text-navy">الإجمالي الكلي</td>
               <td className="px-3 py-3 tabular-nums text-navy">
                 <MoneyDisplay amount={po.total} currency={po.currency} />
               </td>

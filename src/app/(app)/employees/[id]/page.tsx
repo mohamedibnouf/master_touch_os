@@ -837,7 +837,7 @@ export default async function EmployeeDetailPage({
               </p>
             ) : (
               <TableScroll>
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-start text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
                       <th className="p-2">رقم العقد</th>
@@ -1021,7 +1021,7 @@ export default async function EmployeeDetailPage({
               </p>
             ) : (
               <TableScroll>
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-start text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
                       <th className="p-2">تاريخ البدء</th>
@@ -1147,7 +1147,7 @@ export default async function EmployeeDetailPage({
               </p>
             ) : (
               <TableScroll>
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-start text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
                       <th className="p-2">العنوان</th>
@@ -1241,7 +1241,7 @@ export default async function EmployeeDetailPage({
               </p>
             ) : (
               <TableScroll>
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-start text-sm">
                   <thead>
                     <tr className="border-b border-line text-muted">
                       <th className="p-2">البنك</th>

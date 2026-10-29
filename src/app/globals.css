@@ -1,25 +1,38 @@
 @import "tailwindcss";
 
+/*
+ * Master Touch design system (2026-10): calm light canvas, charcoal sidebar,
+ * one strong brand orange. Token names are shared by every screen; change values here.
+ */
 :root {
-  --background: #ffffff;
+  --background: #f4f5f7;
   --surface: #ffffff;
-  --surface-muted: #fafafa;
-  --surface-subtle: #f7f8fa;
-  --surface-strong: #f3f4f6;
-  --ink: #111318;
-  --text-secondary: #667085;
-  --text-muted: #98a2b3;
-  --line: #e8eaed;
-  --border-strong: #d0d5dd;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --surface-muted: #f8f9fb;
+  --surface-subtle: #f2f3f6;
+  --surface-strong: #eaecf0;
+  --ink: #15171c;
+  --text-secondary: #5b6372;
+  --text-muted: #8a93a3;
+  --line: #e5e7eb;
+  --border-strong: #cfd4dc;
+  /* Brand orange tuned for AA contrast with white text; --brand is the logo orange for accents. */
+  --primary: #cc4115;
+  --primary-hover: #b0360f;
   --primary-foreground: #ffffff;
+  --brand: #ff5a1f;
+  --brand-glow: color-mix(in srgb, var(--brand) 35%, transparent);
   --info: #2563eb;
-  --success: #16a34a;
-  --warning: #d97706;
+  --success: #15803d;
+  --warning: #c2680a;
   --danger: #dc2626;
-  --ring: #2563eb;
+  --ring: #cc4115;
   --disabled-foreground: #98a2b3;
+
+  --sidebar: #15171c;
+  --sidebar-elevated: #1e2128;
+  --sidebar-ink: #eceef2;
+  --sidebar-muted: #8f96a3;
+  --sidebar-line: rgba(255, 255, 255, 0.07);
   --success-soft: color-mix(in srgb, var(--success) 10%, #fff);
   --warning-soft: color-mix(in srgb, var(--warning) 10%, #fff);
   --danger-soft: color-mix(in srgb, var(--danger) 10%, #fff);
@@ -42,11 +55,18 @@
   --border: var(--line);
   --primary-soft: color-mix(in srgb, var(--primary) 10%, #fff);
 
-  --shadow-1: 0 1px 2px rgba(17, 19, 24, 0.04);
-  --shadow-2: 0 8px 24px rgba(17, 19, 24, 0.08), 0 2px 6px rgba(17, 19, 24, 0.04);
-  --radius-control: 0.5625rem;
-  --radius-surface: 0.75rem;
-  --radius-hero: 0.875rem;
+  --shadow-1: 0 1px 2px rgba(21, 23, 28, 0.04), 0 1px 1px rgba(21, 23, 28, 0.02);
+  --shadow-2: 0 10px 30px -12px rgba(21, 23, 28, 0.18), 0 2px 6px rgba(21, 23, 28, 0.05);
+  --radius-control: 0.625rem;
+  --radius-surface: 0.875rem;
+  --radius-hero: 1.125rem;
+
+  --app-font: var(--font-ibm-arabic), var(--font-ibm);
+}
+
+/* Latin-first font stack for the English interface. */
+:root:lang(en) {
+  --app-font: var(--font-ibm), var(--font-ibm-arabic);
 }
 
 @theme inline {
@@ -87,7 +107,16 @@
   --color-disabled-foreground: var(--disabled-foreground);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  --font-sans: var(--font-ibm-arabic), var(--font-ibm), ui-sans-serif, system-ui, sans-serif;
+  --color-primary-soft: var(--primary-soft);
+  --color-brand: var(--brand);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-elevated: var(--sidebar-elevated);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-line: var(--sidebar-line);
+  --shadow-card: var(--shadow-1);
+  --shadow-raised: var(--shadow-2);
+  --font-sans: var(--app-font), ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
@@ -116,18 +145,20 @@ summary::-webkit-details-marker {
   display: none;
 }
 
+/* Component classes live in a layer so Tailwind utilities (e.g. xl:hidden) can override them. */
+@layer components {
 .mt-surface {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-surface);
-  box-shadow: none;
+  box-shadow: var(--shadow-1);
 }
 
 .mt-surface-priority {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-surface);
-  box-shadow: none;
+  box-shadow: var(--shadow-2);
 }
 
 .mt-icon-btn-inverse {
@@ -262,13 +293,15 @@ summary::-webkit-details-marker {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-surface);
-  box-shadow: none;
+  box-shadow: var(--shadow-1);
 }
 
 .mt-tab-active {
   color: var(--primary);
   background: var(--primary-soft);
   font-weight: 600;
+}
+
 }
 
 .table-scroll {
@@ -279,6 +312,22 @@ summary::-webkit-details-marker {
 table.table-register thead {
   background: var(--surface-muted);
   color: var(--foreground-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Dark sidebar scrollbar stays subtle. */
+.mt-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Soft brand glow behind the login hero. */
+.mt-hero-glow {
+  background:
+    radial-gradient(60% 50% at 85% 10%, var(--brand-glow), transparent 70%),
+    radial-gradient(40% 40% at 10% 90%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 70%),
+    var(--sidebar);
 }
 
 .table-scroll tbody tr:hover {

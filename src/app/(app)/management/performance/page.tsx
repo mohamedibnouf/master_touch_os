@@ -67,10 +67,10 @@ export default async function ManagementPerformancePage() {
             <table className="w-full min-w-[480px] text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="px-3 py-2 text-right">المسؤول</th>
-                  <th className="px-3 py-2 text-right">مسند</th>
-                  <th className="px-3 py-2 text-right">مكتمل</th>
-                  <th className="px-3 py-2 text-right">متأخر</th>
+                  <th className="px-3 py-2 text-start">المسؤول</th>
+                  <th className="px-3 py-2 text-start">مسند</th>
+                  <th className="px-3 py-2 text-start">مكتمل</th>
+                  <th className="px-3 py-2 text-start">متأخر</th>
                 </tr>
               </thead>
               <tbody>

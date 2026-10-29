@@ -212,7 +212,7 @@ export default async function DocumentDetailPage({
         <h2 className="mb-3 font-semibold text-navy">الإصدارات</h2>
         <TableScroll>
           <table className="min-w-full text-sm">
-            <thead className="text-right text-muted">
+            <thead className="text-start text-muted">
               <tr>
                 <th className="px-2 py-2 font-medium">الإصدار</th>
                 <th className="px-2 py-2 font-medium">المصدر</th>

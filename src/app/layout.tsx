@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
+import { dirFor } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
+import { I18nProvider } from "@/lib/i18n/client";
 import "./globals.css";
 
 const ibmArabic = IBM_Plex_Sans_Arabic({
@@ -17,10 +20,13 @@ const ibmSans = IBM_Plex_Sans({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { ...baseMetadata, title: t.meta.title, description: t.meta.description };
+}
+
+const baseMetadata: Metadata = {
   applicationName: "Master Touch OS",
-  title: "ماستر تاتش | نظام التشغيل الداخلي",
-  description: "نظام تشغيل الأعمال لماستر تاتش",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -46,12 +52,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const { locale, t } = await getI18n();
   return (
-    <html lang="ar" dir="rtl" className={`${ibmArabic.variable} ${ibmSans.variable} h-full`}>
-      <body className="min-h-full bg-white font-sans text-ink antialiased">
-        <PwaRegister />
-        {children}
+    <html lang={locale} dir={dirFor(locale)} className={`${ibmArabic.variable} ${ibmSans.variable} h-full`}>
+      <body className="min-h-full bg-background font-sans text-ink antialiased">
+        <I18nProvider locale={locale} dictionary={t}>
+          <PwaRegister />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

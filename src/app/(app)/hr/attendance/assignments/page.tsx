@@ -68,10 +68,10 @@ export default async function HrAttendanceAssignmentsPage() {
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموظف</th>
-              <th className="px-4 py-3 text-right">الوردية</th>
-              <th className="px-4 py-3 text-right">من</th>
-              <th className="px-4 py-3 text-right">إلى</th>
+              <th className="px-4 py-3 text-start">الموظف</th>
+              <th className="px-4 py-3 text-start">الوردية</th>
+              <th className="px-4 py-3 text-start">من</th>
+              <th className="px-4 py-3 text-start">إلى</th>
             </tr>
           </thead>
           <tbody>

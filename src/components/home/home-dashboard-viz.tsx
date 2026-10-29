@@ -3,39 +3,41 @@ import { FolderKanban, Stamp, Users, AlertTriangle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/primitives";
 import { DonutChart, HorizontalBarList, StackedCountBars } from "@/components/charts/semantic-charts";
 import type { DashboardViz } from "@/server/use-cases/dashboard-viz";
+import { getI18n } from "@/lib/i18n/server";
 
-export function HomeDashboardViz({ viz }: { viz: DashboardViz }) {
+export async function HomeDashboardViz({ viz }: { viz: DashboardViz }) {
+  const { t } = await getI18n();
   const kpis = [
     viz.kpis.activeProjects != null
       ? {
-          label: "المشاريع النشطة",
+          label: t.home.kpiActiveProjects,
           value: viz.kpis.activeProjects,
           tone: "info" as const,
-          icon: <FolderKanban className="h-4 w-4" />,
+          icon: <FolderKanban className="size-5" />,
         }
       : null,
     viz.kpis.pendingApprovals != null
       ? {
-          label: "الموافقات المعلقة",
+          label: t.home.kpiPendingApprovals,
           value: viz.kpis.pendingApprovals,
           tone: "warning" as const,
-          icon: <Stamp className="h-4 w-4" />,
+          icon: <Stamp className="size-5" />,
         }
       : null,
     viz.kpis.overdueStages != null
       ? {
-          label: "المراحل المتأخرة",
+          label: t.home.kpiOverdueStages,
           value: viz.kpis.overdueStages,
           tone: "danger" as const,
-          icon: <AlertTriangle className="h-4 w-4" />,
+          icon: <AlertTriangle className="size-5" />,
         }
       : null,
     viz.kpis.activeEmployees != null
       ? {
-          label: "الموظفون النشطون",
+          label: t.home.kpiActiveEmployees,
           value: viz.kpis.activeEmployees,
           tone: "success" as const,
-          icon: <Users className="h-4 w-4" />,
+          icon: <Users className="size-5" />,
         }
       : null,
   ].filter(Boolean) as Array<{
@@ -57,25 +59,27 @@ export function HomeDashboardViz({ viz }: { viz: DashboardViz }) {
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Card className="min-w-0 lg:col-span-7">
-          <HorizontalBarList title="تقدم المشاريع" rows={viz.progressRows} />
+          <HorizontalBarList title={t.home.chartProjectProgress} emptyLabel={t.common.noDataYet} rows={viz.progressRows} />
         </Card>
         <Card className="min-w-0 lg:col-span-5">
           <DonutChart
-            title="حالة المشاريع"
+            emptyLabel={t.common.noDataYet}
+            title={t.home.chartProjectStatus}
             segments={viz.projectStatus}
             centerValue={viz.projectStatusTotal}
-            centerLabel="إجمالي"
+            centerLabel={t.home.chartTotal}
           />
         </Card>
         <Card className="min-w-0 lg:col-span-7">
-          <StackedCountBars title="حالة المراحل" rows={viz.stageAttention} />
+          <StackedCountBars title={t.home.chartStageStatus} emptyLabel={t.common.noDataYet} rows={viz.stageAttention} />
         </Card>
         <Card className="min-w-0 lg:col-span-5">
           <DonutChart
-            title="الموافقات"
+            emptyLabel={t.common.noDataYet}
+            title={t.home.chartApprovals}
             segments={viz.approvalStatus}
             centerValue={viz.approvalTotal}
-            centerLabel="إجمالي"
+            centerLabel={t.home.chartTotal}
           />
         </Card>
       </div>

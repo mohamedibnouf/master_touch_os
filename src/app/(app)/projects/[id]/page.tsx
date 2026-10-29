@@ -955,7 +955,7 @@ export default async function ProjectDetailPage({
                 </ul>
                 <TableScroll className="hidden rounded-lg border border-line md:block">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-paper text-right text-muted">
+                    <thead className="bg-paper text-start text-muted">
                       <tr>
                         <th className="px-3 py-2 font-medium">المستند</th>
                         <th className="px-3 py-2 font-medium">التصنيف</th>
@@ -1131,7 +1131,7 @@ function ProjectMiniTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-paper text-right text-muted">
+            <thead className="bg-paper text-start text-muted">
               <tr>
                 {headers.map((h) => (
                   <th key={h} className="px-3 py-2 font-medium">

@@ -110,11 +110,11 @@ export default async function PayrollDashboardPage() {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الفترة</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
-                <th className="px-4 py-3 text-right">الموظفون</th>
-                <th className="px-4 py-3 text-right">الإجمالي</th>
-                <th className="px-4 py-3 text-right">الصافي</th>
+                <th className="px-4 py-3 text-start">الفترة</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
+                <th className="px-4 py-3 text-start">الموظفون</th>
+                <th className="px-4 py-3 text-start">الإجمالي</th>
+                <th className="px-4 py-3 text-start">الصافي</th>
               </tr>
             </thead>
             <tbody>

@@ -96,7 +96,7 @@ export default async function NewQuotationPage({ params }: { params: Promise<{ i
             <h3 className="mb-3 font-semibold text-navy">تفاصيل البنود</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-paper text-right text-muted">
+                <thead className="bg-paper text-start text-muted">
                   <tr>
                     <th className="px-3 py-2">#</th>
                     <th className="px-3 py-2">الوصف</th>

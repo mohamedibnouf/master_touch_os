@@ -14,6 +14,8 @@ import { getAiPlatformConfig } from "@/modules/ai/config-env";
 import { loadExecutiveIntelligenceFacts } from "@/server/use-cases/executive-intelligence-facts";
 import type { AuthContext } from "@/types/models";
 import type { DashboardViz } from "@/server/use-cases/dashboard-viz";
+import { format, intlLocale, pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 async function ExecutiveIntelligenceBlock({
   ctx,
@@ -32,8 +34,9 @@ export default async function DashboardPage() {
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
-  const greetingName = ctx.profile.full_name_ar || ctx.profile.full_name_en || "مرحباً";
-  const displayDate = new Date().toLocaleDateString("ar-SA", {
+  const { locale, t } = await getI18n();
+  const greetingName = pickLocalized(locale, ctx.profile.full_name_ar, ctx.profile.full_name_en);
+  const displayDate = new Date().toLocaleDateString(intlLocale(locale), {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -49,12 +52,18 @@ export default async function DashboardPage() {
     <PageContainer data-testid="employee-home" className="space-y-4 md:space-y-5">
       <header className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-ink">
-            مرحباً، <span dir="auto">{greetingName}</span>
+          <h1 className="text-[1.375rem] font-semibold leading-tight tracking-tight text-ink md:text-2xl">
+            {greetingName ? (
+              <bdi>{format(t.home.greeting, { name: greetingName })}</bdi>
+            ) : (
+              t.home.greetingFallback
+            )}
           </h1>
-          <p className="mt-1 text-sm text-muted">ماذا يحتاج انتباهك اليوم؟</p>
+          <p className="mt-1.5 text-sm text-muted">{t.home.subtitle}</p>
         </div>
-        <p className="shrink-0 text-sm text-muted">{displayDate}</p>
+        <p className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted shadow-card">
+          {displayDate}
+        </p>
       </header>
 
       {viz ? <HomeDashboardViz viz={viz} /> : null}

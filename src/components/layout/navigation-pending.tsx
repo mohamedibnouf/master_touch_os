@@ -3,8 +3,10 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
 
 export function NavigationPendingBar() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const active = pendingPath !== null && pendingPath !== pathname;
@@ -48,9 +50,9 @@ export function NavigationPendingBar() {
       )}
       role="progressbar"
       aria-hidden={!active}
-      aria-label={active ? "جارٍ الانتقال" : undefined}
+      aria-label={active ? t.shell.navigating : undefined}
     >
-      <div className={cn("h-full w-full origin-right bg-primary", active && "animate-nav-indeterminate")} />
+      <div className={cn("h-full w-full bg-brand ltr:origin-left rtl:origin-right", active && "animate-nav-indeterminate")} />
     </div>
   );
 }

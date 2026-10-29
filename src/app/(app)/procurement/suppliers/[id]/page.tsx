@@ -141,9 +141,9 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">الرقم</th>
-                  <th className="py-2 text-right">الإجمالي</th>
-                  <th className="py-2 text-right">الحالة</th>
+                  <th className="py-2 text-start">الرقم</th>
+                  <th className="py-2 text-start">الإجمالي</th>
+                  <th className="py-2 text-start">الحالة</th>
                 </tr>
               </thead>
               <tbody>

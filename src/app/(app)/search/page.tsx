@@ -328,10 +328,10 @@ export default async function SearchPage({
             <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-paper text-muted">
                 <tr>
-                  <th className="px-4 py-3 text-right">النوع</th>
-                  <th className="px-4 py-3 text-right">الرقم</th>
-                  <th className="px-4 py-3 text-right">العنوان</th>
-                  <th className="px-4 py-3 text-right">الحالة</th>
+                  <th className="px-4 py-3 text-start">النوع</th>
+                  <th className="px-4 py-3 text-start">الرقم</th>
+                  <th className="px-4 py-3 text-start">العنوان</th>
+                  <th className="px-4 py-3 text-start">الحالة</th>
                 </tr>
               </thead>
               <tbody>

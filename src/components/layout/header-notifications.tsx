@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { formatRiyadhDateTimeAr } from "@/modules/projects/deadline";
 import { NotificationNavLink } from "@/components/notifications/notification-nav-link";
+import { useI18n } from "@/lib/i18n/client";
+import { format } from "@/lib/i18n/config";
 
 export type HeaderNotice = {
   id: string;
@@ -21,6 +23,7 @@ export function HeaderNotifications({
   unreadCount: number;
   items: HeaderNotice[];
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -46,7 +49,7 @@ export function HeaderNotifications({
       <button
         type="button"
         className="mt-icon-btn relative cursor-pointer"
-        aria-label={unreadCount > 0 ? `التنبيهات، ${unreadCount} غير مقروء` : "التنبيهات"}
+        aria-label={unreadCount > 0 ? format(t.shell.notificationsUnread, { count: unreadCount }) : t.shell.notifications}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
@@ -64,11 +67,11 @@ export function HeaderNotifications({
       {open ? (
         <div
           id={panelId}
-          aria-label="التنبيهات"
+          aria-label={t.shell.notifications}
           className="absolute end-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-surface)] border border-line bg-white p-2 shadow-[var(--shadow-2)]"
         >
           {items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted">لا توجد تنبيهات.</p>
+            <p className="px-3 py-6 text-center text-sm text-muted">{t.shell.noNotifications}</p>
           ) : (
             <ul className="max-h-80 space-y-1 overflow-y-auto">
               {items.map((item) => (
@@ -108,7 +111,7 @@ export function HeaderNotifications({
             className="mt-2 block rounded-[var(--radius-control)] px-3 py-2 text-center text-sm font-medium text-primary duration-150 hover:bg-surface-muted"
             onClick={() => setOpen(false)}
           >
-            كل التنبيهات
+            {t.shell.allNotifications}
           </Link>
         </div>
       ) : null}

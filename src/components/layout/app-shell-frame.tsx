@@ -2,42 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { signOutAction } from "@/modules/auth/actions";
 import { Button } from "@/components/ui/primitives";
+import { useI18n } from "@/lib/i18n/client";
 import type { AppNavFlags } from "./nav-flags";
 import { Sidebar } from "./sidebar";
 import { NavigationPendingBar } from "./navigation-pending";
+import { LanguageSwitch } from "./language-switch";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "م";
+  if (parts.length === 0) return "M";
   if (parts.length === 1) return parts[0].slice(0, 1);
   return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`;
 }
 
 export function AppShellFrame({
-  organizationNameAr,
-  organizationNameEn,
+  organizationName,
+  organizationNameAlt,
   userName,
   jobTitle,
   flags,
   notificationsSlot,
   children,
 }: {
-  organizationNameAr: string;
-  organizationNameEn: string;
+  organizationName: string;
+  organizationNameAlt: string;
   userName: string;
   jobTitle: string;
   flags: AppNavFlags;
   notificationsSlot: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const routeKey = pathname;
   const [openForRoute, setOpenForRoute] = useState(routeKey);
   const drawerOpen = navOpen && openForRoute === routeKey;
+  const initials = initialsFromName(userName);
 
   const setDrawerOpen = (next: boolean) => {
     setOpenForRoute(routeKey);
@@ -66,19 +70,19 @@ export function AppShellFrame({
   }, [drawerOpen, routeKey]);
 
   return (
-    <div className="flex min-h-dvh min-w-0 overflow-x-clip bg-white">
+    <div className="flex min-h-dvh min-w-0 overflow-x-clip bg-background">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:text-navy"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:text-ink"
       >
-        تخطي إلى المحتوى
+        {t.shell.skipToContent}
       </a>
       <NavigationPendingBar />
       {drawerOpen ? (
         <button
           type="button"
-          aria-label="إغلاق القائمة"
-          className="fixed inset-0 z-40 bg-ink/40 xl:hidden print:hidden"
+          aria-label={t.shell.closeMenu}
+          className="fixed inset-0 z-40 bg-ink/50 backdrop-blur-[2px] xl:hidden print:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
@@ -89,13 +93,14 @@ export function AppShellFrame({
         onClose={() => setDrawerOpen(false)}
         userName={userName}
         jobTitle={jobTitle}
+        initials={initials}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          className="flex min-h-14 items-center gap-3 border-b border-line bg-white px-3 text-ink md:px-6 print:hidden"
+          className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line/80 bg-surface/85 px-3 text-ink backdrop-blur-md md:px-6 print:hidden"
           style={{
-            paddingTop: "max(0.75rem, env(safe-area-inset-top))",
+            paddingTop: "max(0.5rem, env(safe-area-inset-top))",
             paddingInlineStart: "max(0.75rem, env(safe-area-inset-left))",
             paddingInlineEnd: "max(0.75rem, env(safe-area-inset-right))",
           }}
@@ -103,46 +108,48 @@ export function AppShellFrame({
           <button
             type="button"
             className="mt-icon-btn xl:hidden"
-            aria-label="فتح القائمة"
+            aria-label={t.shell.openMenu}
             aria-expanded={drawerOpen}
             aria-controls="app-sidebar"
             onClick={() => setDrawerOpen(true)}
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="size-5" />
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink" title={organizationNameEn || organizationNameAr}>
-              {organizationNameAr}
+            <p className="truncate text-sm font-semibold text-ink" title={organizationNameAlt || organizationName} dir="auto">
+              {organizationName}
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <LanguageSwitch />
             {flags.notifications ? notificationsSlot : null}
-            <div className="hidden h-6 w-px bg-line sm:block" aria-hidden />
+            <div className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden />
             <div
-              className="flex min-w-0 items-center gap-2 rounded-[var(--radius-control)] py-1 pe-1 ps-1"
+              className="flex min-w-0 items-center gap-2.5 py-1"
               data-testid="header-account"
               title={jobTitle}
             >
               <span
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-primary text-xs font-semibold text-white shadow-sm"
                 aria-hidden
               >
-                {initialsFromName(userName)}
+                {initials}
               </span>
-              <div className="hidden min-w-0 sm:block">
-                <p className="max-w-[10rem] truncate text-sm font-medium leading-tight text-ink md:max-w-[14rem]" dir="auto">
+              <div className="hidden min-w-0 lg:block">
+                <p className="max-w-[12rem] truncate text-sm font-medium leading-tight text-ink" dir="auto">
                   {userName}
                 </p>
-                <p className="max-w-[10rem] truncate text-xs text-muted md:max-w-[14rem]" dir="auto">
+                <p className="max-w-[12rem] truncate text-xs text-muted" dir="auto">
                   {jobTitle}
                 </p>
               </div>
             </div>
             <form action={signOutAction}>
-              <Button type="submit" variant="ghost" className="px-2.5 text-sm">
-                خروج
+              <Button type="submit" variant="ghost" className="px-2.5" aria-label={t.shell.signOut} title={t.shell.signOut}>
+                <LogOut className="size-4 rtl:-scale-x-100" aria-hidden />
+                <span className="hidden sm:inline">{t.shell.signOut}</span>
               </Button>
             </form>
           </div>
@@ -150,8 +157,8 @@ export function AppShellFrame({
 
         <main
           id="main-content"
-          className="min-w-0 w-full flex-1 px-4 py-4 md:px-8 md:py-5 print:max-w-none print:p-0"
-          style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+          className="min-w-0 w-full flex-1 px-4 py-5 md:px-8 md:py-7 print:max-w-none print:p-0"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           {children}
         </main>

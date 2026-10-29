@@ -103,8 +103,8 @@ export default async function HrWorkplaceLocationsPage() {
         <table className="w-full min-w-[880px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموقع</th>
-              <th className="px-4 py-3 text-right">تعديل</th>
+              <th className="px-4 py-3 text-start">الموقع</th>
+              <th className="px-4 py-3 text-start">تعديل</th>
             </tr>
           </thead>
           <tbody>
@@ -217,12 +217,12 @@ export default async function HrWorkplaceLocationsPage() {
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموظف</th>
-              <th className="px-4 py-3 text-right">الموقع</th>
-              <th className="px-4 py-3 text-right">من</th>
-              <th className="px-4 py-3 text-right">إلى</th>
-              <th className="px-4 py-3 text-right">الحالة</th>
-              <th className="px-4 py-3 text-right">إجراءات</th>
+              <th className="px-4 py-3 text-start">الموظف</th>
+              <th className="px-4 py-3 text-start">الموقع</th>
+              <th className="px-4 py-3 text-start">من</th>
+              <th className="px-4 py-3 text-start">إلى</th>
+              <th className="px-4 py-3 text-start">الحالة</th>
+              <th className="px-4 py-3 text-start">إجراءات</th>
             </tr>
           </thead>
           <tbody>

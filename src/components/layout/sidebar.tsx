@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Banknote,
   Bell,
+  BellRing,
   Building2,
   CalendarDays,
+  CalendarCheck,
   ClipboardList,
   FileText,
   FolderKanban,
@@ -21,91 +24,101 @@ import {
   ShoppingCart,
   Wallet,
   Clock,
+  Timer,
   Gauge,
   Sparkles,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
+import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
 import type { AppNavFlags } from "./nav-flags";
 
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; show: keyof AppNavFlags | "always" };
+type NavItemKey = keyof Dictionary["nav"]["items"];
+type NavGroupKey = keyof Dictionary["nav"]["groups"];
+type FinanceKey = keyof Dictionary["nav"]["finance"];
 
-type NavGroup = { id: string; label: string; items: NavItem[] };
+type NavItem = { href: string; key: NavItemKey; icon: typeof LayoutDashboard; show: keyof AppNavFlags | "always" };
+
+type NavGroup = { id: NavGroupKey; items: NavItem[] };
 
 const groups: NavGroup[] = [
   {
     id: "home",
-    label: "الرئيسية",
-    items: [{ href: "/", label: "لوحة العمل", icon: LayoutDashboard, show: "always" }],
+    items: [{ href: "/", key: "dashboard", icon: LayoutDashboard, show: "always" }],
   },
   {
     id: "my",
-    label: "عملي",
     items: [
-      { href: "/attendance", label: "الحضور", icon: Clock, show: "attendance" },
-      { href: "/leave", label: "الإجازات", icon: CalendarDays, show: "leave" },
-      { href: "/approvals", label: "الموافقات", icon: Stamp, show: "approvals" },
-      { href: "/notifications", label: "التنبيهات", icon: Bell, show: "notifications" },
-      { href: "/notifications/preferences", label: "تفضيلات التنبيه", icon: Bell, show: "notifications" },
-      { href: "/my/payslips", label: "قسائمي", icon: Banknote, show: "payslips" },
+      { href: "/attendance", key: "attendance", icon: Clock, show: "attendance" },
+      { href: "/leave", key: "leave", icon: CalendarDays, show: "leave" },
+      { href: "/approvals", key: "approvals", icon: Stamp, show: "approvals" },
+      { href: "/notifications", key: "notifications", icon: Bell, show: "notifications" },
+      { href: "/notifications/preferences", key: "notificationPreferences", icon: BellRing, show: "notifications" },
+      { href: "/my/payslips", key: "payslips", icon: Banknote, show: "payslips" },
     ],
   },
   {
     id: "projects",
-    label: "المشاريع",
     items: [
-      { href: "/projects", label: "المشاريع", icon: FolderKanban, show: "projects" },
-      { href: "/engineering", label: "الهندسة", icon: Wrench, show: "engineering" },
-      { href: "/document-control", label: "مراقبة الوثائق", icon: ClipboardList, show: "documentControl" },
-      { href: "/documents", label: "المستندات", icon: FileText, show: "documents" },
-      { href: "/search", label: "بحث موحّد", icon: Search, show: "search" },
+      { href: "/projects", key: "projects", icon: FolderKanban, show: "projects" },
+      { href: "/engineering", key: "engineering", icon: Wrench, show: "engineering" },
+      { href: "/document-control", key: "documentControl", icon: ClipboardList, show: "documentControl" },
+      { href: "/documents", key: "documents", icon: FileText, show: "documents" },
+      { href: "/search", key: "search", icon: Search, show: "search" },
     ],
   },
   {
     id: "commercial",
-    label: "التشغيل",
     items: [
-      { href: "/procurement", label: "المشتريات", icon: ShoppingCart, show: "procurement" },
-      { href: "/finance", label: "المالية", icon: Wallet, show: "finance" },
+      { href: "/procurement", key: "procurement", icon: ShoppingCart, show: "procurement" },
+      { href: "/finance", key: "finance", icon: Wallet, show: "finance" },
     ],
   },
   {
     id: "people",
-    label: "الموارد البشرية",
     items: [
-      { href: "/employees", label: "الموظفون", icon: Users, show: "employees" },
-      { href: "/departments", label: "الإدارات", icon: Building2, show: "departments" },
-      { href: "/hr/leave", label: "إدارة الإجازات", icon: CalendarDays, show: "hrLeave" },
-      { href: "/hr/attendance", label: "إدارة الحضور", icon: Clock, show: "hrAttendance" },
-      { href: "/payroll", label: "الرواتب", icon: Banknote, show: "payroll" },
+      { href: "/employees", key: "employees", icon: Users, show: "employees" },
+      { href: "/departments", key: "departments", icon: Building2, show: "departments" },
+      { href: "/hr/leave", key: "hrLeave", icon: CalendarCheck, show: "hrLeave" },
+      { href: "/hr/attendance", key: "hrAttendance", icon: Timer, show: "hrAttendance" },
+      { href: "/payroll", key: "payroll", icon: Banknote, show: "payroll" },
     ],
   },
   {
     id: "management",
-    label: "الإدارة",
     items: [
-      { href: "/management", label: "مركز القيادة", icon: Gauge, show: "management" },
-      { href: "/management/analyst", label: "المحلل الذكي", icon: Sparkles, show: "analyst" },
+      { href: "/management", key: "management", icon: Gauge, show: "management" },
+      { href: "/management/analyst", key: "analyst", icon: Sparkles, show: "analyst" },
     ],
   },
   {
     id: "system",
-    label: "النظام",
     items: [
-      { href: "/settings", label: "الإعدادات", icon: Settings, show: "settings" },
-      { href: "/settings/roles", label: "الأدوار والصلاحيات", icon: Shield, show: "roles" },
+      { href: "/settings", key: "settings", icon: Settings, show: "settings" },
+      { href: "/settings/roles", key: "roles", icon: Shield, show: "roles" },
     ],
   },
 ];
 
-const financeSubLinks = [
-  { href: "/finance", label: "لوحة المالية", exact: true },
-  { href: "/finance/supplier-invoices", label: "فواتير الموردين" },
-  { href: "/finance/client-valuations", label: "مستخلصات العملاء" },
-  { href: "/finance/client-invoices", label: "فواتير العملاء" },
-  { href: "/finance/variations", label: "أوامر التغيير" },
-  { href: "/finance/receivables", label: "ذمم العملاء" },
+const financeSubLinks: { href: string; key: FinanceKey; exact?: boolean }[] = [
+  { href: "/finance", key: "dashboard", exact: true },
+  { href: "/finance/supplier-invoices", key: "supplierInvoices" },
+  { href: "/finance/client-valuations", key: "clientValuations" },
+  { href: "/finance/client-invoices", key: "clientInvoices" },
+  { href: "/finance/variations", key: "variations" },
+  { href: "/finance/receivables", key: "receivables" },
 ];
+
+/** Longest matching nav href wins, so /settings/roles does not also light up /settings. */
+function activeHref(pathname: string, hrefs: string[]): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    const match = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+    if (match && (!best || href.length > best.length)) best = href;
+  }
+  return best;
+}
 
 export function Sidebar({
   flags,
@@ -113,13 +126,16 @@ export function Sidebar({
   onClose,
   userName,
   jobTitle,
+  initials,
 }: {
   flags: AppNavFlags;
   open?: boolean;
   onClose?: () => void;
   userName?: string;
   jobTitle?: string;
+  initials?: string;
 }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const onFinance = pathname.startsWith("/finance");
   const [isDesktop, setIsDesktop] = useState(false);
@@ -138,44 +154,65 @@ export function Sidebar({
       items: g.items.filter((item) => item.show === "always" || flags[item.show]),
     }))
     .filter((g) => g.items.length > 0);
+  const current = activeHref(
+    pathname,
+    visibleGroups.flatMap((g) => g.items.map((item) => item.href)),
+  );
 
   return (
     <aside
       id="app-sidebar"
       aria-hidden={isDesktop ? false : !open}
       className={cn(
-        "flex w-[16.5rem] shrink-0 flex-col border-e border-line bg-white text-ink print:hidden",
+        "flex w-[17rem] shrink-0 flex-col bg-sidebar text-sidebar-ink print:hidden",
         "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out max-xl:transition-transform",
-        "xl:static xl:z-auto xl:h-auto xl:min-h-dvh xl:self-stretch xl:translate-x-0 xl:transition-none",
+        "xl:sticky xl:top-0 xl:z-auto xl:translate-x-0 xl:transition-none",
         "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
         open ? "max-xl:translate-x-0" : "max-xl:-translate-x-full max-xl:rtl:translate-x-full",
       )}
     >
-      <div className="flex items-start justify-between gap-3 px-4 pb-4 pt-5">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">Master Touch</p>
-          <p className="mt-0.5 text-xs text-muted">نظام التشغيل</p>
-        </div>
+      <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-5">
+        <Link href="/" onClick={onClose} className="flex min-w-0 items-center gap-3 rounded-lg outline-offset-4">
+          <Image
+            src="/icons/icon-192x192.png"
+            alt=""
+            width={36}
+            height={36}
+            priority
+            className="size-9 shrink-0 rounded-[0.6rem] ring-1 ring-white/10"
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-[0.9375rem] font-semibold tracking-tight text-white">
+              {t.common.appName}
+            </span>
+            <span className="block truncate text-xs text-sidebar-muted">{t.common.appTagline}</span>
+          </span>
+        </Link>
         <button
           type="button"
-          className="mt-icon-btn xl:hidden"
-          aria-label="إغلاق القائمة"
+          className="inline-flex size-9 items-center justify-center rounded-lg text-sidebar-muted hover:bg-white/5 hover:text-white xl:hidden"
+          aria-label={t.shell.closeMenu}
           onClick={onClose}
         >
-          <X className="h-4 w-4" />
+          <X className="size-4" />
         </button>
       </div>
-      <div className="mx-4 h-px bg-line" aria-hidden />
-      <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4" aria-label="التنقل الرئيسي">
+
+      <nav
+        className="mt-sidebar-scroll flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 pb-4 pt-2"
+        aria-label={t.shell.mainNav}
+      >
         {visibleGroups.map((group) => (
           <div key={group.id}>
             {group.id !== "home" ? (
-              <p className="px-2.5 pb-1.5 text-[11px] font-medium text-muted">{group.label}</p>
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-muted/80">
+                {t.nav.groups[group.id]}
+              </p>
             ) : null}
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const active = current === item.href;
                 const isFinance = item.href === "/finance";
                 return (
                   <div key={item.href}>
@@ -184,17 +221,29 @@ export function Sidebar({
                       onClick={onClose}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-1.5 text-sm duration-150 transition-colors",
+                        "group relative flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 text-sm duration-150 transition-colors",
                         active
-                          ? "bg-primary/10 font-medium text-primary"
-                          : "text-ink/80 hover:bg-surface-muted hover:text-ink",
+                          ? "bg-white/[0.08] font-medium text-white"
+                          : "text-sidebar-ink/75 hover:bg-white/[0.04] hover:text-white",
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{item.label}</span>
+                      {active ? (
+                        <span
+                          aria-hidden
+                          className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand shadow-[0_0_12px_var(--brand-glow)]"
+                        />
+                      ) : null}
+                      <Icon
+                        className={cn(
+                          "size-[1.125rem] shrink-0 duration-150 transition-colors",
+                          active ? "text-brand" : "text-sidebar-muted group-hover:text-sidebar-ink",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="truncate">{t.nav.items[item.key]}</span>
                     </Link>
                     {isFinance && onFinance ? (
-                      <div className="me-2 mt-1 space-y-0.5 border-s border-line pe-2">
+                      <div className="ms-[1.3rem] mt-1 space-y-0.5 border-s border-sidebar-line ps-3">
                         {financeSubLinks.map((sub) => {
                           const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
                           return (
@@ -205,11 +254,13 @@ export function Sidebar({
                               aria-current={subActive ? "page" : undefined}
                               data-testid={`sidebar-${sub.href.replaceAll("/", "-").slice(1)}`}
                               className={cn(
-                                "block rounded-[var(--radius-control)] py-1.5 pe-3 ps-6 text-xs duration-150 transition-colors",
-                                subActive ? "bg-primary/10 font-medium text-primary" : "text-muted hover:bg-surface-muted hover:text-ink",
+                                "block rounded-[var(--radius-control)] px-3 py-1.5 text-[0.8125rem] duration-150 transition-colors",
+                                subActive
+                                  ? "bg-white/[0.06] font-medium text-white"
+                                  : "text-sidebar-muted hover:bg-white/[0.04] hover:text-white",
                               )}
                             >
-                              {sub.label}
+                              {t.nav.finance[sub.key]}
                             </Link>
                           );
                         })}
@@ -222,16 +273,25 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+
       {userName ? (
-        <div className="border-t border-line px-4 py-3">
-          <p className="truncate text-sm font-medium text-ink" dir="auto">
-            {userName}
-          </p>
-          {jobTitle ? (
-            <p className="truncate text-xs text-muted" dir="auto">
-              {jobTitle}
-            </p>
-          ) : null}
+        <div className="m-3 flex items-center gap-3 rounded-[var(--radius-surface)] bg-sidebar-elevated px-3 py-2.5 ring-1 ring-sidebar-line">
+          <span
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-primary text-xs font-semibold text-white"
+            aria-hidden
+          >
+            {initials}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium text-white" dir="auto">
+              {userName}
+            </span>
+            {jobTitle ? (
+              <span className="block truncate text-xs text-sidebar-muted" dir="auto">
+                {jobTitle}
+              </span>
+            ) : null}
+          </span>
         </div>
       ) : null}
     </aside>

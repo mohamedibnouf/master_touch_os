@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "@/lib/i18n/client";
+
 export function SkeletonPulse({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-line/80 ${className ?? ""}`} />;
 }
@@ -62,9 +66,10 @@ export function FormSkeleton() {
 }
 
 export function PageRouteSkeleton() {
+  const { t } = useI18n();
   return (
-    <div data-testid="route-loading" role="status" aria-live="polite" aria-label="جارٍ التحميل">
-      <span className="sr-only">جارٍ التحميل…</span>
+    <div data-testid="route-loading" role="status" aria-live="polite" aria-label={t.common.loading}>
+      <span className="sr-only">{t.common.loading}</span>
       <PageHeaderSkeleton />
       <KpiRowSkeleton />
       <TableListSkeleton />

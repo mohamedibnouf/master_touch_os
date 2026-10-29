@@ -66,10 +66,10 @@ export default async function MyPayslipsPage() {
           <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الفترة</th>
-                <th className="px-4 py-3 text-right">الإجمالي</th>
-                <th className="px-4 py-3 text-right">الصافي</th>
-                <th className="px-4 py-3 text-right">الصرف</th>
+                <th className="px-4 py-3 text-start">الفترة</th>
+                <th className="px-4 py-3 text-start">الإجمالي</th>
+                <th className="px-4 py-3 text-start">الصافي</th>
+                <th className="px-4 py-3 text-start">الصرف</th>
               </tr>
             </thead>
             <tbody>

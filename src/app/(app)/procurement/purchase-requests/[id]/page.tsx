@@ -110,10 +110,10 @@ export default async function PurchaseRequestDetailPage({
             <table className="w-full text-sm">
               <thead className="text-muted">
                 <tr>
-                  <th className="py-2 text-right">#</th>
-                  <th className="py-2 text-right">الوصف</th>
-                  <th className="py-2 text-right">الكمية</th>
-                  <th className="py-2 text-right">التقدير</th>
+                  <th className="py-2 text-start">#</th>
+                  <th className="py-2 text-start">الوصف</th>
+                  <th className="py-2 text-start">الكمية</th>
+                  <th className="py-2 text-start">التقدير</th>
                 </tr>
               </thead>
               <tbody>

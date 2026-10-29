@@ -204,14 +204,14 @@ export default async function HrAttendancePage({
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الموظف</th>
-                <th className="px-4 py-3 text-right">الإجراء</th>
-                <th className="px-4 py-3 text-right">النتيجة</th>
-                <th className="px-4 py-3 text-right">الموقع</th>
-                <th className="px-4 py-3 text-right">المسافة</th>
-                <th className="px-4 py-3 text-right">الدقة</th>
-                <th className="px-4 py-3 text-right">الوقت</th>
-                {canEvidence ? <th className="px-4 py-3 text-right">الإحداثيات</th> : null}
+                <th className="px-4 py-3 text-start">الموظف</th>
+                <th className="px-4 py-3 text-start">الإجراء</th>
+                <th className="px-4 py-3 text-start">النتيجة</th>
+                <th className="px-4 py-3 text-start">الموقع</th>
+                <th className="px-4 py-3 text-start">المسافة</th>
+                <th className="px-4 py-3 text-start">الدقة</th>
+                <th className="px-4 py-3 text-start">الوقت</th>
+                {canEvidence ? <th className="px-4 py-3 text-start">الإحداثيات</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -248,11 +248,11 @@ export default async function HrAttendancePage({
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الموظف</th>
-                <th className="px-4 py-3 text-right">دخول</th>
-                <th className="px-4 py-3 text-right">انصراف</th>
-                <th className="px-4 py-3 text-right">عمل (د)</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-start">الموظف</th>
+                <th className="px-4 py-3 text-start">دخول</th>
+                <th className="px-4 py-3 text-start">انصراف</th>
+                <th className="px-4 py-3 text-start">عمل (د)</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
               </tr>
             </thead>
             <tbody>

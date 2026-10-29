@@ -5,6 +5,8 @@ import { CoreRepository } from "@/server/repositories/core.repository";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 import type { AppNavFlags } from "./nav-flags";
 import { AppShellFrame } from "./app-shell-frame";
 import { HeaderNotifications } from "./header-notifications";
@@ -89,12 +91,17 @@ export async function AppShell({
     analyst: g("reports.management.read"),
   };
 
+  const { locale, t } = await getI18n();
+  const organizationName = pickLocalized(locale, ctx.organization.name_ar, ctx.organization.name_en);
+
   return (
     <AppShellFrame
-      organizationNameAr={ctx.organization.name_ar}
-      organizationNameEn={ctx.organization.name_en}
-      userName={ctx.profile.full_name_ar || ctx.profile.full_name_en || "مستخدم"}
-      jobTitle={ctx.employee?.job_title_ar ?? "حساب تشغيلي"}
+      organizationName={organizationName}
+      organizationNameAlt={locale === "ar" ? ctx.organization.name_en : ctx.organization.name_ar}
+      userName={pickLocalized(locale, ctx.profile.full_name_ar, ctx.profile.full_name_en) || t.common.user}
+      jobTitle={
+        pickLocalized(locale, ctx.employee?.job_title_ar, ctx.employee?.job_title_en) || t.shell.operationalAccount
+      }
       flags={flags}
       notificationsSlot={
         flags.notifications ? (

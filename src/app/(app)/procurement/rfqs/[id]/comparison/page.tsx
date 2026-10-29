@@ -135,7 +135,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
       <Card className="mb-6 p-0">
         <TableScroll>
           <table className="w-full text-sm">
-            <thead className="bg-paper text-right text-muted">
+            <thead className="bg-paper text-start text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">البند</th>
                 {quotes.map((q) => {
@@ -168,7 +168,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
                     const qItems = (q.supplier_quotation_items as Array<Record<string, unknown>>) ?? [];
                     const match = qItems.find((qi) => String(qi.rfq_item_id) === String(rfqItem.id));
                     return (
-                      <td key={q.id} className="border-l border-line px-4 py-3">
+                      <td key={q.id} className="border-e border-line px-4 py-3">
                         {match ? (
                           <div className="space-y-1">
                             <div className="tabular-nums">
@@ -202,7 +202,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
               <tr className="border-t-2 border-primary/20 bg-paper font-semibold">
                 <td className="px-4 py-3">الإجمالي الكلي</td>
                 {quotes.map((q) => (
-                  <td key={q.id} className="border-l border-line px-4 py-3">
+                  <td key={q.id} className="border-e border-line px-4 py-3">
                     <div className="space-y-1 text-sm">
                       <div className="tabular-nums">
                         <MoneyDisplay amount={q.subtotal} currency={q.currency} />

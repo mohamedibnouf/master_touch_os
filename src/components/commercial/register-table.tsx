@@ -26,7 +26,7 @@ export function RegisterTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="bg-paper text-right text-muted">
+        <thead className="bg-paper text-start text-muted">
           <tr>
             {columns.map((col) => (
               <th key={col.key} className={`px-4 py-3 font-medium ${col.className ?? ""}`}>

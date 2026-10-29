@@ -108,10 +108,10 @@ export default async function AttendanceTeamPage() {
           <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-paper text-muted">
               <tr>
-                <th className="px-4 py-3 text-right">الموظف</th>
-                <th className="px-4 py-3 text-right">دخول</th>
-                <th className="px-4 py-3 text-right">انصراف</th>
-                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-start">الموظف</th>
+                <th className="px-4 py-3 text-start">دخول</th>
+                <th className="px-4 py-3 text-start">انصراف</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
               </tr>
             </thead>
             <tbody>
@@ -135,10 +135,10 @@ export default async function AttendanceTeamPage() {
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-paper text-muted">
             <tr>
-              <th className="px-4 py-3 text-right">الموظف</th>
-              <th className="px-4 py-3 text-right">التاريخ</th>
-              <th className="px-4 py-3 text-right">الحالة</th>
-              <th className="px-4 py-3 text-right">تأخير (د)</th>
+              <th className="px-4 py-3 text-start">الموظف</th>
+              <th className="px-4 py-3 text-start">التاريخ</th>
+              <th className="px-4 py-3 text-start">الحالة</th>
+              <th className="px-4 py-3 text-start">تأخير (د)</th>
             </tr>
           </thead>
           <tbody>

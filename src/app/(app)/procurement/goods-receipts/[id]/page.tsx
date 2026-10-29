@@ -70,7 +70,7 @@ export default async function GoodsReceiptDetailPage({ params }: { params: Promi
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-paper text-right text-muted">
+              <thead className="bg-paper text-start text-muted">
                 <tr>
                   <th className="px-3 py-2">الوصف</th>
                   <th className="px-3 py-2">المستلم</th>
