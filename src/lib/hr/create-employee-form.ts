@@ -53,6 +53,34 @@ export function readCreateEmployeeFormData(formData: FormData) {
 
 export type CreateEmployeeFormPayload = ReturnType<typeof readCreateEmployeeFormData>;
 
+function issueMessageEn(issue: z.ZodIssue): string {
+  const field = String(issue.path[0] ?? "");
+  if (field === "employee_number") {
+    if (issue.code === "too_small") return "Employee number is required.";
+    return "Employee number is not valid.";
+  }
+  if (field === "full_name_ar") {
+    if (issue.code === "too_small") return "The Arabic name must be at least 2 characters.";
+    return "The Arabic name is required.";
+  }
+  if (field === "full_name_en") {
+    if (issue.code === "too_small") return "The English name must be at least 2 characters.";
+    return "The English name is required.";
+  }
+  if (field === "email") return "The internal email is not valid.";
+  if (field === "initial_password") return "The password must be at least 8 characters.";
+  if (field === "employment_type") return "Employment type is not valid.";
+  if (field === "department_id") return "The selected department is not valid.";
+  if (field === "role_id") return "The selected role is not valid.";
+  if (field === "joining_date") return "Joining date is not valid.";
+  if (field === "job_title_id" || field === "job_title_ar" || field === "job_title_en") {
+    return "The job title is not valid.";
+  }
+  if (field === "nationality") return "Nationality is not valid.";
+  if (field === "work_location") return "Work location is not valid.";
+  return "Check the employee details.";
+}
+
 function issueMessageAr(issue: z.ZodIssue): string {
   const field = String(issue.path[0] ?? "");
   if (field === "employee_number") {
@@ -81,8 +109,8 @@ function issueMessageAr(issue: z.ZodIssue): string {
   return "تحقق من بيانات الموظف.";
 }
 
-export function createEmployeeValidationMessageAr(error: z.ZodError): string {
-  const messages = [...new Set(error.issues.map(issueMessageAr))];
+export function createEmployeeValidationMessageAr(error: z.ZodError, locale: "ar" | "en" = "ar"): string {
+  const messages = [...new Set(error.issues.map(locale === "en" ? issueMessageEn : issueMessageAr))];
   return messages.join(" ");
 }
 
@@ -107,17 +135,22 @@ export function createEmployeeLoginProvisioned(password: string | undefined): bo
   return Boolean(password);
 }
 
-export function employeeNumberConflictMessage(error: {
-  code?: string;
-  message?: string;
-  details?: string;
-} | null): string | null {
+export function employeeNumberConflictMessage(
+  error: {
+    code?: string;
+    message?: string;
+    details?: string;
+  } | null,
+  locale: "ar" | "en" = "ar",
+): string | null {
   if (error?.code !== "23505") return null;
   const blob = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
   if (blob.includes("employee_number")) {
-    return "الرقم الوظيفي مستخدم مسبقاً في هذه المنشأة.";
+    return locale === "en"
+      ? "This employee number is already used in this organization."
+      : "الرقم الوظيفي مستخدم مسبقاً في هذه المنشأة.";
   }
-  return "هذه البيانات مستخدمة مسبقاً.";
+  return locale === "en" ? "This data is already in use." : "هذه البيانات مستخدمة مسبقاً.";
 }
 
 export function hrCreateRoleAssignmentError(input: {

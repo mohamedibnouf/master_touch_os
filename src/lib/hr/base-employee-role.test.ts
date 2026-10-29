@@ -214,10 +214,10 @@ describe("base employee system role", () => {
 
 describe("067 base employee role SQL and create UX copy", () => {
   const sql = readFileSync(join(process.cwd(), "supabase/migrations/067_base_employee_role.sql"), "utf8");
-  const createUi = readFileSync(
-    join(process.cwd(), "src/components/hr/employee-create-form.tsx"),
-    "utf8",
-  );
+  // UI copy lives in the hrPeople dictionary; append it so the copy assertions still apply.
+  const createUi =
+    readFileSync(join(process.cwd(), "src/components/hr/employee-create-form.tsx"), "utf8") +
+    readFileSync(join(process.cwd(), "src/lib/i18n/dictionaries/hr-people.ar.ts"), "utf8");
   const payslipRls = readFileSync(
     join(process.cwd(), "supabase/migrations/060_phase4_payroll_payslip_rls_repair.sql"),
     "utf8",

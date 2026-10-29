@@ -2,11 +2,21 @@ import type { Dictionary } from "./ar";
 import { projectDetailEn } from "./project-detail.en";
 import { projectWorkflowEn } from "./project-workflow.en";
 import { projectCommercialEn } from "./project-commercial.en";
+import { employeeDetailEn } from "./employee-detail.en";
+import { hrPeopleEn } from "./hr-people.en";
+import { attendanceEn } from "./attendance.en";
+import { leaveEn } from "./leave.en";
+import { payrollEn } from "./payroll.en";
 
 export const en: Dictionary = {
   projectDetail: projectDetailEn,
   projectWorkflow: projectWorkflowEn,
   projectCommercial: projectCommercialEn,
+  employeeDetail: employeeDetailEn,
+  hrPeople: hrPeopleEn,
+  attendance: attendanceEn,
+  leave: leaveEn,
+  payroll: payrollEn,
   meta: {
     title: "Master Touch | Internal Operating System",
     description: "Business operating system for Master Touch",
@@ -21,6 +31,7 @@ export const en: Dictionary = {
     loading: "Loading…",
     user: "User",
     noDataYet: "Not enough data yet",
+    formPending: "Working… please wait.",
     days: "{count} days",
   },
   shell: {

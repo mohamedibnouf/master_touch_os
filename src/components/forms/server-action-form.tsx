@@ -3,11 +3,13 @@
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import type { FormActionState } from "@/server/forms/form-state";
+import { useI18n } from "@/lib/i18n/client";
 
 function FormBusyNote() {
+  const { t } = useI18n();
   const { pending } = useFormStatus();
   if (!pending) return null;
-  return <p className="text-sm text-muted">جارٍ التنفيذ… يرجى الانتظار.</p>;
+  return <p className="text-sm text-muted" role="status">{t.common.formPending}</p>;
 }
 
 function FormError({ state }: { state: FormActionState }) {

@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Button, Card, Field, Input, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Field, Input, PageHeader, Section, StatCard } from "@/components/ui/primitives";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { isUuid } from "@/lib/utils";
 import { getAuthContext } from "@/server/context";
@@ -17,10 +17,9 @@ import {
   submitPayrollForReviewAction,
 } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
-
-function formatSar(amount: number) {
-  return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
-}
+import { formatPeriodLabel, formatSar } from "@/lib/payroll/format";
+import { format } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 function statusTone(status: string): "neutral" | "success" | "danger" | "warning" | "navy" {
   if (status === "paid" || status === "locked" || status === "approved") return "success";
@@ -52,8 +51,10 @@ export default async function PayrollPeriodDetailPage({
   if (!isUuid(id)) notFound();
   const supabase = await createServerSupabaseClient();
   const repo = new PayrollRepository(supabase);
-  const period = await repo.getPeriod(ctx.organization.id, id);
+  const [period, { t, locale }] = await Promise.all([repo.getPeriod(ctx.organization.id, id), getI18n()]);
   if (!period) notFound();
+  const tp = t.payroll.period;
+  const tc = t.payroll.common;
 
   const status = period.status;
   const canCalculate =
@@ -64,66 +65,63 @@ export default async function PayrollPeriodDetailPage({
   const canLock = hasPermission(ctx, "payroll.lock") && status === "approved";
   const canCancel =
     hasPermission(ctx, "payroll.prepare") && (status === "draft" || status === "calculated");
+  const hasAction = canCalculate || canSubmit || canReview || canApprove || canLock;
 
   return (
     <PageContainer data-testid="payroll-period-detail" className="space-y-5">
       <PageHeader
-        title={`مسير ${period.year}/${String(period.month).padStart(2, "0")}`}
-        description={`${period.period_start} → ${period.period_end}`}
+        title={format(tp.title, { period: formatPeriodLabel(period.year, period.month) })}
+        description={format(tc.periodRange, { start: period.period_start, end: period.period_end })}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Link href={`/payroll/${period.id}/employees`}>
               <Button variant="secondary" className="w-full sm:w-auto" data-testid="payroll-employees-link">
-                الموظفون
+                {tc.employees}
               </Button>
             </Link>
             <Link href={`/payroll/${period.id}/review`}>
               <Button variant="secondary" className="w-full sm:w-auto" data-testid="payroll-review-link">
-                المراجعة
+                {tc.review}
               </Button>
             </Link>
             <Link href="/payroll">
               <Button variant="secondary" className="w-full sm:w-auto">
-                العودة
+                {tc.back}
               </Button>
             </Link>
           </div>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <p className="text-sm text-muted">الحالة</p>
-          <p className="mt-1">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={tc.status}
+          value={
             <Badge tone={statusTone(status)} data-testid="payroll-period-status">
-              {payrollPeriodStatusLabel(status)}
+              {payrollPeriodStatusLabel(status, locale)}
             </Badge>
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">الموظفون</p>
-          <p className="mt-1 text-2xl font-semibold text-navy">{period.employee_count}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">إجمالي الاستحقاقات</p>
-          <p className="mt-1 text-xl font-semibold text-navy tabular-nums">{formatSar(period.total_gross)}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">صافي الرواتب</p>
-          <p className="mt-1 text-xl font-semibold text-navy tabular-nums" data-testid="payroll-period-net">
-            {formatSar(period.total_net)}
-          </p>
-        </Card>
+          }
+        />
+        <StatCard label={tp.employeeCount} value={period.employee_count} />
+        <StatCard label={tp.totalGross} value={<span className="text-xl">{formatSar(period.total_gross, locale)}</span>} />
+        <StatCard
+          label={tp.totalNet}
+          tone="info"
+          value={
+            <span className="text-xl" data-testid="payroll-period-net">
+              {formatSar(period.total_net, locale)}
+            </span>
+          }
+        />
       </div>
 
-      <Card className="mb-6">
-        <h2 className="mb-3 font-semibold text-navy">الإجراءات</h2>
+      <Section title={tp.actionsTitle}>
         <div className="flex flex-wrap gap-2">
           {canCalculate ? (
             <ServerActionForm action={calculatePayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-calculate-btn">
-                احتساب
+                {tp.calculate}
               </Button>
             </ServerActionForm>
           ) : null}
@@ -131,7 +129,7 @@ export default async function PayrollPeriodDetailPage({
             <ServerActionForm action={submitPayrollForReviewAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-submit-btn">
-                إرسال للمراجعة
+                {tp.submitForReview}
               </Button>
             </ServerActionForm>
           ) : null}
@@ -139,7 +137,7 @@ export default async function PayrollPeriodDetailPage({
             <ServerActionForm action={markPayrollReviewedAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" variant="secondary" data-testid="payroll-review-btn">
-                تأكيد المراجعة
+                {tp.confirmReview}
               </Button>
             </ServerActionForm>
           ) : null}
@@ -147,7 +145,7 @@ export default async function PayrollPeriodDetailPage({
             <ServerActionForm action={approvePayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-approve-btn">
-                اعتماد
+                {tp.approve}
               </Button>
             </ServerActionForm>
           ) : null}
@@ -155,44 +153,48 @@ export default async function PayrollPeriodDetailPage({
             <ServerActionForm action={lockPayrollPeriodAction}>
               <input type="hidden" name="periodId" value={period.id} />
               <Button type="submit" data-testid="payroll-lock-btn">
-                قفل
+                {tp.lock}
               </Button>
             </ServerActionForm>
           ) : null}
+          {!hasAction && !canCancel ? <p className="text-sm text-muted">{tp.noActions}</p> : null}
         </div>
 
         {canCancel ? (
-          <ServerActionForm action={cancelPayrollPeriodAction} className="mt-4 grid gap-3 sm:grid-cols-3" testId="payroll-cancel-form">
-            <input type="hidden" name="periodId" value={period.id} />
-            <Field label="سبب الإلغاء">
-              <Input name="reason" required minLength={3} placeholder="سبب الإلغاء" />
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="payroll-cancel-btn">
-                إلغاء الفترة
-              </Button>
+          <ServerActionForm action={cancelPayrollPeriodAction} className="mt-4 border-t border-line pt-4" testId="payroll-cancel-form">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <input type="hidden" name="periodId" value={period.id} />
+              <div className="sm:col-span-2">
+                <Field label={tp.cancelReason}>
+                  <Input name="reason" required minLength={3} placeholder={tp.cancelReason} />
+                </Field>
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="payroll-cancel-btn">
+                  {tp.cancelPeriod}
+                </Button>
+              </div>
             </div>
           </ServerActionForm>
         ) : null}
-      </Card>
+      </Section>
 
-      <Card>
-        <h2 className="mb-3 font-semibold text-navy">ملخص المبالغ</h2>
-        <dl className="grid gap-2 text-sm sm:grid-cols-3">
-          <div>
-            <dt className="text-muted">الاستحقاقات</dt>
-            <dd className="font-medium tabular-nums">{formatSar(period.total_gross)}</dd>
+      <Section title={tp.summaryTitle}>
+        <dl className="grid gap-4 text-sm sm:grid-cols-3">
+          <div className="rounded-lg bg-surface-muted p-3">
+            <dt className="text-xs text-muted">{tp.earnings}</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-ink">{formatSar(period.total_gross, locale)}</dd>
           </div>
-          <div>
-            <dt className="text-muted">الخصومات</dt>
-            <dd className="font-medium tabular-nums">{formatSar(period.total_deductions)}</dd>
+          <div className="rounded-lg bg-surface-muted p-3">
+            <dt className="text-xs text-muted">{tp.deductions}</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-danger">{formatSar(period.total_deductions, locale)}</dd>
           </div>
-          <div>
-            <dt className="text-muted">الصافي</dt>
-            <dd className="font-medium tabular-nums">{formatSar(period.total_net)}</dd>
+          <div className="rounded-lg bg-primary-soft p-3">
+            <dt className="text-xs text-primary">{tp.net}</dt>
+            <dd className="mt-1 font-semibold tabular-nums text-primary">{formatSar(period.total_net, locale)}</dd>
           </div>
         </dl>
-      </Card>
+      </Section>
     </PageContainer>
   );
 }

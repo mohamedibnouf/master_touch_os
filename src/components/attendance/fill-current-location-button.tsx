@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { useI18n } from "@/lib/i18n/client";
 
 export function FillCurrentLocationButton() {
+  const { t } = useI18n();
+  const tl = t.attendance.locations;
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <div>
@@ -14,7 +17,7 @@ export function FillCurrentLocationButton() {
         onClick={() => {
           setMsg(null);
           if (!navigator.geolocation) {
-            setMsg("المتصفح لا يدعم تحديد الموقع.");
+            setMsg(tl.browserNoGeolocation);
             return;
           }
           navigator.geolocation.getCurrentPosition(
@@ -23,14 +26,14 @@ export function FillCurrentLocationButton() {
               const lng = document.querySelector<HTMLInputElement>('input[name="longitude"]');
               if (lat) lat.value = String(pos.coords.latitude);
               if (lng) lng.value = String(pos.coords.longitude);
-              setMsg("تم تعبئة الإحداثيات من جهازك.");
+              setMsg(tl.coordinatesFilled);
             },
-            () => setMsg("تعذر قراءة الموقع."),
+            () => setMsg(tl.locationReadFailed),
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
           );
         }}
       >
-        استخدم موقعي الحالي
+        {tl.useCurrentLocation}
       </Button>
       {msg ? <p className="mt-2 text-xs text-muted">{msg}</p> : null}
     </div>

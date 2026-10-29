@@ -2,17 +2,20 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/primitives";
-import { GPS_STAGE_COPY } from "@/modules/attendance/gps-ux";
+import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
+import type { Dictionary } from "@/lib/i18n/dictionaries/ar";
+import { gpsStageCopy } from "@/modules/attendance/gps-ux";
 import {
   checkInWithLocationAction,
   checkOutWithLocationAction,
   type AttendancePunchState,
 } from "@/server/use-cases/attendance";
 
-function clientGpsMessage(err: GeolocationPositionError): string {
-  if (err.code === err.PERMISSION_DENIED) return "يجب السماح بالوصول إلى الموقع لتسجيل الحضور.";
-  if (err.code === err.TIMEOUT) return "تعذر تحديد موقعك في الوقت المحدد. حاول مرة أخرى.";
-  return "تعذر تحديد موقعك. حاول مرة أخرى.";
+function clientGpsMessage(err: GeolocationPositionError, tp: Dictionary["attendance"]["punch"]): string {
+  if (err.code === err.PERMISSION_DENIED) return tp.permissionDenied;
+  if (err.code === err.TIMEOUT) return tp.timeout;
+  return tp.failed;
 }
 
 export function GeofencePunchButton({
@@ -20,12 +23,18 @@ export function GeofencePunchButton({
   label,
   testId,
   variant = "primary",
+  size = "default",
 }: {
   action: "check_in" | "check_out";
   label: string;
   testId: string;
   variant?: "primary" | "secondary";
+  /** "large" renders a taller, full-width button for the self check-in screen. */
+  size?: "default" | "large";
 }) {
+  const { t, locale } = useI18n();
+  const tp = t.attendance.punch;
+  const stage = gpsStageCopy(locale);
   const [localError, setLocalError] = useState<string | null>(null);
   const [waitingGps, setWaitingGps] = useState(false);
   const bound = action === "check_in" ? checkInWithLocationAction : checkOutWithLocationAction;
@@ -34,7 +43,7 @@ export function GeofencePunchButton({
   async function onSubmit(formData: FormData) {
     setLocalError(null);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocalError("جهازك أو المتصفح لا يدعم تحديد الموقع.");
+      setLocalError(tp.noGeolocation);
       return;
     }
     setWaitingGps(true);
@@ -52,9 +61,9 @@ export function GeofencePunchButton({
       formAction(formData);
     } catch (err) {
       if (err && typeof err === "object" && "code" in err) {
-        setLocalError(clientGpsMessage(err as GeolocationPositionError));
+        setLocalError(clientGpsMessage(err as GeolocationPositionError, tp));
       } else {
-        setLocalError("تعذر تحديد موقعك. حاول مرة أخرى.");
+        setLocalError(tp.failed);
       }
     } finally {
       setWaitingGps(false);
@@ -63,20 +72,28 @@ export function GeofencePunchButton({
 
   const busy = pending || waitingGps;
   const message = localError || (!state?.ok ? state?.message : null);
+  const large = size === "large";
 
   return (
-    <form action={onSubmit} className="w-full sm:w-auto">
-      <Button type="submit" variant={variant} className="min-h-11 w-full sm:w-auto" data-testid={testId} disabled={busy}>
-        {waitingGps ? GPS_STAGE_COPY.locating : pending ? GPS_STAGE_COPY.verifying : label}
+    <form action={onSubmit} className={cn("w-full", !large && "sm:w-auto")}>
+      <Button
+        type="submit"
+        variant={variant}
+        className={cn("min-h-11 w-full", large ? "min-h-12 text-base md:min-h-12" : "sm:w-auto")}
+        data-testid={testId}
+        disabled={busy}
+        aria-busy={busy}
+      >
+        {waitingGps ? stage.locating : pending ? stage.verifying : label}
       </Button>
       {message ? (
-        <p className="mt-2 text-sm text-danger" data-testid="attendance-geofence-error">
+        <p className="mt-2 text-sm text-danger" role="alert" data-testid="attendance-geofence-error">
           {message}
         </p>
       ) : null}
       {state?.ok ? (
-        <p className="mt-2 text-sm text-success" data-testid="attendance-geofence-ok">
-          تم التسجيل.
+        <p className="mt-2 text-sm text-success" role="status" data-testid="attendance-geofence-ok">
+          {tp.success}
         </p>
       ) : null}
     </form>

@@ -1,14 +1,18 @@
 import { PageContainer } from "@/components/layout/page-container";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, PageHeader, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PayrollRepository } from "@/server/repositories/payroll.repository";
+import { formatPeriodLabel, formatSar } from "@/lib/payroll/format";
+import { getI18n } from "@/lib/i18n/server";
 
-function formatSar(amount: number) {
-  return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
+function paymentTone(status: string): "neutral" | "success" | "warning" {
+  if (status === "paid") return "success";
+  if (status === "partial") return "warning";
+  return "neutral";
 }
 
 export default async function MyPayslipsPage() {
@@ -18,11 +22,15 @@ export default async function MyPayslipsPage() {
     redirect("/");
   }
 
+  const { t, locale } = await getI18n();
+  const tm = t.payroll.my;
+  const tc = t.payroll.common;
+
   if (!ctx.employee) {
     return (
       <PageContainer data-testid="my-payslips" className="space-y-5">
-        <PageHeader title="قسائم الرواتب" description="لا يوجد سجل موظف مرتبط بحسابك." />
-        <EmptyState title="تواصل مع الموارد البشرية لربط حسابك بملف موظف." />
+        <PageHeader title={tm.noEmployeeTitle} description={tm.noEmployeeDescription} />
+        <EmptyState title={tm.noEmployeeHint} />
       </PageContainer>
     );
   }
@@ -41,58 +49,64 @@ export default async function MyPayslipsPage() {
   );
 
   const canOps = hasPermission(ctx, "payroll.view_all") || hasPermission(ctx, "payroll.prepare");
+  const paymentLabel = (status: string) =>
+    status in tc.paymentStatus ? tc.paymentStatus[status as keyof typeof tc.paymentStatus] : status;
 
   return (
     <PageContainer data-testid="my-payslips" className="space-y-5">
       <PageHeader
-        title="قسائمي"
-        description="قسائم الرواتب المتاحة لحسابك"
+        title={tm.title}
+        description={tm.description}
         actions={
           canOps ? (
             <Link href="/payroll">
-              <Button variant="secondary">إدارة الرواتب</Button>
+              <Button variant="secondary">{tm.manage}</Button>
             </Link>
           ) : null
         }
       />
 
-      <Card className="overflow-x-auto p-0">
-        <div className="border-b border-line px-4 py-3 font-semibold text-navy">السجل</div>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-line px-4 py-3 text-sm font-semibold text-ink">{tm.historyTitle}</div>
         {entries.length === 0 ? (
           <div className="p-4">
-            <EmptyState title="لا توجد قسائم متاحة بعد." />
+            <EmptyState title={tm.empty} />
           </div>
         ) : (
-          <table className="w-full min-w-[520px] text-sm">
-            <thead className="bg-paper text-muted">
-              <tr>
-                <th className="px-4 py-3 text-start">الفترة</th>
-                <th className="px-4 py-3 text-start">الإجمالي</th>
-                <th className="px-4 py-3 text-start">الصافي</th>
-                <th className="px-4 py-3 text-start">الصرف</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e) => {
-                const p = periods.get(e.payroll_period_id);
-                const label = p ? `${p.year}/${String(p.month).padStart(2, "0")}` : "—";
-                return (
-                  <tr key={e.id} className="border-t border-line" data-testid="my-payslip-row">
-                    <td className="px-4 py-3">
-                      <Link href={`/my/payslips/${e.id}`} className="font-medium text-navy underline">
-                        {label}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">{formatSar(e.gross_pay)}</td>
-                    <td className="px-4 py-3 tabular-nums">{formatSar(e.net_pay)}</td>
-                    <td className="px-4 py-3">
-                      <Badge>{e.payment_status}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <TableScroll>
+            <table className="w-full min-w-[520px] text-sm">
+              <thead className="bg-surface-muted text-xs text-muted">
+                <tr>
+                  <th className="px-4 py-2.5 text-start font-medium">{tm.colPeriod}</th>
+                  <th className="px-4 py-2.5 text-end font-medium">{tm.colGross}</th>
+                  <th className="px-4 py-2.5 text-end font-medium">{tm.colNet}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{tm.colPayment}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => {
+                  const p = periods.get(e.payroll_period_id);
+                  const label = p ? formatPeriodLabel(p.year, p.month) : "—";
+                  return (
+                    <tr key={e.id} className="border-t border-line" data-testid="my-payslip-row">
+                      <td className="px-4 py-2.5">
+                        <Link href={`/my/payslips/${e.id}`} className="font-medium tabular-nums text-primary hover:underline">
+                          {label}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-end tabular-nums">{formatSar(e.gross_pay, locale)}</td>
+                      <td className="px-4 py-2.5 text-end font-semibold tabular-nums text-ink">
+                        {formatSar(e.net_pay, locale)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={paymentTone(e.payment_status)}>{paymentLabel(e.payment_status)}</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScroll>
         )}
       </Card>
     </PageContainer>

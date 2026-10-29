@@ -1,6 +1,11 @@
 import { projectDetailAr } from "./project-detail.ar";
 import { projectWorkflowAr } from "./project-workflow.ar";
 import { projectCommercialAr } from "./project-commercial.ar";
+import { employeeDetailAr } from "./employee-detail.ar";
+import { hrPeopleAr } from "./hr-people.ar";
+import { attendanceAr } from "./attendance.ar";
+import { leaveAr } from "./leave.ar";
+import { payrollAr } from "./payroll.ar";
 
 /**
  * Arabic is the source dictionary: its shape defines the Dictionary type, and en.ts
@@ -10,6 +15,11 @@ export const ar = {
   projectDetail: projectDetailAr,
   projectWorkflow: projectWorkflowAr,
   projectCommercial: projectCommercialAr,
+  employeeDetail: employeeDetailAr,
+  hrPeople: hrPeopleAr,
+  attendance: attendanceAr,
+  leave: leaveAr,
+  payroll: payrollAr,
   meta: {
     title: "ماستر تاتش | نظام التشغيل الداخلي",
     description: "نظام تشغيل الأعمال لماستر تاتش",
@@ -24,6 +34,7 @@ export const ar = {
     loading: "جارٍ التحميل…",
     user: "مستخدم",
     noDataYet: "لا توجد بيانات كافية بعد",
+    formPending: "جارٍ التنفيذ… يرجى الانتظار.",
     days: "{count} يوم",
   },
   shell: {

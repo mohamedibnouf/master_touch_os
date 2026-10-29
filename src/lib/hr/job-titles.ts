@@ -82,7 +82,16 @@ export function resolveEmploymentJobTitlePatch(input: {
   });
 }
 
-export function jobTitleAssignmentMessageAr(reason: JobTitleAssignmentFail["reason"]): string {
+export function jobTitleAssignmentMessageAr(
+  reason: JobTitleAssignmentFail["reason"],
+  locale: "ar" | "en" = "ar",
+): string {
+  if (locale === "en") {
+    if (reason === "cross_org") return "The job title does not belong to this organization.";
+    if (reason === "inactive") return "An inactive job title cannot be assigned.";
+    if (reason === "wrong_department") return "The job title is not available for the selected department.";
+    return "The selected job title is not valid.";
+  }
   if (reason === "cross_org") return "المسمى الوظيفي لا ينتمي لهذه المنشأة.";
   if (reason === "inactive") return "لا يمكن تعيين مسمى وظيفي غير نشط.";
   if (reason === "wrong_department") return "المسمى الوظيفي غير متاح للإدارة المحددة.";

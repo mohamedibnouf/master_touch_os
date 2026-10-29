@@ -1,99 +1,117 @@
 import { PageContainer } from "@/components/layout/page-container";
 import { redirect } from "next/navigation";
-import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, TableScroll } from "@/components/ui/primitives";
 import { getAuthContext } from "@/server/context";
 import { authorize } from "@/server/policies/authorize";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaveRepository } from "@/server/repositories/leave.repository";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { upsertLeaveTypeAction } from "@/server/use-cases/leave";
+import { pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function HrLeaveTypesPage() {
   authorize(await getAuthContext(), "leave.manage");
   const ctx = await getAuthContext();
   if (!ctx) redirect("/login");
 
+  const { t, locale } = await getI18n();
+  const tt = t.leave.types;
+  const tc = t.leave.common;
+
   const supabase = await createServerSupabaseClient();
   const types = await new LeaveRepository(supabase).listLeaveTypes(ctx.organization.id);
 
   return (
     <PageContainer className="space-y-5">
-      <PageHeader title="أنواع الإجازة" description="إدارة سياسات وأنواع الإجازات للمؤسسة" />
+      <PageHeader title={tt.title} description={tt.description} />
 
-      <Card className="mb-6" data-testid="leave-type-form">
-        <h2 className="mb-4 font-semibold text-navy">إضافة / تحديث نوع</h2>
-        <ServerActionForm action={upsertLeaveTypeAction} className="grid gap-3 md:grid-cols-2">
-          <Field label="الرمز">
-            <Input name="code" required placeholder="ANNUAL" />
-          </Field>
-          <Field label="الاستحقاق السنوي (أيام)">
-            <Input name="annual_entitlement_days" type="number" step="0.5" defaultValue={0} />
-          </Field>
-          <Field label="الاسم بالعربية">
-            <Input name="name_ar" required />
-          </Field>
-          <Field label="Name (EN)">
-            <Input name="name_en" required />
-          </Field>
-          <Field label="إشعار أدنى (أيام)">
-            <Input name="minimum_notice_days" type="number" defaultValue={0} />
-          </Field>
-          <Field label="أقصى أيام متتالية">
-            <Input name="maximum_consecutive_days" type="number" />
-          </Field>
-          <Field label="مدفوعة؟">
-            <Select name="is_paid" defaultValue="true">
-              <option value="true">نعم</option>
-              <option value="false">لا</option>
-            </Select>
-          </Field>
-          <Field label="تتطلب مرفقاً؟">
-            <Select name="requires_attachment" defaultValue="false">
-              <option value="false">لا</option>
-              <option value="true">نعم</option>
-            </Select>
-          </Field>
-          <Field label="ترحيل رصيد؟">
-            <Select name="allow_carry_forward" defaultValue="false">
-              <option value="false">لا</option>
-              <option value="true">نعم</option>
-            </Select>
-          </Field>
-          <Field label="سماح برصيد سالب؟">
-            <Select name="allow_negative_balance" defaultValue="false">
-              <option value="false">لا</option>
-              <option value="true">نعم</option>
-            </Select>
-          </Field>
-          <div className="md:col-span-2">
-            <Button type="submit">حفظ النوع</Button>
+      <Card data-testid="leave-type-form">
+        <h2 className="mb-4 text-sm font-semibold text-ink">{tt.formTitle}</h2>
+        <ServerActionForm action={upsertLeaveTypeAction}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={tt.code}>
+              <Input name="code" required placeholder="ANNUAL" dir="ltr" />
+            </Field>
+            <Field label={tt.annualEntitlement}>
+              <Input name="annual_entitlement_days" type="number" step="0.5" defaultValue={0} />
+            </Field>
+            <Field label={tt.nameAr}>
+              <Input name="name_ar" required dir="rtl" />
+            </Field>
+            <Field label={tt.nameEn}>
+              <Input name="name_en" required dir="ltr" />
+            </Field>
+            <Field label={tt.minimumNotice}>
+              <Input name="minimum_notice_days" type="number" defaultValue={0} />
+            </Field>
+            <Field label={tt.maximumConsecutive}>
+              <Input name="maximum_consecutive_days" type="number" />
+            </Field>
+            <Field label={tt.isPaid}>
+              <Select name="is_paid" defaultValue="true">
+                <option value="true">{tc.yes}</option>
+                <option value="false">{tc.no}</option>
+              </Select>
+            </Field>
+            <Field label={tt.requiresAttachment}>
+              <Select name="requires_attachment" defaultValue="false">
+                <option value="false">{tc.no}</option>
+                <option value="true">{tc.yes}</option>
+              </Select>
+            </Field>
+            <Field label={tt.carryForward}>
+              <Select name="allow_carry_forward" defaultValue="false">
+                <option value="false">{tc.no}</option>
+                <option value="true">{tc.yes}</option>
+              </Select>
+            </Field>
+            <Field label={tt.negativeBalance}>
+              <Select name="allow_negative_balance" defaultValue="false">
+                <option value="false">{tc.no}</option>
+                <option value="true">{tc.yes}</option>
+              </Select>
+            </Field>
+            <div className="md:col-span-2">
+              <Button type="submit">{tt.save}</Button>
+            </div>
           </div>
         </ServerActionForm>
       </Card>
 
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-paper text-muted">
-            <tr>
-              <th className="px-4 py-3 text-start">الرمز</th>
-              <th className="px-4 py-3 text-start">الاسم</th>
-              <th className="px-4 py-3 text-start">الاستحقاق</th>
-              <th className="px-4 py-3 text-start">مدفوعة</th>
-              <th className="px-4 py-3 text-start">نشط</th>
-            </tr>
-          </thead>
-          <tbody>
-            {types.map((t) => (
-              <tr key={t.id} className="border-t border-line">
-                <td className="px-4 py-3 font-mono text-xs">{t.code}</td>
-                <td className="px-4 py-3">{t.name_ar}</td>
-                <td className="px-4 py-3">{t.annual_entitlement_days}</td>
-                <td className="px-4 py-3">{t.is_paid ? "نعم" : "لا"}</td>
-                <td className="px-4 py-3">{t.is_active ? "نعم" : "لا"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card className="overflow-hidden p-0">
+        {types.length === 0 ? (
+          <div className="p-4">
+            <EmptyState title={tt.empty} />
+          </div>
+        ) : (
+          <TableScroll>
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="bg-surface-muted text-xs text-muted">
+                <tr>
+                  <th className="px-4 py-2.5 text-start font-medium">{tt.colCode}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{tt.colName}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{tt.colEntitlement}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{tt.colPaid}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{tt.colActive}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {types.map((ty) => (
+                  <tr key={ty.id} className="border-t border-line">
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted">{ty.code}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink">{pickLocalized(locale, ty.name_ar, ty.name_en)}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{ty.annual_entitlement_days}</td>
+                    <td className="px-4 py-2.5">{ty.is_paid ? tc.yes : tc.no}</td>
+                    <td className="px-4 py-2.5">
+                      <Badge tone={ty.is_active ? "success" : "neutral"}>{ty.is_active ? tc.yes : tc.no}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        )}
       </Card>
     </PageContainer>
   );

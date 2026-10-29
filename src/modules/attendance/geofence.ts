@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n/config";
+
 export type GeoPoint = { latitude: number; longitude: number };
 
 export const EARTH_RADIUS_METERS = 6_371_000;
@@ -317,9 +319,13 @@ export function evidenceCoordinatesToStore(input: {
   };
 }
 
-export function formatEvidenceCoordinates(latitude: number | null | undefined, longitude: number | null | undefined): string {
+export function formatEvidenceCoordinates(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+  locale: Locale = "ar",
+): string {
   if (latitude == null || longitude == null || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return "غير متاح";
+    return locale === "en" ? "Not available" : "غير متاح";
   }
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }

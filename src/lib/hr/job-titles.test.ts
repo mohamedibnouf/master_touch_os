@@ -227,13 +227,19 @@ describe("migration 068 safety", () => {
 });
 
 describe("job title UI copy", () => {
-  const createUi = readFileSync(join(process.cwd(), "src/components/hr/employee-create-form.tsx"), "utf8");
-  const titleFields = readFileSync(join(process.cwd(), "src/components/hr/employee-title-fields.tsx"), "utf8");
+  // UI copy lives in the hrPeople dictionary; append it so the copy assertions still apply.
+  const hrPeopleAr = readFileSync(join(process.cwd(), "src/lib/i18n/dictionaries/hr-people.ar.ts"), "utf8");
+  const createUi =
+    readFileSync(join(process.cwd(), "src/components/hr/employee-create-form.tsx"), "utf8") + hrPeopleAr;
+  const titleFields =
+    readFileSync(join(process.cwd(), "src/components/hr/employee-title-fields.tsx"), "utf8") + hrPeopleAr;
 
   it("orders الإدارة then المسمى الوظيفي then الدور والصلاحيات", () => {
     expect(createUi).toContain("الإدارة ثم المسمى الوظيفي ثم الدور والصلاحيات");
-    expect(titleFields).toContain('label="الإدارة"');
-    expect(titleFields).toContain('label="المسمى الوظيفي"');
+    expect(titleFields).toContain("label={tf.department}");
+    expect(titleFields).toContain('department: "الإدارة"');
+    expect(titleFields).toContain("label={tf.jobTitle}");
+    expect(titleFields).toContain('jobTitle: "المسمى الوظيفي"');
     expect(createUi).toContain("الدور والصلاحيات");
     expect(createUi).not.toContain('name="job_title_ar"');
   });

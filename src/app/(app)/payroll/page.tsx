@@ -9,10 +9,8 @@ import { PayrollRepository } from "@/server/repositories/payroll.repository";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createPayrollPeriodAction } from "@/server/use-cases/payroll";
 import { payrollPeriodStatusLabel } from "@/lib/hr/labels";
-
-function formatSar(amount: number) {
-  return `${Number(amount).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR`;
-}
+import { formatPeriodLabel, formatSar, monthName } from "@/lib/payroll/format";
+import { getI18n } from "@/lib/i18n/server";
 
 function statusTone(status: string): "neutral" | "success" | "danger" | "warning" | "navy" {
   if (status === "paid" || status === "locked" || status === "approved") return "success";
@@ -42,6 +40,9 @@ export default async function PayrollDashboardPage() {
   if (!canOps && !canSelf) redirect("/");
   if (!canOps && canSelf) redirect("/my/payslips");
 
+  const { t, locale } = await getI18n();
+  const td = t.payroll.dashboard;
+
   const supabase = await createServerSupabaseClient();
   const repo = new PayrollRepository(supabase);
   const periods = await repo.listPeriods(ctx.organization.id);
@@ -52,21 +53,21 @@ export default async function PayrollDashboardPage() {
   return (
     <PageContainer data-testid="payroll-dashboard" className="space-y-5">
       <PageHeader
-        title="الرواتب"
-        description="فترات مسير الرواتب الشهرية"
+        title={td.title}
+        description={td.description}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             {canSelf ? (
               <Link href="/my/payslips">
                 <Button variant="secondary" className="w-full sm:w-auto" data-testid="payroll-my-payslips-link">
-                  قسائمي
+                  {td.myPayslips}
                 </Button>
               </Link>
             ) : null}
             {canSettings ? (
               <Link href="/payroll/settings">
                 <Button variant="secondary" className="w-full sm:w-auto" data-testid="payroll-settings-link">
-                  الإعدادات
+                  {td.settings}
                 </Button>
               </Link>
             ) : null}
@@ -75,66 +76,70 @@ export default async function PayrollDashboardPage() {
       />
 
       {canPrepare ? (
-        <Card className="mb-6" data-testid="payroll-create-form">
-          <h2 className="mb-3 font-semibold text-navy">إنشاء فترة رواتب</h2>
-          <ServerActionForm action={createPayrollPeriodAction} className="grid gap-3 sm:grid-cols-3">
-            <Field label="السنة">
-              <Input type="number" name="year" defaultValue={defaultYear} min={2000} max={2100} required />
-            </Field>
-            <Field label="الشهر">
-              <Select name="month" defaultValue={String(defaultMonth)} required>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" className="w-full sm:w-auto" data-testid="payroll-create-submit">
-                إنشاء
-              </Button>
+        <Card data-testid="payroll-create-form">
+          <h2 className="mb-3 text-sm font-semibold text-ink">{td.createTitle}</h2>
+          <ServerActionForm action={createPayrollPeriodAction}>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label={td.year}>
+                <Input type="number" name="year" defaultValue={defaultYear} min={2000} max={2100} required />
+              </Field>
+              <Field label={td.month}>
+                <Select name="month" defaultValue={String(defaultMonth)} required>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>
+                      {String(m).padStart(2, "0")} · {monthName(m, locale)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="flex items-end">
+                <Button type="submit" className="w-full sm:w-auto" data-testid="payroll-create-submit">
+                  {td.create}
+                </Button>
+              </div>
             </div>
           </ServerActionForm>
         </Card>
       ) : null}
 
-      <Card className="p-0">
-        <div className="border-b border-line px-4 py-3 font-semibold text-navy">الفترات</div>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-line px-4 py-3 text-sm font-semibold text-ink">{td.periodsTitle}</div>
         {periods.length === 0 ? (
           <div className="p-4">
-            <EmptyState title="لا توجد فترات رواتب بعد." />
+            <EmptyState title={td.empty} />
           </div>
         ) : (
           <TableScroll>
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-paper text-muted">
-              <tr>
-                <th className="px-4 py-3 text-start">الفترة</th>
-                <th className="px-4 py-3 text-start">الحالة</th>
-                <th className="px-4 py-3 text-start">الموظفون</th>
-                <th className="px-4 py-3 text-start">الإجمالي</th>
-                <th className="px-4 py-3 text-start">الصافي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {periods.map((p) => (
-                <tr key={p.id} className="border-t border-line" data-testid="payroll-period-row">
-                  <td className="px-4 py-3">
-                    <Link href={`/payroll/${p.id}`} className="font-medium text-navy underline">
-                      {p.year}/{String(p.month).padStart(2, "0")}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={statusTone(p.status)}>{payrollPeriodStatusLabel(p.status)}</Badge>
-                  </td>
-                  <td className="px-4 py-3">{p.employee_count}</td>
-                  <td className="px-4 py-3 tabular-nums">{formatSar(p.total_gross)}</td>
-                  <td className="px-4 py-3 tabular-nums">{formatSar(p.total_net)}</td>
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="bg-surface-muted text-xs text-muted">
+                <tr>
+                  <th className="px-4 py-2.5 text-start font-medium">{td.colPeriod}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{td.colStatus}</th>
+                  <th className="px-4 py-2.5 text-start font-medium">{td.colEmployees}</th>
+                  <th className="px-4 py-2.5 text-end font-medium">{td.colGross}</th>
+                  <th className="px-4 py-2.5 text-end font-medium">{td.colNet}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {periods.map((p) => (
+                  <tr key={p.id} className="border-t border-line" data-testid="payroll-period-row">
+                    <td className="px-4 py-2.5">
+                      <Link href={`/payroll/${p.id}`} className="font-medium tabular-nums text-primary hover:underline">
+                        {formatPeriodLabel(p.year, p.month)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Badge tone={statusTone(p.status)}>{payrollPeriodStatusLabel(p.status, locale)}</Badge>
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums">{p.employee_count}</td>
+                    <td className="px-4 py-2.5 text-end tabular-nums">{formatSar(p.total_gross, locale)}</td>
+                    <td className="px-4 py-2.5 text-end font-medium tabular-nums text-ink">
+                      {formatSar(p.total_net, locale)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </TableScroll>
         )}
       </Card>

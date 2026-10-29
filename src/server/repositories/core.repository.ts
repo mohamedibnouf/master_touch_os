@@ -84,10 +84,10 @@ export class CoreRepository {
   /** Name picker only — avoids the heavy directory embed that can hit statement timeout (57014). */
   async listEmployeeNameOptions(
     organizationId: string,
-  ): Promise<Array<{ id: string; profile_id: string; employee_number: string | null; profiles: { full_name_ar: string | null } | null }>> {
+  ): Promise<Array<{ id: string; profile_id: string; employee_number: string | null; profiles: { full_name_ar: string | null; full_name_en: string | null } | null }>> {
     const { data, error } = await this.supabase
       .from("employees")
-      .select("id, profile_id, employee_number, profiles(full_name_ar)")
+      .select("id, profile_id, employee_number, profiles(full_name_ar, full_name_en)")
       .eq("organization_id", organizationId)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
@@ -97,7 +97,7 @@ export class CoreRepository {
       id: string;
       profile_id: string;
       employee_number: string | null;
-      profiles: { full_name_ar: string | null } | null;
+      profiles: { full_name_ar: string | null; full_name_en: string | null } | null;
     }>;
   }
 

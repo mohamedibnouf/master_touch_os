@@ -5,14 +5,24 @@ import { FormSection } from "@/components/ui/form-section";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import { createEmployeeAction } from "@/server/use-cases/hr";
 import { isOperationalAssignableRole } from "@/lib/hr/roles";
-import { EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPES } from "@/lib/hr/labels";
+import { EMPLOYMENT_TYPES, employmentTypeLabel } from "@/lib/hr/labels";
 import { EmployeeTitleFields } from "@/components/hr/employee-title-fields";
 import type { JobTitleRecord } from "@/lib/hr/job-titles";
+import { pickLocalized } from "@/lib/i18n/config";
+import { getI18n } from "@/lib/i18n/server";
 
-type RoleRow = { id: string; name_ar: string; code?: string; is_external?: boolean; is_system?: boolean; is_active?: boolean };
-type DeptRow = { id: string; name_ar: string };
+type RoleRow = {
+  id: string;
+  name_ar: string;
+  name_en?: string | null;
+  code?: string;
+  is_external?: boolean;
+  is_system?: boolean;
+  is_active?: boolean;
+};
+type DeptRow = { id: string; name_ar: string; name_en?: string | null };
 
-export function EmployeeCreateForm({
+export async function EmployeeCreateForm({
   departments,
   titles,
   roles,
@@ -27,31 +37,30 @@ export function EmployeeCreateForm({
   allowPrivilegedRoles: boolean;
   canManageTitles: boolean;
 }) {
+  const { t, locale } = await getI18n();
+  const tc = t.hrPeople.createForm;
+
   return (
-    <div className="mx-auto w-full max-w-3xl" data-testid="employee-create-card">
+    <div className="mx-auto w-full max-w-3xl" id="employee-create-card" data-testid="employee-create-card">
       <div className="mt-surface-priority p-4 md:p-6">
-        <FormSection
-          icon={IdCard}
-          title="توظيف موظف جديد"
-          description="يتطلب صلاحية إنشاء موظف. الدخول يتم بالرقم الوظيفي وكلمة المرور — ليس بالبريد. تعيين الأدوار يتطلب صلاحية منفصلة."
-        >
+        <FormSection icon={IdCard} title={tc.title} description={tc.description}>
           <ServerActionForm action={createEmployeeAction} className="space-y-6" testId="employee-create-form">
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="الرقم الوظيفي" required>
-                <Input name="employee_number" required data-testid="employee-create-number" />
+              <Field label={tc.employeeNumber} required>
+                <Input name="employee_number" required dir="ltr" data-testid="employee-create-number" />
               </Field>
-              <Field label="الجنسية">
+              <Field label={tc.nationality}>
                 <Input name="nationality" />
               </Field>
-              <Field label="الاسم بالعربية" required>
-                <Input name="full_name_ar" required minLength={2} data-testid="employee-create-name-ar" />
+              <Field label={tc.nameAr} required>
+                <Input name="full_name_ar" required minLength={2} dir="rtl" data-testid="employee-create-name-ar" />
               </Field>
-              <Field label="الاسم بالإنجليزية" required>
-                <Input name="full_name_en" required minLength={2} data-testid="employee-create-name-en" />
+              <Field label={tc.nameEn} required>
+                <Input name="full_name_en" required minLength={2} dir="ltr" data-testid="employee-create-name-en" />
               </Field>
             </div>
 
-            <FormSection icon={Building2} title="التنظيم" description="الإدارة ثم المسمى الوظيفي ثم الدور والصلاحيات. المسمى مهنة وليست صلاحية.">
+            <FormSection icon={Building2} title={tc.orgTitle} description={tc.orgDescription}>
               <div className="grid gap-3 md:grid-cols-2">
                 <EmployeeTitleFields
                   departments={departments}
@@ -59,12 +68,9 @@ export function EmployeeCreateForm({
                   canManageTitles={canManageTitles}
                 />
                 {canAssignRole ? (
-                  <Field
-                    label="الدور والصلاحيات"
-                    hint="تحدد ما يستطيع الموظف الوصول إليه داخل النظام، ولا تمثل مسماه الوظيفي."
-                  >
+                  <Field label={tc.roleLabel} hint={tc.roleHint}>
                     <Select name="role_id" defaultValue="" data-testid="employee-create-role">
-                      <option value="">بدون — تُعيَّن صلاحية موظف تلقائياً عند تفعيل الدخول</option>
+                      <option value="">{tc.roleNone}</option>
                       {roles
                         .filter((role) =>
                           isOperationalAssignableRole({
@@ -77,7 +83,7 @@ export function EmployeeCreateForm({
                         )
                         .map((role) => (
                           <option key={role.id} value={role.id}>
-                            {role.name_ar}
+                            {pickLocalized(locale, role.name_ar, role.name_en)}
                           </option>
                         ))}
                     </Select>
@@ -86,37 +92,30 @@ export function EmployeeCreateForm({
               </div>
             </FormSection>
 
-            <FormSection icon={Briefcase} title="التوظيف" description="نوع التعاقد وتاريخ الالتحاق وموقع العمل.">
+            <FormSection icon={Briefcase} title={tc.employmentTitle} description={tc.employmentDescription}>
               <div className="grid gap-3 md:grid-cols-2">
-                <Field label="نوع التوظيف">
+                <Field label={tc.employmentType}>
                   <Select name="employment_type" defaultValue="" data-testid="employee-create-type">
-                    <option value="">غير محدد</option>
-                    {EMPLOYMENT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {EMPLOYMENT_TYPE_LABELS[t].ar}
+                    <option value="">{tc.employmentTypeUnset}</option>
+                    {EMPLOYMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {employmentTypeLabel(type, locale)}
                       </option>
                     ))}
                   </Select>
                 </Field>
-                <Field label="تاريخ الالتحاق">
+                <Field label={tc.joiningDate}>
                   <Input name="joining_date" type="date" />
                 </Field>
-                <Field label="موقع العمل">
+                <Field label={tc.workLocation}>
                   <Input name="work_location" />
                 </Field>
               </div>
             </FormSection>
 
-            <FormSection
-              icon={KeyRound}
-              title="حساب الدخول (اختياري)"
-              description="إن وُضعت كلمة مرور يُفعَّل الدخول بالرقم الوظيفي. البريد الداخلي اختياري ولا يُستخدم لدخول الموظف."
-            >
+            <FormSection icon={KeyRound} title={tc.loginTitle} description={tc.loginDescription}>
               <div className="grid gap-3 md:grid-cols-2">
-                <Field
-                  label="كلمة مرور الدخول (اختياري)"
-                  hint="إن وُجدت يجب ألا تقل عن 8 أحرف. لا تُعرض بعد الحفظ."
-                >
+                <Field label={tc.passwordLabel} hint={tc.passwordHint}>
                   <Input
                     name="initial_password"
                     type="password"
@@ -125,21 +124,21 @@ export function EmployeeCreateForm({
                     data-testid="employee-create-password"
                   />
                 </Field>
-                <Field label="بريد داخلي اختياري — لا يُطلب من الموظف عند الدخول">
-                  <Input name="email" type="email" data-testid="employee-create-email" />
+                <Field label={tc.emailLabel}>
+                  <Input name="email" type="email" dir="ltr" data-testid="employee-create-email" />
                 </Field>
               </div>
             </FormSection>
 
             <div className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center">
               <Button type="submit" className="w-full sm:w-auto" data-testid="employee-create-submit">
-                إنشاء الموظف
+                {tc.submit}
               </Button>
               <Link
                 href="#employees-list"
-                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] px-4 text-sm font-medium text-muted duration-150 hover:bg-paper hover:text-ink md:min-h-10"
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] px-4 text-sm font-medium text-muted duration-150 hover:bg-surface-muted hover:text-ink md:min-h-10"
               >
-                إلى الدليل
+                {tc.toDirectory}
               </Link>
             </div>
           </ServerActionForm>

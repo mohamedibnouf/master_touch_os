@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Field, Select } from "@/components/ui/primitives";
 import { filterSelectableJobTitles, type JobTitleRecord } from "@/lib/hr/job-titles";
+import { pickLocalized } from "@/lib/i18n/config";
+import { useI18n } from "@/lib/i18n/client";
 
-type DeptRow = { id: string; name_ar: string };
+type DeptRow = { id: string; name_ar: string; name_en?: string | null };
 
 export function EmployeeTitleFields({
   departments,
@@ -28,6 +30,8 @@ export function EmployeeTitleFields({
   departmentTestId?: string;
   titleTestId?: string;
 }) {
+  const { t, locale } = useI18n();
+  const tf = t.hrPeople.titleFields;
   const [departmentId, setDepartmentId] = useState(defaultDepartmentId);
   const selectable = useMemo(
     () => filterSelectableJobTitles(titles, departmentId || undefined),
@@ -47,41 +51,34 @@ export function EmployeeTitleFields({
 
   return (
     <>
-      <Field label="الإدارة">
+      <Field label={tf.department}>
         <Select
           name="department_id"
           value={departmentId}
           onChange={(event) => onDepartmentChange(event.target.value)}
           data-testid={departmentTestId}
         >
-          <option value="">بدون</option>
+          <option value="">{tf.none}</option>
           {departments.map((department) => (
             <option key={department.id} value={department.id}>
-              {department.name_ar}
+              {pickLocalized(locale, department.name_ar, department.name_en)}
             </option>
           ))}
         </Select>
       </Field>
-      <Field
-        label="المسمى الوظيفي"
-        hint="مهنة أو مسمى وظيفي فقط — ليس صلاحية النظام."
-      >
+      <Field label={tf.jobTitle} hint={tf.jobTitleHint}>
         <Select
           name="job_title_id"
           value={titleId}
           onChange={(event) => setTitleId(event.target.value)}
           data-testid={titleTestId}
         >
-          <option value="">{legacyHint ? "بدون تغيير — مسمى قديم" : "بدون"}</option>
-          {keepCurrent ? (
-            <option value={defaultTitleId}>
-              المسمى الحالي (تاريخي)
-            </option>
-          ) : null}
+          <option value="">{legacyHint ? tf.keepLegacy : tf.none}</option>
+          {keepCurrent ? <option value={defaultTitleId}>{tf.currentHistorical}</option> : null}
           {selectable.map((title) => (
             <option key={title.id} value={title.id}>
-              {title.name_ar}
-              {title.department_id ? "" : " — عام"}
+              {pickLocalized(locale, title.name_ar, title.name_en)}
+              {title.department_id ? "" : tf.orgWideSuffix}
             </option>
           ))}
         </Select>
@@ -89,12 +86,12 @@ export function EmployeeTitleFields({
         {legacyHint ? <span className="mt-1 block text-xs text-muted">{legacyHint}</span> : null}
         {selectable.length === 0 ? (
           <p className="mt-1 text-xs text-muted" data-testid="job-title-empty">
-            لا توجد مسميات وظيفية نشطة لهذه الإدارة.
+            {tf.empty}
             {canManageTitles ? (
               <>
                 {" "}
-                <Link href="/departments/job-titles" className="font-medium text-navy underline">
-                  إدارة المسميات الوظيفية
+                <Link href="/departments/job-titles" className="font-medium text-primary underline">
+                  {tf.manageTitles}
                 </Link>
               </>
             ) : null}

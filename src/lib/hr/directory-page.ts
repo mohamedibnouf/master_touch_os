@@ -11,22 +11,26 @@ export function deriveEmployeeDirectoryStats(rows: DirectoryEmployeeStatRow[]) {
   };
 }
 
-export function directoryProfileName(profiles: unknown): string {
+/** Localized profile name for the directory; `fallback` is shown when no name is stored. */
+export function directoryProfileName(profiles: unknown, fallback = "بدون اسم", locale: "ar" | "en" = "ar"): string {
   const row = Array.isArray(profiles) ? profiles[0] : profiles;
   if (!row || typeof row !== "object") {
-    return "بدون اسم";
+    return fallback;
   }
-  const name = (row as { full_name_ar?: string | null }).full_name_ar;
+  const names = row as { full_name_ar?: string | null; full_name_en?: string | null };
+  const preferred = locale === "en" ? names.full_name_en : names.full_name_ar;
+  const other = locale === "en" ? names.full_name_ar : names.full_name_en;
+  const name = preferred?.trim() ? preferred : other;
   if (typeof name !== "string" || name.trim().length === 0) {
-    return "بدون اسم";
+    return fallback;
   }
   return name;
 }
 
 export function attachProfilesById<T extends { profile_id: string }>(
   rows: T[],
-  profiles: Array<{ id: string; full_name_ar: string | null }>,
-): Array<T & { profiles: { id: string; full_name_ar: string | null } | null }> {
+  profiles: Array<{ id: string; full_name_ar: string | null; full_name_en?: string | null }>,
+): Array<T & { profiles: { id: string; full_name_ar: string | null; full_name_en?: string | null } | null }> {
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   return rows.map((row) => ({
     ...row,

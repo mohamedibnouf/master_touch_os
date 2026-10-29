@@ -13,7 +13,7 @@ export const AUTH_EMPLOYEE_COLUMNS =
 export const EMPLOYEE_DIRECTORY_PAGE_COLUMNS =
   "id, organization_id, profile_id, employee_number, job_title_ar, employment_status, employment_type, is_active, created_at" as const;
 
-export const EMPLOYEE_DIRECTORY_PROFILE_COLUMNS = "id, full_name_ar" as const;
+export const EMPLOYEE_DIRECTORY_PROFILE_COLUMNS = "id, full_name_ar, full_name_en" as const;
 
 export const PROJECT_LIST_COLUMNS =
   "id, project_code, name_ar, name_en, status, risk_level, progress_percentage, project_manager_id, created_at" as const;

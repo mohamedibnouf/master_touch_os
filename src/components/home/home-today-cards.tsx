@@ -84,7 +84,7 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
               <div className="min-w-0">
                 <p className="text-xs font-medium text-muted">{format(t.home.attendanceToday, { date: todayYmd })}</p>
                 <p className="mt-1 text-xl font-semibold leading-snug text-ink">
-                  {attendance ? attendanceStatusLabel(attendance.attendance_status) : t.home.notRecordedYet}
+                  {attendance ? attendanceStatusLabel(attendance.attendance_status, locale) : t.home.notRecordedYet}
                 </p>
                 {shift ? <p className="mt-1 text-sm text-muted">{pickLocalized(locale, shift.name_ar, shift.name_en)}</p> : null}
                 {attendance?.check_in_at && !attendance.check_out_at ? (
