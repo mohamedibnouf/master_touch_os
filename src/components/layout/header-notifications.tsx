@@ -23,7 +23,7 @@ export function HeaderNotifications({
   unreadCount: number;
   items: HeaderNotice[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -58,7 +58,7 @@ export function HeaderNotifications({
         {unreadCount > 0 ? (
           <span
             data-testid="header-unread-count"
-            className="absolute -top-1 -start-1 inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white"
+            className="absolute -top-1 -start-1 inline-flex min-w-5 items-center justify-center rounded-full bg-danger-solid px-1 text-[10px] font-semibold text-white"
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
@@ -89,7 +89,7 @@ export function HeaderNotifications({
                       >
                         {item.title}
                       </p>
-                      <p className="text-xs text-muted">{formatRiyadhDateTimeAr(item.created_at)}</p>
+                      <p className="text-xs text-muted">{formatRiyadhDateTimeAr(item.created_at, locale)}</p>
                     </NotificationNavLink>
                   ) : (
                     <div className="rounded-[var(--radius-control)] px-3 py-2">
@@ -99,7 +99,7 @@ export function HeaderNotifications({
                       >
                         {item.title}
                       </p>
-                      <p className="text-xs text-muted">{formatRiyadhDateTimeAr(item.created_at)}</p>
+                      <p className="text-xs text-muted">{formatRiyadhDateTimeAr(item.created_at, locale)}</p>
                     </div>
                   )}
                 </li>

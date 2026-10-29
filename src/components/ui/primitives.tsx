@@ -26,7 +26,7 @@ export function Button({
         "inline-flex min-h-10 select-none items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium duration-150 transition-[background-color,box-shadow,color,border-color,transform] active:scale-[0.98] disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-50 disabled:active:scale-100 md:min-h-9",
         variant === "primary" &&
           "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(204,65,21,0.35)] hover:bg-primary-hover active:bg-primary-hover",
-        variant === "success" && "bg-success text-white shadow-sm hover:bg-success/90",
+        variant === "success" && "bg-success-solid text-white shadow-sm hover:bg-success-solid/90",
         variant === "warning" &&
           "border border-warning-border bg-warning-soft text-warning hover:bg-warning/15",
         variant === "secondary" &&
@@ -34,7 +34,7 @@ export function Button({
         variant === "outline" &&
           "border border-line bg-surface text-ink hover:border-border-strong hover:bg-surface-muted",
         variant === "ghost" && "text-muted hover:bg-surface-muted hover:text-ink",
-        variant === "danger" && "bg-danger text-white hover:bg-danger/90",
+        variant === "danger" && "bg-danger-solid text-white hover:bg-danger-solid/90",
         variant === "icon" &&
           "h-9 w-9 min-h-9 px-0 text-ink hover:bg-surface-muted",
         className,

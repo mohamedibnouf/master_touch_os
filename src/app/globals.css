@@ -174,6 +174,9 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-primary-soft: var(--primary-soft);
+  --color-overlay: var(--overlay);
+  --color-success-solid: var(--success-solid);
+  --color-danger-solid: var(--danger-solid);
   --color-brand: var(--brand);
   --color-sidebar: var(--sidebar);
   --color-sidebar-elevated: var(--sidebar-elevated);
@@ -471,12 +474,13 @@ table.table-register thead {
 @media (prefers-reduced-motion: no-preference) {
   /* Page content settles in on every navigation. */
   .mt-page {
-    animation: mt-fade-up 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    /* backwards (not both): a filling transform would make this a containing block for fixed dialogs. */
+    animation: mt-fade-up 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
 
   /* KPI cards cascade in. */
   .mt-stat {
-    animation: mt-fade-up 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: mt-fade-up 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
   .mt-stat:nth-child(2) {
     animation-delay: 40ms;
@@ -558,7 +562,77 @@ table.table-register thead {
   overflow-y: auto;
 }
 
+/*
+ * Light tokens forced for paper: printed pages (whatever the screen theme) and documents
+ * that must always look like paper on screen (.mt-force-light, e.g. the PO print view).
+ */
+.mt-force-light {
+  --background: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f8f9fb;
+  --surface-subtle: #f2f3f6;
+  --surface-strong: #eaecf0;
+  --ink: #15171c;
+  --text-secondary: #5b6372;
+  --text-muted: #8a93a3;
+  --line: #e5e7eb;
+  --border-strong: #cfd4dc;
+  --primary: #cc4115;
+  --success: #15803d;
+  --warning: #c2680a;
+  --danger: #dc2626;
+  --soft-mix: 10%;
+  color-scheme: light;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* Readable status fills and text accents in dark mode. */
+:root {
+  --overlay: rgba(10, 11, 14, 0.5);
+  --success-solid: #15803d;
+  --danger-solid: #dc2626;
+  --primary-text: var(--primary);
+}
+:root[data-theme="dark"] {
+  --overlay: rgba(0, 0, 0, 0.62);
+  --primary-text: #ff7a45;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --overlay: rgba(0, 0, 0, 0.62);
+    --primary-text: #ff7a45;
+  }
+}
+.text-primary {
+  color: var(--primary-text);
+}
+.dir-ltr {
+  direction: ltr;
+}
+
 @media print {
+  :root,
+  :root[data-theme] {
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-muted: #f8f9fb;
+    --surface-subtle: #f2f3f6;
+    --surface-strong: #eaecf0;
+    --ink: #15171c;
+    --text-secondary: #5b6372;
+    --text-muted: #8a93a3;
+    --line: #e5e7eb;
+    --border-strong: #cfd4dc;
+    --primary: #cc4115;
+    --primary-text: #cc4115;
+    --success: #15803d;
+    --warning: #c2680a;
+    --danger: #dc2626;
+    --soft-mix: 10%;
+    color-scheme: light;
+  }
+
   body {
     background: white !important;
     color: black !important;

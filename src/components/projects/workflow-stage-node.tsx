@@ -40,7 +40,7 @@ export async function WorkflowStageNode({
             aria-label={`${name} — ${node.visualLabel}`}
             className={cn(
               "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
-              node.visual === "completed" && "border-success bg-success text-white",
+              node.visual === "completed" && "border-success bg-success-solid text-white",
               node.visual === "current" &&
                 "border-primary bg-primary text-white",
               node.visual === "waiting_approval" && "border-warning bg-warning/15 text-warning",

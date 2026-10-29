@@ -124,7 +124,7 @@ export function CaseFlowStep({
           onClick={() => setOpen((v) => !v)}
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-            tone === "success" && "border-success bg-success text-white",
+            tone === "success" && "border-success bg-success-solid text-white",
             tone === "info" && "border-primary bg-primary text-white",
             tone === "warning" && "border-warning bg-warning-soft text-warning",
             tone === "danger" && "border-danger bg-danger-soft text-danger",

@@ -7,7 +7,7 @@ import { archiveDocumentAction, restoreDocumentAction } from "@/server/use-cases
 import { archiveConfirmCopy } from "@/modules/documents/lifecycle";
 import { useI18n } from "@/lib/i18n/client";
 
-const dialogBackdrop = "fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center";
+const dialogBackdrop = "fixed inset-0 z-50 flex items-end justify-center bg-overlay p-4 sm:items-center";
 const dialogPanel =
   "w-full max-w-md rounded-[var(--radius-surface)] border border-line bg-surface p-5 shadow-[var(--shadow-2)]";
 

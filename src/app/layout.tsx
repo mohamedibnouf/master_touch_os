@@ -6,6 +6,7 @@ import { getI18n } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
+import { ThemeProvider } from "@/components/layout/theme-toggle";
 import "./globals.css";
 
 const ibmArabic = IBM_Plex_Sans_Arabic({
@@ -69,8 +70,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full bg-background font-sans text-ink antialiased">
         <I18nProvider locale={locale} dictionary={t}>
-          <PwaRegister />
-          {children}
+          <ThemeProvider theme={theme}>
+            <PwaRegister />
+            {children}
+          </ThemeProvider>
         </I18nProvider>
       </body>
     </html>

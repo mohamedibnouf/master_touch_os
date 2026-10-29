@@ -66,7 +66,7 @@ export default async function PurchaseOrderPrintPage({
       <article
         dir={dirFor(locale)}
         lang={locale}
-        className="rounded-lg border border-line bg-white p-8 text-ink print:rounded-none print:border-0 print:p-0"
+        className="mt-force-light rounded-lg border border-line bg-surface p-8 text-ink print:rounded-none print:border-0 print:p-0"
       >
         {/* Header */}
         <header className="mb-8 flex items-start justify-between gap-6 border-b-2 border-primary pb-6">

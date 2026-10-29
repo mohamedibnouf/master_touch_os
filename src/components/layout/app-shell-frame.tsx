@@ -83,7 +83,7 @@ export function AppShellFrame({
         <button
           type="button"
           aria-label={t.shell.closeMenu}
-          className="fixed inset-0 z-40 bg-ink/50 backdrop-blur-[2px] xl:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-overlay backdrop-blur-[2px] xl:hidden print:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       ) : null}
