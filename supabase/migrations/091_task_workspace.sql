@@ -41,6 +41,11 @@ insert into public.permissions (key, resource, action, description_ar, descripti
   ('task.performance.read', 'task', 'performance.read', 'عرض أداء الفريق في المهام', 'View team task performance')
 on conflict (key) do nothing;
 
+-- System role permissions are protected by role_permissions_protect_system (069). The
+-- documented migration bypass only works for the postgres/supabase_admin user and is
+-- transaction-local; it is switched off again right after the seed below.
+select set_config('master_touch.allow_system_role_ddl', 'on', true);
+
 -- All internal system roles: read + create (viewer: read only).
 insert into public.role_permissions (role_id, permission_key)
 select r.id, x.permission_key
@@ -69,6 +74,8 @@ where r.organization_id is null
   and r.is_system = true
   and r.code in ('super_admin', 'general_manager', 'operations_manager', 'project_manager', 'hr_manager', 'finance_manager')
 on conflict do nothing;
+
+select set_config('master_touch.allow_system_role_ddl', 'off', true);
 
 -- =============================================================================
 -- B. Tables
