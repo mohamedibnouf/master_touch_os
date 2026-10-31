@@ -262,7 +262,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const viewIcons = { list: List, board: KanbanSquare, calendar: CalendarDays } as const;
 
   return (
-    <PageContainer data-testid="tasks-page" className="lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)] lg:items-start lg:gap-5">
+    <PageContainer data-testid="tasks-page" className="lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start lg:gap-5">
       <WorkspacePanel
         spaces={panelSpaces}
         selection={selection}

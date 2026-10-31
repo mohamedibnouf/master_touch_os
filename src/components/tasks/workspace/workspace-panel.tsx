@@ -191,12 +191,12 @@ export function WorkspacePanel({
                     {space.lists.map((list) => {
                       const active = selection.kind === "list" && selection.id === list.id;
                       return (
-                        <li key={list.id} className="group/list flex items-center gap-1">
+                        <li key={list.id} className="group/list flex min-w-0 items-center gap-1">
                           <Link
                             href={tasksHref({}, { list: list.id, view: viewParam })}
                             onClick={close}
                             aria-current={active ? "page" : undefined}
-                            className={cn(navCls(active), "min-h-8 flex-1 py-1 text-[13px]")}
+                            className={cn(navCls(active), "min-h-8 min-w-0 flex-1 py-1 text-[13px]")}
                             data-testid="tasks-list-link"
                           >
                             {list.isProject ? (
@@ -204,7 +204,7 @@ export function WorkspacePanel({
                             ) : (
                               <LayoutList className="size-3.5 shrink-0 text-muted" aria-hidden />
                             )}
-                            <span className="flex-1 truncate" dir="auto">
+                            <span className="min-w-0 flex-1 truncate" dir="auto">
                               {list.name}
                             </span>
                             {list.openCount > 0 ? (
@@ -257,7 +257,7 @@ export function WorkspacePanel({
       <aside
         id="tasks-workspace-panel"
         className={cn(
-          "lg:sticky lg:top-4 lg:block lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:rounded-[var(--radius-card,0.875rem)] lg:border lg:border-line lg:bg-surface lg:p-3 lg:shadow-card",
+          "lg:sticky lg:top-4 lg:block lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:rounded-[var(--radius-card,0.875rem)] lg:border lg:border-line lg:bg-surface lg:p-3 lg:shadow-card",
           open
             ? "max-lg:fixed max-lg:inset-y-0 max-lg:start-0 max-lg:z-50 max-lg:w-[18rem] max-lg:max-w-[85vw] max-lg:overflow-y-auto max-lg:border-e max-lg:border-line max-lg:bg-surface max-lg:p-3 max-lg:pt-[max(0.75rem,env(safe-area-inset-top))] max-lg:shadow-[var(--shadow-2)]"
             : "max-lg:hidden",
