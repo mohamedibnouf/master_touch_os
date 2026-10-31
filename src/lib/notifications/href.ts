@@ -42,6 +42,8 @@ export function notificationEntityHref(entityType: string | null, entityId: stri
       return "/approvals";
     case "employee":
       return `/employees/${entityId}`;
+    case "task":
+      return `/tasks/${entityId}`;
     case "payroll_period":
       return "/payroll";
     case "hr_alert_hook":

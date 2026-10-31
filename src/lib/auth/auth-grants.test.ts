@@ -124,8 +124,9 @@ describe("Home self-service without employees row", () => {
 });
 
 describe("permission freezes", () => {
-  it("keeps the certified employee eight and job_title matrix", () => {
-    expect(BASE_EMPLOYEE_PERMISSIONS).toHaveLength(8);
+  it("keeps the certified employee eight (+ 091 task.read/task.create) and job_title matrix", () => {
+    expect(BASE_EMPLOYEE_PERMISSIONS).toHaveLength(10);
+    expect(BASE_EMPLOYEE_PERMISSIONS.filter((k) => !k.startsWith("task."))).toHaveLength(8);
     expect(ROLE_PERMISSION_MAP.employee).toEqual(BASE_EMPLOYEE_PERMISSIONS);
     expect(ROLE_PERMISSION_MAP.general_manager).toContain("job_title.manage");
     expect(ROLE_PERMISSION_MAP.hr_officer).toContain("job_title.read");

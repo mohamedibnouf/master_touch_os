@@ -28,6 +28,8 @@ import {
   Gauge,
   Sparkles,
   X,
+  ListChecks,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/client";
@@ -50,6 +52,8 @@ const groups: NavGroup[] = [
   {
     id: "my",
     items: [
+      { href: "/tasks", key: "tasks", icon: ListChecks, show: "tasks" },
+      { href: "/tasks/performance", key: "tasksPerformance", icon: TrendingUp, show: "tasks" },
       { href: "/attendance", key: "attendance", icon: Clock, show: "attendance" },
       { href: "/leave", key: "leave", icon: CalendarDays, show: "leave" },
       { href: "/approvals", key: "approvals", icon: Stamp, show: "approvals" },

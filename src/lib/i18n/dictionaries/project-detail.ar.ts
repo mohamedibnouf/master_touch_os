@@ -32,6 +32,7 @@ export const projectDetailAr = {
     health: "صحة المشروع: {health}",
     due: "الاستحقاق: {date}",
     requiredAction: "الإجراء المطلوب: {action}",
+    tasks: "المهام",
   },
   health: {
     red: "أحمر",

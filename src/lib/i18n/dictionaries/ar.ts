@@ -15,6 +15,10 @@ import { aiAr } from "./ai.ar";
 import { managementAr } from "./management.ar";
 import { documentsAr } from "./documents.ar";
 import { engineeringAr } from "./engineering.ar";
+import { tasksAr } from "./tasks.ar";
+import { tasksPerformanceAr } from "./tasks-performance.ar";
+import { tasksDetailAr } from "./tasks-detail.ar";
+import { tasksWorkspaceAr } from "./tasks-workspace.ar";
 
 /**
  * Arabic is the source dictionary: its shape defines the Dictionary type, and en.ts
@@ -38,6 +42,10 @@ export const ar = {
   management: managementAr,
   documents: documentsAr,
   engineering: engineeringAr,
+  tasks: tasksAr,
+  tasksPerformance: tasksPerformanceAr,
+  tasksDetail: tasksDetailAr,
+  tasksWorkspace: tasksWorkspaceAr,
   meta: {
     title: "ماستر تاتش | نظام التشغيل الداخلي",
     description: "نظام تشغيل الأعمال لماستر تاتش",
@@ -84,6 +92,8 @@ export const ar = {
     },
     items: {
       dashboard: "لوحة العمل",
+      tasks: "المهام",
+      tasksPerformance: "الأداء",
       attendance: "الحضور",
       leave: "الإجازات",
       approvals: "الموافقات",

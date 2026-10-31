@@ -136,6 +136,18 @@ const ACTION_LABELS: Record<string, string> = {
   "profile.whatsapp_opt_in.changed": "تم تحديث موافقة واتساب التشغيلية",
   "push.subscription.created": "تم تفعيل إشعارات الجهاز",
   "push.subscription.revoked": "أُلغي اشتراك الإشعارات",
+  "task_space.created": "تم إنشاء مساحة مهام",
+  "task_space.updated": "تم تحديث مساحة مهام",
+  "task_space.archived": "أُرشفت مساحة مهام",
+  "task_list.created": "تم إنشاء قائمة مهام",
+  "task_list.updated": "تم تحديث قائمة مهام",
+  "task_list.archived": "أُرشفت قائمة مهام",
+  "task.created": "تم إنشاء مهمة",
+  "task.updated": "تم تحديث مهمة",
+  "task.deleted": "تم حذف مهمة",
+  "task.status_changed": "تم تغيير حالة مهمة",
+  "task.assigned": "تم إسناد مهمة",
+  "task.unassigned": "أُلغي إسناد مهمة",
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -172,6 +184,9 @@ const ENTITY_LABELS: Record<string, string> = {
   client_payment: "تحصيل من العميل",
   variation: "أمر تغيير",
   contract_milestone: "مرحلة تعاقدية",
+  task: "مهمة",
+  task_space: "مساحة مهام",
+  task_list: "قائمة مهام",
 };
 
 const ACTION_LABELS_EN: Record<string, string> = {
@@ -309,6 +324,18 @@ const ACTION_LABELS_EN: Record<string, string> = {
   "profile.whatsapp_opt_in.changed": "Operational WhatsApp consent updated",
   "push.subscription.created": "Device notifications enabled",
   "push.subscription.revoked": "Notification subscription revoked",
+  "task_space.created": "Task space created",
+  "task_space.updated": "Task space updated",
+  "task_space.archived": "Task space archived",
+  "task_list.created": "Task list created",
+  "task_list.updated": "Task list updated",
+  "task_list.archived": "Task list archived",
+  "task.created": "Task created",
+  "task.updated": "Task updated",
+  "task.deleted": "Task deleted",
+  "task.status_changed": "Task status changed",
+  "task.assigned": "Task assigned",
+  "task.unassigned": "Task unassigned",
 };
 
 const ENTITY_LABELS_EN: Record<string, string> = {
@@ -345,6 +372,9 @@ const ENTITY_LABELS_EN: Record<string, string> = {
   client_payment: "Client payment",
   variation: "Variation",
   contract_milestone: "Contract milestone",
+  task: "Task",
+  task_space: "Task space",
+  task_list: "Task list",
 };
 
 export function auditActionLabel(action: string, locale: AuditLabelLocale = "ar"): string {

@@ -22,6 +22,7 @@ export type PermissionGroupId =
   | "engineering"
   | "procurement"
   | "commercial"
+  | "tasks"
   | "other";
 
 export const PERMISSION_GROUP_LABELS: Record<PermissionGroupId, { ar: string; en: string }> = {
@@ -46,6 +47,7 @@ export const PERMISSION_GROUP_LABELS: Record<PermissionGroupId, { ar: string; en
   engineering: { ar: "الهندسة ومراقبة الوثائق", en: "Engineering" },
   procurement: { ar: "المشتريات", en: "Procurement" },
   commercial: { ar: "التجاري", en: "Commercial" },
+  tasks: { ar: "المهام", en: "Tasks" },
   other: { ar: "أخرى", en: "Other" },
 };
 
@@ -102,6 +104,7 @@ const RESOURCE_TO_GROUP: Record<string, PermissionGroupId> = {
   variation: "commercial",
   commercial_reports: "commercial",
   ai: "reports",
+  task: "tasks",
 };
 
 export function permissionGroupForKey(key: PermissionKey | string): PermissionGroupId {

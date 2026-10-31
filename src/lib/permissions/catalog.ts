@@ -173,6 +173,10 @@ export const PERMISSIONS = [
   "ai.document.analyze",
   "ai.report.generate",
   "ai.management.view",
+  "task.read",
+  "task.create",
+  "task.manage",
+  "task.performance.read",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number];
@@ -225,6 +229,18 @@ export const BASE_EMPLOYEE_PERMISSIONS: readonly PermissionKey[] = [
   "leave.cancel_self",
   "notification.read",
   "payroll.view_self",
+  "task.read",
+  "task.create",
+];
+
+/** Task workspace (091): every internal role reads and creates tasks. */
+const TASK_BASE_PERMISSIONS: PermissionKey[] = ["task.read", "task.create"];
+
+/** Task workspace (091): managers also manage spaces/any task and read team performance. */
+const TASK_MANAGER_PERMISSIONS: PermissionKey[] = [
+  ...TASK_BASE_PERMISSIONS,
+  "task.manage",
+  "task.performance.read",
 ];
 
 /** Viewer: limited Phase 1 reads only — not every *.read permission. */
@@ -234,6 +250,7 @@ const VIEWER_PERMISSIONS: PermissionKey[] = [
   "project.read",
   "document.read",
   "notification.read",
+  "task.read",
 ];
 
 const PHASE2_OPS: PermissionKey[] = [
@@ -282,6 +299,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
   super_admin: ALL_INTERNAL_PERMISSIONS,
   general_manager: ALL_INTERNAL_PERMISSIONS.filter((key) => key !== "settings.manage"),
   operations_manager: [
+    ...TASK_MANAGER_PERMISSIONS,
     "project.create",
     "project.read",
     "project.read_all",
@@ -323,6 +341,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     ...PHASE2_OPS,
   ],
   department_manager: [
+    ...TASK_BASE_PERMISSIONS,
     "department.read",
     "department.update",
     "project.read",
@@ -357,6 +376,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "attendance.view_team",
   ],
   project_manager: [
+    ...TASK_MANAGER_PERMISSIONS,
     "project.read",
     "project.update",
     "project.manage_team",
@@ -390,6 +410,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     ...PHASE2_OPS,
   ],
   project_engineer: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -432,6 +453,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "correspondence.read",
   ],
   engineer: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -470,6 +492,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "payroll.view_self",
   ],
   document_controller: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "project.read_all",
     "document.upload",
@@ -512,6 +535,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "transmittal.issue",
   ],
   finance_manager: [
+    ...TASK_MANAGER_PERMISSIONS,
     "finance.read",
     "finance.manage",
     "project.read",
@@ -571,6 +595,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "commercial_reports.read",
   ],
   finance_officer: [
+    ...TASK_BASE_PERMISSIONS,
     "finance.read",
     "project.read",
     "document.read",
@@ -600,6 +625,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "commercial_reports.read",
   ],
   hr_manager: [
+    ...TASK_MANAGER_PERMISSIONS,
     "employee.create",
     "employee.read",
     "employee.manage",
@@ -653,6 +679,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "audit.read",
   ],
   hr_officer: [
+    ...TASK_BASE_PERMISSIONS,
     "employee.read",
     "employee_compliance.read",
     "employee_contract.read",
@@ -682,6 +709,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "notification.read",
   ],
   procurement_manager: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -722,6 +750,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "supplier_invoice.review",
   ],
   procurement_officer: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -749,6 +778,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "goods_receipt.read",
   ],
   hse_manager: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -763,6 +793,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "ncr.read",
   ],
   hse_officer: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",
@@ -772,6 +803,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "inspection.read",
   ],
   quality_manager: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "project.read_all",
     "document.upload",
@@ -793,6 +825,7 @@ export const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly PermissionKey[
     "method_statement.read",
   ],
   quality_officer: [
+    ...TASK_BASE_PERMISSIONS,
     "project.read",
     "document.upload",
     "document.read",

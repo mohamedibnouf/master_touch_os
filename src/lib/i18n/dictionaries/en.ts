@@ -16,6 +16,10 @@ import { aiEn } from "./ai.en";
 import { managementEn } from "./management.en";
 import { documentsEn } from "./documents.en";
 import { engineeringEn } from "./engineering.en";
+import { tasksEn } from "./tasks.en";
+import { tasksPerformanceEn } from "./tasks-performance.en";
+import { tasksDetailEn } from "./tasks-detail.en";
+import { tasksWorkspaceEn } from "./tasks-workspace.en";
 
 export const en: Dictionary = {
   projectDetail: projectDetailEn,
@@ -35,6 +39,10 @@ export const en: Dictionary = {
   management: managementEn,
   documents: documentsEn,
   engineering: engineeringEn,
+  tasks: tasksEn,
+  tasksPerformance: tasksPerformanceEn,
+  tasksDetail: tasksDetailEn,
+  tasksWorkspace: tasksWorkspaceEn,
   meta: {
     title: "Master Touch | Internal Operating System",
     description: "Business operating system for Master Touch",
@@ -81,6 +89,8 @@ export const en: Dictionary = {
     },
     items: {
       dashboard: "Dashboard",
+      tasks: "Tasks",
+      tasksPerformance: "Performance",
       attendance: "Attendance",
       leave: "Leave",
       approvals: "Approvals",

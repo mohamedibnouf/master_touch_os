@@ -33,6 +33,7 @@ export const projectDetailEn: Dictionary["projectDetail"] = {
     health: "Project health: {health}",
     due: "Due: {date}",
     requiredAction: "Required action: {action}",
+    tasks: "Tasks",
   },
   health: {
     red: "Red",

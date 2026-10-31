@@ -20,4 +20,5 @@ export type AppNavFlags = {
   settings: boolean;
   roles: boolean;
   analyst: boolean;
+  tasks: boolean;
 };

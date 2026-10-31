@@ -174,11 +174,11 @@ describe("job title catalog domain", () => {
     );
   });
 
-  it("base employee permissions stay eight keys and exclude job_title.manage/read", () => {
-    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...EIGHT].sort());
+  it("base employee permissions stay eight self-service keys + 091 task keys and exclude job_title.manage/read", () => {
+    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...EIGHT, "task.read", "task.create"].sort());
     expect(ROLE_PERMISSION_MAP.employee).not.toContain("job_title.manage");
     expect(ROLE_PERMISSION_MAP.employee).not.toContain("job_title.read");
-    expect([...BASE_EMPLOYEE_PERMISSIONS]).toHaveLength(8);
+    expect([...BASE_EMPLOYEE_PERMISSIONS]).toHaveLength(10);
   });
 
   it("job_title.manage is granted to hr_manager, not employee", () => {

@@ -6,6 +6,8 @@ import { EntityHeader } from "@/components/ui/entity-header";
 import { getAuthContext } from "@/server/context";
 import { hasPermission } from "@/server/policies/authorize";
 import { CoreRepository } from "@/server/repositories/core.repository";
+import { TaskRepository } from "@/server/repositories/task.repository";
+import { ListChecks } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ServerActionForm } from "@/components/forms/server-action-form";
 import {
@@ -103,6 +105,19 @@ export default async function ProjectDetailPage({
       catalogRead: hasCatalogProjectRead(ctx.grants, ctx.organization.id, id),
     });
     notFound();
+  }
+
+  // Link to the project's task list (created on first need; never blocks the page).
+  let projectTaskListId: string | null = null;
+  if (hasPermission(ctx, "task.read")) {
+    try {
+      const taskRepo = new TaskRepository(supabase);
+      projectTaskListId =
+        (await taskRepo.findProjectListId(ctx.organization.id, project.id)) ??
+        (await taskRepo.ensureProjectList(project.id));
+    } catch (error) {
+      logger.warn("project task list unavailable", { projectId: project.id, error: String(error) });
+    }
   }
 
   const needDocs = projectNeedsDocumentCatalog(tab);
@@ -550,6 +565,16 @@ export default async function ProjectDetailPage({
         initials={project.project_code.slice(0, 2)}
         title={projectTitle}
         subtitle={projectAltName ? `${project.project_code} · ${projectAltName}` : project.project_code}
+        actions={
+          projectTaskListId ? (
+            <Link href={`/tasks?list=${projectTaskListId}`} data-testid="project-tasks-link">
+              <Button variant="secondary">
+                <ListChecks className="size-4" aria-hidden />
+                {td.header.tasks}
+              </Button>
+            </Link>
+          ) : undefined
+        }
         meta={
           <span>
             <bdi>{format(td.header.currentStage, { stage: currentStageName })}</bdi>

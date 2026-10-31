@@ -33,6 +33,9 @@ const EIGHT: PermissionKey[] = [
   "payroll.view_self",
 ];
 
+/** 091 adds the task workspace base keys to the employee role. */
+const BASE_TEN: PermissionKey[] = [...EIGHT, "task.read", "task.create"];
+
 function grant(role: SystemRoleCode, organizationId: string): RoleGrant {
   return {
     roleCode: role,
@@ -50,10 +53,10 @@ describe("base employee system role", () => {
     expect(BASE_EMPLOYEE_ROLE_CODE).toBe("employee");
   });
 
-  it("B. ROLE_PERMISSION_MAP.employee contains EXACTLY eight permissions", () => {
-    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...EIGHT].sort());
-    expect(ROLE_PERMISSION_MAP.employee).toHaveLength(8);
-    expect([...BASE_EMPLOYEE_PERMISSIONS].sort()).toEqual([...EIGHT].sort());
+  it("B. ROLE_PERMISSION_MAP.employee contains EXACTLY ten permissions (eight self-service + task.read/task.create from 091)", () => {
+    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...BASE_TEN].sort());
+    expect(ROLE_PERMISSION_MAP.employee).toHaveLength(10);
+    expect([...BASE_EMPLOYEE_PERMISSIONS].sort()).toEqual([...BASE_TEN].sort());
   });
 
   it("C–J. employee has the eight self-service keys", () => {

@@ -89,6 +89,7 @@ export async function AppShell({
     settings: g("user.read") || g("settings.manage"),
     roles: g("role.manage") || g("role.read"),
     analyst: g("reports.management.read"),
+    tasks: g("task.read"),
   };
 
   const { locale, t } = await getI18n();

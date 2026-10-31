@@ -22,7 +22,8 @@ import { groupPermissionKeys, permissionGroupForKey } from "@/lib/rbac/permissio
 
 const ORG_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const ORG_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-const EIGHT = [...BASE_EMPLOYEE_PERMISSIONS];
+/** The 067 self-service eight (091 adds task.read / task.create on top, seeded by 091). */
+const EIGHT = BASE_EMPLOYEE_PERMISSIONS.filter((key) => !key.startsWith("task."));
 
 describe("custom role domain security", () => {
   it("normalizes codes and reserves system codes", () => {
@@ -180,6 +181,7 @@ describe("catalog denylist and grouping", () => {
       "project.read",
       "document.read",
       "notification.read",
+      "task.read",
     ]);
   });
 
@@ -188,7 +190,7 @@ describe("catalog denylist and grouping", () => {
     expect(ROLE_PERMISSION_MAP.general_manager).toContain("role.manage");
     expect(ROLE_PERMISSION_MAP.hr_manager).not.toContain("role.manage");
     expect(ROLE_PERMISSION_MAP.employee).not.toContain("role.manage");
-    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...EIGHT].sort());
+    expect([...ROLE_PERMISSION_MAP.employee].sort()).toEqual([...EIGHT, "task.read", "task.create"].sort());
   });
 
   it("groups actual catalog prefixes without inventing keys", () => {

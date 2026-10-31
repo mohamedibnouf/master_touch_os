@@ -7,6 +7,8 @@ const APP = path.join(process.cwd(), "src", "app", "(app)");
 
 const SIDEBAR_HREFS = [
   "/",
+  "/tasks",
+  "/tasks/performance",
   "/attendance",
   "/leave",
   "/approvals",
