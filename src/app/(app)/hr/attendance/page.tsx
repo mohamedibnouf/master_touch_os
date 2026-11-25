@@ -69,7 +69,11 @@ export default async function HrAttendancePage({
 
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
-  const records = await repo.listRecordsForDate(ctx.organization.id, date, status);
+  const [records, shiftsList] = await Promise.all([
+    repo.listRecordsForDate(ctx.organization.id, date, status),
+    repo.listShifts(ctx.organization.id),
+  ]);
+  const shiftNames = new Map(shiftsList.map((s) => [s.id, pickLocalized(locale, s.name_ar, s.name_en)]));
   const canEvidence = hasPermission(ctx, "attendance.view_location_evidence");
   const geofenceReady = await repo.geofenceSchemaReady();
   const attempts = geofenceReady
@@ -81,11 +85,14 @@ export default async function HrAttendancePage({
     locale,
   );
 
-  const present = records.filter((r) => ["present", "late", "partial"].includes(r.attendance_status)).length;
-  const late = records.filter((r) => r.attendance_status === "late").length;
-  const absent = records.filter((r) => r.attendance_status === "absent").length;
-  const missing = records.filter((r) => r.attendance_status === "missing_checkout").length;
-  const onLeave = records.filter((r) => r.attendance_status === "on_leave").length;
+  // 092: split-shift employees have one row per shift; count employees, not rows.
+  const employeesWith = (statuses: string[]) =>
+    new Set(records.filter((r) => statuses.includes(r.attendance_status)).map((r) => r.employee_id)).size;
+  const present = employeesWith(["present", "late", "partial"]);
+  const late = employeesWith(["late"]);
+  const absent = employeesWith(["absent"]);
+  const missing = employeesWith(["missing_checkout"]);
+  const onLeave = employeesWith(["on_leave"]);
   const canManage = hasPermission(ctx, "attendance.manage");
   const canPolicies = hasPermission(ctx, "attendance.manage_policies");
   const canShifts = hasPermission(ctx, "attendance.manage_shifts");
@@ -267,6 +274,7 @@ export default async function HrAttendancePage({
               <thead className="bg-surface-muted text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start font-medium">{tc.employee}</th>
+                  <th className="px-4 py-3 text-start font-medium">{tc.shift}</th>
                   <th className="px-4 py-3 text-start font-medium">{ta.checkIn}</th>
                   <th className="px-4 py-3 text-start font-medium">{ta.checkOut}</th>
                   <th className="px-4 py-3 text-start font-medium">{ta.workedMinutes}</th>
@@ -279,6 +287,7 @@ export default async function HrAttendancePage({
                     <td className="px-4 py-3 font-medium text-ink">
                       {names.get(r.employee_id) ?? r.employee_id.slice(0, 8)}
                     </td>
+                    <td className="px-4 py-3 text-muted">{(r.shift_id && shiftNames.get(r.shift_id)) || "—"}</td>
                     <td className="px-4 py-3">{formatAttendanceTime(r.check_in_at, locale)}</td>
                     <td className="px-4 py-3">{formatAttendanceTime(r.check_out_at, locale)}</td>
                     <td className="px-4 py-3 tabular-nums">{r.worked_minutes}</td>

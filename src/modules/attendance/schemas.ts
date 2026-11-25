@@ -39,6 +39,15 @@ export const assignEmployeeShiftSchema = z.object({
     .nullable(),
 });
 
+export const endEmployeeShiftAssignmentSchema = z.object({
+  assignmentId: z.string().uuid(),
+  effectiveTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export const deleteEmployeeShiftAssignmentSchema = z.object({
+  assignmentId: z.string().uuid(),
+});
+
 export const upsertAttendancePolicySchema = z.object({
   id: z.string().uuid().optional(),
   code: z.string().min(2).max(32),

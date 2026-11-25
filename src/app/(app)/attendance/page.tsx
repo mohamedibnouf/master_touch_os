@@ -16,7 +16,8 @@ import { ServerActionForm } from "@/components/forms/server-action-form";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
-import { todayInRiyadh } from "@/lib/time/riyadh";
+import { addDaysYmd, todayInRiyadh } from "@/lib/time/riyadh";
+import { buildTodayShiftRows, shiftsForWeekday, todayPunchState } from "@/modules/attendance/split-shifts";
 
 export default async function AttendanceDashboardPage() {
   const ctx = await getAuthContext();
@@ -44,32 +45,45 @@ export default async function AttendanceDashboardPage() {
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
 
-  const [todayRecord, recent, assignment, geofenceReady] = await Promise.all([
-    repo.getRecordForDate(ctx.organization.id, ctx.employee.id, today),
-    repo.listRecordsForEmployee(ctx.organization.id, ctx.employee.id, { limit: 7 }),
-    repo.getActiveAssignment(ctx.organization.id, ctx.employee.id, today),
+  const yesterday = addDaysYmd(today, -1);
+  const [recentRecords, recent, assignedShifts, geofenceReady] = await Promise.all([
+    repo.listRecordsForEmployeeDates(ctx.organization.id, ctx.employee.id, yesterday, today),
+    repo.listRecordsForEmployee(ctx.organization.id, ctx.employee.id, { limit: 14 }),
+    repo.listShiftsForEmployeeOnDate(ctx.organization.id, ctx.employee.id, today),
     repo.geofenceSchemaReady(),
   ]);
-  const shift = assignment
-    ? await repo.getShift(ctx.organization.id, assignment.shift_id)
-    : null;
   const workplaces = geofenceReady
     ? await repo.listEligibleWorkplacesForEmployee(ctx.organization.id, ctx.employee.id, today)
     : [];
 
-  const canCheckIn = hasPermission(ctx, "attendance.check_in") && !todayRecord?.check_in_at;
-  const canCheckOut =
-    hasPermission(ctx, "attendance.check_out") &&
-    Boolean(todayRecord?.check_in_at) &&
-    !todayRecord?.check_out_at;
+  // 092: one row per shift per day (split shifts). Yesterday's still-open night shift counts too.
+  const todayRecords = recentRecords.filter((r) => r.attendance_date === today);
+  const carriedOpen = recentRecords.filter(
+    (r) => r.attendance_date === yesterday && r.check_in_at && !r.check_out_at,
+  );
+  const todayDow = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const shiftsToday = shiftsForWeekday(assignedShifts, todayDow);
+  const punch = todayPunchState({ shiftsToday, todayRecords, carriedOpenRecords: carriedOpen });
+  const shiftRows = buildTodayShiftRows(shiftsToday, todayRecords, carriedOpen);
+  const shiftById = new Map(assignedShifts.map((s) => [s.id, s]));
+  const todayRecord = punch.headlineRecord;
+  const isSplit = shiftRows.length > 1;
+  const recentShowsShift = new Set(recent.map((r) => r.shift_id ?? "")).size > 1;
+
+  const canCheckIn = hasPermission(ctx, "attendance.check_in") && punch.canCheckIn;
+  const canCheckOut = hasPermission(ctx, "attendance.check_out") && punch.canCheckOut;
   const canTeam = hasPermission(ctx, "attendance.view_team");
   const canHr = hasPermission(ctx, "attendance.view_all") || hasPermission(ctx, "attendance.manage");
 
   const fmt = (value: string | null) => formatAttendanceDayTime(value, locale);
   const statusTone = todayRecord ? attendanceStatusTone(todayRecord.attendance_status) : "neutral";
-  const checkedIn = Boolean(todayRecord?.check_in_at);
-  const checkedOut = Boolean(todayRecord?.check_out_at);
-  const hint = !checkedIn ? ts.notCheckedInHint : !checkedOut ? ts.checkedInHint : ts.doneHint;
+  const hint = punch.openRecord
+    ? ts.checkedInHint
+    : punch.betweenShifts
+      ? ts.nextShiftHint
+      : todayRecord?.check_in_at
+        ? ts.doneHint
+        : ts.notCheckedInHint;
 
   return (
     <PageContainer data-testid="attendance-dashboard" className="space-y-5">
@@ -150,14 +164,50 @@ export default async function AttendanceDashboardPage() {
             </div>
           </dl>
 
-          {todayRecord ? (
+          {isSplit ? (
+            <ul className="mt-3 space-y-2" data-testid="attendance-today-shifts">
+              {shiftRows.map((row) => {
+                const sh = row.shift ?? (row.record?.shift_id ? shiftById.get(row.record.shift_id) : undefined);
+                return (
+                  <li
+                    key={row.record?.id ?? row.shift?.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+                  >
+                    <span className="min-w-0">
+                      <span className="font-medium text-ink">
+                        {sh ? pickLocalized(locale, sh.name_ar, sh.name_en) : row.record?.attendance_date}
+                      </span>
+                      {sh ? (
+                        <span className="ms-2 tabular-nums text-muted" dir="ltr">
+                          {String(sh.start_time).slice(0, 5)} → {String(sh.end_time).slice(0, 5)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs text-muted">
+                      <span className="tabular-nums" dir="ltr">
+                        {fmt(row.record?.check_in_at ?? null)} – {fmt(row.record?.check_out_at ?? null)}
+                      </span>
+                      <Badge tone={row.record ? attendanceStatusTone(row.record.attendance_status) : "neutral"}>
+                        {row.state === "open"
+                          ? ts.shiftOpen
+                          : row.record
+                            ? attendanceStatusLabel(row.record.attendance_status, locale)
+                            : ts.shiftNotStarted}
+                      </Badge>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {todayRecords.length > 0 ? (
             <p className="mt-3 text-xs text-muted">
-              {ts.worked} {format(tc.minutes, { n: todayRecord.worked_minutes })} · {ts.late}{" "}
-              {format(tc.minutes, { n: todayRecord.late_minutes })} · {ts.earlyLeave}{" "}
-              {format(tc.minutes, { n: todayRecord.early_leave_minutes })}
+              {ts.worked} {format(tc.minutes, { n: punch.totals.worked })} · {ts.late}{" "}
+              {format(tc.minutes, { n: punch.totals.late })} · {ts.earlyLeave}{" "}
+              {format(tc.minutes, { n: punch.totals.early })}
             </p>
           ) : null}
-          {todayRecord?.check_in_at && !todayRecord.check_out_at ? (
+          {punch.openRecord ? (
             <p className="mt-1 text-xs font-medium text-warning">{ts.checkoutPending}</p>
           ) : null}
         </div>
@@ -244,19 +294,23 @@ export default async function AttendanceDashboardPage() {
         <Card data-testid="attendance-shift-card">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <Clock className="size-4 text-primary" aria-hidden />
-            {ts.shiftTitle}
+            {assignedShifts.length > 1 ? ts.shiftsTitle : ts.shiftTitle}
           </h2>
-          {shift ? (
-            <div className="text-sm">
-              <p className="font-medium text-ink">{pickLocalized(locale, shift.name_ar, shift.name_en)}</p>
-              <p className="mt-1 text-muted">
-                <span className="tabular-nums" dir="ltr">
-                  {String(shift.start_time).slice(0, 5)} → {String(shift.end_time).slice(0, 5)}
-                </span>
-                {shift.crosses_midnight ? ` ${ts.crossesMidnight}` : ""} ·{" "}
-                {format(ts.breakMinutes, { n: shift.break_minutes })}
-              </p>
-            </div>
+          {assignedShifts.length > 0 ? (
+            <ul className="space-y-2 text-sm">
+              {assignedShifts.map((shift) => (
+                <li key={shift.id}>
+                  <p className="font-medium text-ink">{pickLocalized(locale, shift.name_ar, shift.name_en)}</p>
+                  <p className="mt-1 text-muted">
+                    <span className="tabular-nums" dir="ltr">
+                      {String(shift.start_time).slice(0, 5)} → {String(shift.end_time).slice(0, 5)}
+                    </span>
+                    {shift.crosses_midnight ? ` ${ts.crossesMidnight}` : ""} ·{" "}
+                    {format(ts.breakMinutes, { n: shift.break_minutes })}
+                  </p>
+                </li>
+              ))}
+            </ul>
           ) : (
             <EmptyState title={ts.noShift} />
           )}
@@ -275,6 +329,7 @@ export default async function AttendanceDashboardPage() {
               <thead className="bg-surface-muted text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start font-medium">{tc.date}</th>
+                  {recentShowsShift ? <th className="px-4 py-3 text-start font-medium">{tc.shift}</th> : null}
                   <th className="px-4 py-3 text-start font-medium">{tc.checkIn}</th>
                   <th className="px-4 py-3 text-start font-medium">{tc.checkOut}</th>
                   <th className="px-4 py-3 text-start font-medium">{tc.status}</th>
@@ -284,6 +339,14 @@ export default async function AttendanceDashboardPage() {
                 {recent.map((r) => (
                   <tr key={r.id} className="border-t border-line">
                     <td className="px-4 py-3 tabular-nums">{r.attendance_date}</td>
+                    {recentShowsShift ? (
+                      <td className="px-4 py-3 text-muted">
+                        {(() => {
+                          const sh = r.shift_id ? shiftById.get(r.shift_id) : undefined;
+                          return sh ? pickLocalized(locale, sh.name_ar, sh.name_en) : "—";
+                        })()}
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3">{fmt(r.check_in_at)}</td>
                     <td className="px-4 py-3">{fmt(r.check_out_at)}</td>
                     <td className="px-4 py-3">

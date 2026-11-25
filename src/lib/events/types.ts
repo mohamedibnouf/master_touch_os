@@ -86,6 +86,8 @@ export const DOMAIN_EVENTS = [
   "attendance.checked_out",
   "attendance.adjusted",
   "attendance.shift_assigned",
+  "attendance.shift_assignment_ended",
+  "attendance.shift_assignment_deleted",
   "attendance.reconciled",
   "payroll.period_created",
   "payroll.calculated",

@@ -10,6 +10,7 @@ import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { attendanceStatusTone } from "@/lib/ui/operational-labels";
 import { formatAttendanceTime } from "@/components/attendance/attendance-format";
 import { getI18n } from "@/lib/i18n/server";
+import { pickLocalized } from "@/lib/i18n/config";
 
 export default async function AttendanceHistoryPage() {
   const ctx = await getAuthContext();
@@ -30,11 +31,13 @@ export default async function AttendanceHistoryPage() {
   }
 
   const supabase = await createServerSupabaseClient();
-  const records = await new AttendanceRepository(supabase).listRecordsForEmployee(
-    ctx.organization.id,
-    ctx.employee.id,
-    { limit: 90 },
-  );
+  const repo = new AttendanceRepository(supabase);
+  const [records, shifts] = await Promise.all([
+    repo.listRecordsForEmployee(ctx.organization.id, ctx.employee.id, { limit: 90 }),
+    repo.listShifts(ctx.organization.id),
+  ]);
+  const shiftNames = new Map(shifts.map((s) => [s.id, pickLocalized(locale, s.name_ar, s.name_en)]));
+  const showShift = new Set(records.map((r) => r.shift_id ?? "")).size > 1;
 
   return (
     <PageContainer data-testid="attendance-history" className="space-y-5">
@@ -59,6 +62,7 @@ export default async function AttendanceHistoryPage() {
               <thead className="bg-surface-muted text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start font-medium">{tc.date}</th>
+                  {showShift ? <th className="px-4 py-3 text-start font-medium">{tc.shift}</th> : null}
                   <th className="px-4 py-3 text-start font-medium">{th.checkIn}</th>
                   <th className="px-4 py-3 text-start font-medium">{th.checkOut}</th>
                   <th className="px-4 py-3 text-start font-medium">{th.workedMinutes}</th>
@@ -70,6 +74,9 @@ export default async function AttendanceHistoryPage() {
                 {records.map((r) => (
                   <tr key={r.id} className="border-t border-line" data-testid="attendance-history-row">
                     <td className="px-4 py-3 tabular-nums">{r.attendance_date}</td>
+                    {showShift ? (
+                      <td className="px-4 py-3 text-muted">{(r.shift_id && shiftNames.get(r.shift_id)) || "—"}</td>
+                    ) : null}
                     <td className="px-4 py-3">{formatAttendanceTime(r.check_in_at, locale)}</td>
                     <td className="px-4 py-3">{formatAttendanceTime(r.check_out_at, locale)}</td>
                     <td className="px-4 py-3 tabular-nums">{r.worked_minutes}</td>

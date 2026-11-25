@@ -48,7 +48,7 @@ export const LEAVE_BALANCE_LIST_COLUMNS =
   "id, leave_type_id, year, entitled_days, used_days, pending_days, available_days" as const;
 
 export const ATTENDANCE_RECORD_LIST_COLUMNS =
-  "id, organization_id, employee_id, attendance_date, attendance_status, check_in_at, check_out_at, worked_minutes, late_minutes, source, check_in_distance_meters, check_out_distance_meters, check_in_location_verified, check_out_location_verified" as const;
+  "id, organization_id, employee_id, shift_id, attendance_date, attendance_status, check_in_at, check_out_at, worked_minutes, late_minutes, source, check_in_distance_meters, check_out_distance_meters, check_in_location_verified, check_out_location_verified" as const;
 
 export const AUDIT_FEED_COLUMNS = "id, action, entity_type, entity_id, created_at, actor_id, new_values" as const;
 

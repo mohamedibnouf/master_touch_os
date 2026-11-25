@@ -58,11 +58,12 @@ export class AttendanceRepository {
     return (data ?? []) as EmployeeShiftAssignment[];
   }
 
-  async getActiveAssignment(
+  /** All shift assignments in force on a date (092: an employee may hold several). */
+  async listActiveAssignments(
     organizationId: string,
     employeeId: string,
     onDate: string,
-  ): Promise<EmployeeShiftAssignment | null> {
+  ): Promise<EmployeeShiftAssignment[]> {
     const { data, error } = await this.supabase
       .from("employee_shift_assignments")
       .select("*")
@@ -70,11 +71,29 @@ export class AttendanceRepository {
       .eq("employee_id", employeeId)
       .lte("effective_from", onDate)
       .or(`effective_to.is.null,effective_to.gte.${onDate}`)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("effective_from", { ascending: false });
     if (error) fail(error);
-    return (data as EmployeeShiftAssignment | null) ?? null;
+    return (data ?? []) as EmployeeShiftAssignment[];
+  }
+
+  /** Active shifts assigned to the employee on a date, earliest start first. */
+  async listShiftsForEmployeeOnDate(
+    organizationId: string,
+    employeeId: string,
+    onDate: string,
+  ): Promise<AttendanceShift[]> {
+    const assignments = await this.listActiveAssignments(organizationId, employeeId, onDate);
+    const ids = [...new Set(assignments.map((a) => a.shift_id))];
+    if (ids.length === 0) return [];
+    const { data, error } = await this.supabase
+      .from("attendance_shifts")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .in("id", ids)
+      .order("start_time");
+    if (error) fail(error);
+    return (data ?? []) as AttendanceShift[];
   }
 
   async getShift(organizationId: string, id: string): Promise<AttendanceShift | null> {
@@ -88,21 +107,25 @@ export class AttendanceRepository {
     return (data as AttendanceShift | null) ?? null;
   }
 
-  async getRecordForDate(
+  /** Attendance rows of one employee for a date range (092: one row per shift per day). */
+  async listRecordsForEmployeeDates(
     organizationId: string,
     employeeId: string,
-    attendanceDate: string,
-  ): Promise<AttendanceRecord | null> {
+    fromDate: string,
+    toDate: string,
+  ): Promise<AttendanceRecord[]> {
     const { data, error } = await this.supabase
       .from("attendance_records")
       // Dual FKs to workplace_locations (check_in/out). Never embed workplace_locations without a FK hint (PGRST201).
       .select("*")
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
-      .eq("attendance_date", attendanceDate)
-      .maybeSingle();
+      .gte("attendance_date", fromDate)
+      .lte("attendance_date", toDate)
+      .order("attendance_date", { ascending: true })
+      .order("scheduled_start", { ascending: true, nullsFirst: false });
     if (error) fail(error);
-    return (data as AttendanceRecord | null) ?? null;
+    return (data ?? []) as AttendanceRecord[];
   }
 
   async listRecordsForEmployee(
@@ -116,6 +139,7 @@ export class AttendanceRepository {
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId)
       .order("attendance_date", { ascending: false })
+      .order("check_in_at", { ascending: true, nullsFirst: false })
       .limit(opts?.limit ?? 60);
     if (opts?.from) q = q.gte("attendance_date", opts.from);
     if (opts?.to) q = q.lte("attendance_date", opts.to);
@@ -135,6 +159,7 @@ export class AttendanceRepository {
       .eq("organization_id", organizationId)
       .eq("attendance_date", attendanceDate)
       .order("employee_id")
+      .order("check_in_at", { ascending: true, nullsFirst: false })
       .limit(500);
     if (status) q = q.eq("attendance_status", status);
     const { data, error } = await q;

@@ -61,10 +61,13 @@ export default async function HrAttendanceAdjustmentsPage() {
   const today = todayInRiyadh();
   const supabase = await createServerSupabaseClient();
   const repo = new AttendanceRepository(supabase);
-  const [adjustments, todayRecords] = await Promise.all([
+  const [adjustments, todayRecords, shifts] = await Promise.all([
     repo.listAdjustments(ctx.organization.id, 100),
     repo.listRecordsForDate(ctx.organization.id, today),
+    repo.listShifts(ctx.organization.id),
   ]);
+  // 092: split-shift employees have one row per shift — name the shift in the picker.
+  const shiftNames = new Map(shifts.map((s) => [s.id, pickLocalized(locale, s.name_ar, s.name_en)]));
   const names = await employeeNameMap(
     supabase,
     [...adjustments.map((a) => a.employee_id), ...todayRecords.map((r) => r.employee_id)],
@@ -82,7 +85,14 @@ export default async function HrAttendanceAdjustmentsPage() {
             <AttendanceAdjustFields
               records={todayRecords.map((r) => ({
                 id: r.id,
-                label: `${names.get(r.employee_id) ?? r.employee_id.slice(0, 8)} · ${r.attendance_date} · ${attendanceStatusLabel(r.attendance_status, locale)}`,
+                label: [
+                  names.get(r.employee_id) ?? r.employee_id.slice(0, 8),
+                  r.attendance_date,
+                  r.shift_id ? shiftNames.get(r.shift_id) : null,
+                  attendanceStatusLabel(r.attendance_status, locale),
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
                 checkInLocal: isoToRiyadhLocalInput(r.check_in_at),
                 checkOutLocal: isoToRiyadhLocalInput(r.check_out_at),
               }))}

@@ -15,6 +15,8 @@ import { createNotificationService } from "@/server/services/notification.servic
 import {
   adjustAttendanceSchema,
   assignEmployeeShiftSchema,
+  deleteEmployeeShiftAssignmentSchema,
+  endEmployeeShiftAssignmentSchema,
   checkInSchema,
   checkOutSchema,
   reconcileAttendanceSchema,
@@ -32,6 +34,7 @@ import {
   parseAttendancePunchRpc,
 } from "@/modules/attendance/geofence";
 import { workplaceUniqueViolationMessage } from "@/modules/attendance/workplace-write";
+import { shiftAssignmentErrorMessage } from "@/modules/attendance/split-shifts";
 import { riyadhLocalInputToIso, todayInRiyadh } from "@/lib/time/riyadh";
 
 function formBool(value: FormDataEntryValue | null, fallback = false): boolean {
@@ -304,13 +307,79 @@ export async function assignEmployeeShiftAction(
       p_effective_from: parsed.data.effectiveFrom,
       p_effective_to: parsed.data.effectiveTo ?? null,
     });
-    if (error) throw new DatabaseError(error);
+    if (error) throwShiftAssignmentError(error);
 
     revalidatePath("/hr/attendance/assignments");
     revalidatePath("/attendance");
     return { ok: true };
   } catch (err) {
     return formActionFailure(err, "تعذر تعيين الوردية. حاول مرة أخرى.");
+  }
+}
+
+function throwShiftAssignmentError(error: { message?: string; code?: string }): never {
+  const friendly = shiftAssignmentErrorMessage(error);
+  if (friendly) throw new ValidationError(friendly.ar, friendly.en);
+  if (/\bFORBIDDEN\b/.test(error.message ?? "")) throw new ForbiddenError({ source: "shift_assignment_rpc" });
+  if (/\bNOT_FOUND\b/.test(error.message ?? "")) {
+    throw new ValidationError("التعيين غير موجود.", "Assignment not found.");
+  }
+  throw new DatabaseError(error);
+}
+
+/** 092: take an employee off a shift from a date (history kept). */
+export async function endEmployeeShiftAssignmentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    authorize(await getAuthContext(), "attendance.manage_shifts");
+    const parsed = endEmployeeShiftAssignmentSchema.safeParse({
+      assignmentId: formData.get("assignmentId"),
+      effectiveTo: String(formData.get("effectiveTo") ?? "").trim() || todayInRiyadh(),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("تاريخ الإنهاء غير صالح.", "Invalid end date.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("end_employee_shift_assignment", {
+      p_assignment_id: parsed.data.assignmentId,
+      p_effective_to: parsed.data.effectiveTo,
+    });
+    if (error) throwShiftAssignmentError(error);
+    revalidatePath("/hr/attendance/assignments");
+    revalidatePath("/attendance");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر إنهاء الوردية. حاول مرة أخرى.");
+  }
+}
+
+/** 092: delete an assignment made by mistake (refused once attendance exists on it). */
+export async function deleteEmployeeShiftAssignmentAction(
+  _prev: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  try {
+    authorize(await getAuthContext(), "attendance.manage_shifts");
+    const parsed = deleteEmployeeShiftAssignmentSchema.safeParse({
+      assignmentId: formData.get("assignmentId"),
+    });
+    if (!parsed.success) {
+      throw new ValidationError("تعيين غير صالح.", "Invalid assignment.");
+    }
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.rpc("delete_employee_shift_assignment", {
+      p_assignment_id: parsed.data.assignmentId,
+    });
+    if (error) throwShiftAssignmentError(error);
+    revalidatePath("/hr/attendance/assignments");
+    revalidatePath("/attendance");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return formActionFailure(err, "تعذر حذف التعيين. حاول مرة أخرى.");
   }
 }
 
@@ -604,7 +673,7 @@ export async function reconcileAttendanceAction(
   formData: FormData,
 ): Promise<FormActionState> {
   try {
-    authorize(await getAuthContext(), "attendance.manage");
+    const ctx = authorize(await getAuthContext(), "attendance.manage");
     const empRaw = String(formData.get("employeeId") ?? "").trim();
     const parsed = reconcileAttendanceSchema.safeParse({
       attendanceDate: formData.get("attendanceDate"),
@@ -615,9 +684,10 @@ export async function reconcileAttendanceAction(
     }
 
     const supabase = await createServerSupabaseClient();
+    // Named args must match 057/092 reconcile_attendance_for_date(p_organization_id, p_date).
     const { error } = await supabase.rpc("reconcile_attendance_for_date", {
-      p_attendance_date: parsed.data.attendanceDate,
-      p_employee_id: parsed.data.employeeId ?? null,
+      p_organization_id: ctx.organization.id,
+      p_date: parsed.data.attendanceDate,
     });
     if (error) throw new DatabaseError(error);
 

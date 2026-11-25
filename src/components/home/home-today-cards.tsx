@@ -11,10 +11,11 @@ import { attendanceStatusLabel } from "@/lib/hr/labels";
 import { GeofencePunchButton } from "@/components/attendance/geofence-punch-button";
 import { checkInAction, checkOutAction } from "@/server/use-cases/attendance";
 import { ServerActionForm } from "@/components/forms/server-action-form";
-import type { AuthContext } from "@/types/models";
+import type { AttendanceRecord, AttendanceShift, AuthContext } from "@/types/models";
 import { format, pickLocalized } from "@/lib/i18n/config";
 import { getI18n } from "@/lib/i18n/server";
-import { todayInRiyadh } from "@/lib/time/riyadh";
+import { addDaysYmd, todayInRiyadh } from "@/lib/time/riyadh";
+import { shiftsForWeekday, todayPunchState } from "@/modules/attendance/split-shifts";
 
 export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
   const { locale, t } = await getI18n();
@@ -32,13 +33,14 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
     permissionGranted: hasPermission(ctx, "leave.view_self"),
   });
 
-  const [record, assignment, geofenceReady, leavePack] = await Promise.all([
+  const attendanceYesterday = addDaysYmd(attendanceToday, -1);
+  const [recentRecords, assignedShifts, geofenceReady, leavePack] = await Promise.all([
     canViewAttendance && ctx.employee
-      ? attRepo.getRecordForDate(ctx.organization.id, ctx.employee.id, attendanceToday)
-      : Promise.resolve(null),
+      ? attRepo.listRecordsForEmployeeDates(ctx.organization.id, ctx.employee.id, attendanceYesterday, attendanceToday)
+      : Promise.resolve<AttendanceRecord[]>([]),
     canViewAttendance && ctx.employee
-      ? attRepo.getActiveAssignment(ctx.organization.id, ctx.employee.id, attendanceToday)
-      : Promise.resolve(null),
+      ? attRepo.listShiftsForEmployeeOnDate(ctx.organization.id, ctx.employee.id, attendanceToday)
+      : Promise.resolve<AttendanceShift[]>([]),
     ctx.employee ? attRepo.geofenceSchemaReady() : Promise.resolve(false),
     canViewLeave && ctx.employee
       ? Promise.all([
@@ -48,23 +50,28 @@ export async function HomeTodayCards({ ctx }: { ctx: AuthContext }) {
       : Promise.resolve(null),
   ]);
 
+  // 092: split shifts — one attendance row per shift per day.
+  const todayRecords = recentRecords.filter((r) => r.attendance_date === attendanceToday);
+  const carriedOpen = recentRecords.filter(
+    (r) => r.attendance_date === attendanceYesterday && r.check_in_at && !r.check_out_at,
+  );
+  const shiftsToday = shiftsForWeekday(
+    assignedShifts,
+    new Date(`${attendanceToday}T12:00:00Z`).getUTCDay(),
+  );
+  const punch = todayPunchState({ shiftsToday, todayRecords, carriedOpenRecords: carriedOpen });
+  const attendance = punch.headlineRecord;
   const shift =
-    assignment && ctx.employee
-      ? await attRepo.getShift(ctx.organization.id, assignment.shift_id)
-      : null;
-
-  const attendance = record;
+    (attendance?.shift_id ? assignedShifts.find((s) => s.id === attendance.shift_id) : undefined) ??
+    shiftsToday[0] ??
+    null;
   const leaveAvailable = leavePack
     ? leavePack[0].reduce((sum, b) => sum + Number(b.available_days ?? 0), 0)
     : null;
   const leavePendingCount = leavePack ? leavePack[1].filter((r) => r.status === "submitted").length : 0;
 
-  const canCheckIn = hasPermission(ctx, "attendance.check_in") && ctx.employee && !attendance?.check_in_at;
-  const canCheckOut =
-    hasPermission(ctx, "attendance.check_out") &&
-    ctx.employee &&
-    Boolean(attendance?.check_in_at) &&
-    !attendance?.check_out_at;
+  const canCheckIn = hasPermission(ctx, "attendance.check_in") && ctx.employee && punch.canCheckIn;
+  const canCheckOut = hasPermission(ctx, "attendance.check_out") && ctx.employee && punch.canCheckOut;
 
   const showAttendance = canViewAttendance;
   const showLeave = canViewLeave;
