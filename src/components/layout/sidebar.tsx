@@ -169,11 +169,17 @@ export function Sidebar({
       aria-hidden={isDesktop ? false : !open}
       inert={!isDesktop && !open}
       className={cn(
-        "flex w-[17rem] shrink-0 flex-col border-e border-sidebar-line bg-sidebar text-sidebar-ink print:hidden",
-        "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out max-xl:transition-transform",
+        "flex w-[17rem] shrink-0 flex-col border-e border-nav-line bg-nav text-nav-ink print:hidden",
+        "fixed inset-y-0 start-0 z-50 h-dvh max-xl:duration-200 max-xl:ease-out",
+        // Closed drawer is display:none on phones: an off-screen fixed panel widens the page
+        // on iOS Safari, so the whole app slid left/right. display is transitioned discretely
+        // (with @starting-style for the slide-in) where supported; elsewhere it just snaps.
+        "max-xl:transition-[translate,display] max-xl:transition-discrete",
         "xl:sticky xl:top-0 xl:z-auto xl:translate-x-0 xl:transition-none",
         "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
-        open ? "max-xl:translate-x-0" : "max-xl:-translate-x-full max-xl:rtl:translate-x-full",
+        open
+          ? "max-xl:translate-x-0 max-xl:starting:-translate-x-full max-xl:rtl:starting:translate-x-full"
+          : "max-xl:hidden max-xl:-translate-x-full max-xl:rtl:translate-x-full",
       )}
     >
       <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-5">
@@ -184,18 +190,18 @@ export function Sidebar({
             width={36}
             height={36}
             priority
-            className="size-9 shrink-0 rounded-[0.6rem] ring-1 ring-white/10"
+            className="size-9 shrink-0 rounded-[0.6rem] ring-1 ring-nav-line"
           />
           <span className="min-w-0">
-            <span className="block truncate text-[0.9375rem] font-semibold tracking-tight text-white">
+            <span className="block truncate text-[0.9375rem] font-semibold tracking-tight text-nav-strong">
               {t.common.appName}
             </span>
-            <span className="block truncate text-xs text-sidebar-muted">{t.common.appTagline}</span>
+            <span className="block truncate text-xs text-nav-muted">{t.common.appTagline}</span>
           </span>
         </Link>
         <button
           type="button"
-          className="inline-flex size-9 items-center justify-center rounded-lg text-sidebar-muted hover:bg-white/5 hover:text-white xl:hidden"
+          className="inline-flex size-9 items-center justify-center rounded-lg text-nav-muted hover:bg-nav-hover hover:text-nav-strong xl:hidden"
           aria-label={t.shell.closeMenu}
           onClick={onClose}
         >
@@ -210,7 +216,7 @@ export function Sidebar({
         {visibleGroups.map((group) => (
           <div key={group.id}>
             {group.id !== "home" ? (
-              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-muted/80">
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-nav-muted/80">
                 {t.nav.groups[group.id]}
               </p>
             ) : null}
@@ -228,8 +234,8 @@ export function Sidebar({
                       className={cn(
                         "group relative flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 text-sm duration-150 transition-colors",
                         active
-                          ? "bg-white/[0.08] font-medium text-white"
-                          : "text-sidebar-ink/75 hover:bg-white/[0.04] hover:text-white",
+                          ? "bg-nav-active font-medium text-nav-strong"
+                          : "text-nav-ink/75 hover:bg-nav-hover hover:text-nav-strong",
                       )}
                     >
                       {active ? (
@@ -241,14 +247,14 @@ export function Sidebar({
                       <Icon
                         className={cn(
                           "size-[1.125rem] shrink-0 duration-150 transition-colors",
-                          active ? "text-brand" : "text-sidebar-muted group-hover:text-sidebar-ink",
+                          active ? "text-brand" : "text-nav-muted group-hover:text-nav-ink",
                         )}
                         aria-hidden
                       />
                       <span className="truncate">{t.nav.items[item.key]}</span>
                     </Link>
                     {isFinance && onFinance ? (
-                      <div className="ms-[1.3rem] mt-1 space-y-0.5 border-s border-sidebar-line ps-3">
+                      <div className="ms-[1.3rem] mt-1 space-y-0.5 border-s border-nav-line ps-3">
                         {financeSubLinks.map((sub) => {
                           const subActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href);
                           return (
@@ -261,8 +267,8 @@ export function Sidebar({
                               className={cn(
                                 "block rounded-[var(--radius-control)] px-3 py-1.5 text-[0.8125rem] duration-150 transition-colors",
                                 subActive
-                                  ? "bg-white/[0.06] font-medium text-white"
-                                  : "text-sidebar-muted hover:bg-white/[0.04] hover:text-white",
+                                  ? "bg-nav-active font-medium text-nav-strong"
+                                  : "text-nav-muted hover:bg-nav-hover hover:text-nav-strong",
                               )}
                             >
                               {t.nav.finance[sub.key]}
@@ -280,7 +286,7 @@ export function Sidebar({
       </nav>
 
       {userName ? (
-        <div className="m-3 flex items-center gap-3 rounded-[var(--radius-surface)] bg-sidebar-elevated px-3 py-2.5 ring-1 ring-sidebar-line">
+        <div className="m-3 flex items-center gap-3 rounded-[var(--radius-surface)] bg-nav-elevated px-3 py-2.5 ring-1 ring-nav-line">
           <span
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-primary text-xs font-semibold text-white"
             aria-hidden
@@ -288,11 +294,11 @@ export function Sidebar({
             {initials}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium text-white" dir="auto">
+            <span className="block truncate text-sm font-medium text-nav-strong" dir="auto">
               {userName}
             </span>
             {jobTitle ? (
-              <span className="block truncate text-xs text-sidebar-muted" dir="auto">
+              <span className="block truncate text-xs text-nav-muted" dir="auto">
                 {jobTitle}
               </span>
             ) : null}

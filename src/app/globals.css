@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
 /*
- * Master Touch design system (2026-10): calm light canvas, charcoal sidebar,
- * one strong brand orange. Token names are shared by every screen; change values here.
+ * Master Touch design system (2026-11): crisp white light mode with a white navigation
+ * rail, near-black ink and one strong brand orange; charcoal navigation in dark mode.
+ * Token names are shared by every screen; change values here.
  */
 :root {
-  --background: #f4f5f7;
+  --background: #f6f7f9;
   --surface: #ffffff;
-  --surface-muted: #f8f9fb;
-  --surface-subtle: #f2f3f6;
-  --surface-strong: #eaecf0;
-  --ink: #15171c;
-  --text-secondary: #5b6372;
-  --text-muted: #8a93a3;
-  --line: #e5e7eb;
-  --border-strong: #cfd4dc;
+  --surface-muted: #f9fafb;
+  --surface-subtle: #f3f4f6;
+  --surface-strong: #e8eaee;
+  --ink: #0e1116;
+  --text-secondary: #4a5260;
+  --text-muted: #7a8292;
+  --line: #e4e7ec;
+  --border-strong: #c9ced7;
   /* Brand orange tuned for AA contrast with white text; --brand is the logo orange for accents. */
   --primary: #cc4115;
   --primary-hover: #b0360f;
@@ -33,6 +34,17 @@
   --sidebar-ink: #eceef2;
   --sidebar-muted: #8f96a3;
   --sidebar-line: rgba(255, 255, 255, 0.07);
+
+  /* Navigation rail (app sidebar). Light: white rail; dark: charcoal (see dark blocks). */
+  --nav: #ffffff;
+  --nav-elevated: #f6f7f9;
+  --nav-ink: #262b34;
+  --nav-strong: #0e1116;
+  --nav-muted: #6b7382;
+  --nav-line: #e7e9ee;
+  --nav-hover: #f3f4f6;
+  --nav-active: color-mix(in srgb, var(--brand) 9%, #ffffff);
+  --nav-scrollbar: rgba(14, 17, 22, 0.14);
   --success-soft: color-mix(in srgb, var(--success) var(--soft-mix), var(--surface));
   --warning-soft: color-mix(in srgb, var(--warning) var(--soft-mix), var(--surface));
   --danger-soft: color-mix(in srgb, var(--danger) var(--soft-mix), var(--surface));
@@ -55,8 +67,8 @@
   --border: var(--line);
   --primary-soft: color-mix(in srgb, var(--primary) var(--soft-mix), var(--surface));
 
-  --shadow-1: 0 1px 2px rgba(21, 23, 28, 0.04), 0 1px 1px rgba(21, 23, 28, 0.02);
-  --shadow-2: 0 10px 30px -12px rgba(21, 23, 28, 0.18), 0 2px 6px rgba(21, 23, 28, 0.05);
+  --shadow-1: 0 1px 2px rgba(14, 17, 22, 0.05), 0 0 0 0.5px rgba(14, 17, 22, 0.02);
+  --shadow-2: 0 12px 32px -14px rgba(14, 17, 22, 0.2), 0 2px 6px rgba(14, 17, 22, 0.05);
   --radius-control: 0.625rem;
   --radius-surface: 0.875rem;
   --radius-hero: 1.125rem;
@@ -98,6 +110,15 @@
   --sidebar: #0a0b0e;
   --sidebar-elevated: #14161b;
   --sidebar-line: rgba(255, 255, 255, 0.06);
+  --nav: #0a0b0e;
+  --nav-elevated: #14161b;
+  --nav-ink: #eceef2;
+  --nav-strong: #ffffff;
+  --nav-muted: #8f96a3;
+  --nav-line: rgba(255, 255, 255, 0.06);
+  --nav-hover: rgba(255, 255, 255, 0.04);
+  --nav-active: rgba(255, 255, 255, 0.08);
+  --nav-scrollbar: rgba(255, 255, 255, 0.12);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 14px 34px -14px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35);
   --soft-mix: 16%;
@@ -128,6 +149,15 @@
     --sidebar: #0a0b0e;
     --sidebar-elevated: #14161b;
     --sidebar-line: rgba(255, 255, 255, 0.06);
+    --nav: #0a0b0e;
+    --nav-elevated: #14161b;
+    --nav-ink: #eceef2;
+    --nav-strong: #ffffff;
+    --nav-muted: #8f96a3;
+    --nav-line: rgba(255, 255, 255, 0.06);
+    --nav-hover: rgba(255, 255, 255, 0.04);
+    --nav-active: rgba(255, 255, 255, 0.08);
+    --nav-scrollbar: rgba(255, 255, 255, 0.12);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-2: 0 14px 34px -14px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35);
     --soft-mix: 16%;
@@ -178,6 +208,14 @@
   --color-success-solid: var(--success-solid);
   --color-danger-solid: var(--danger-solid);
   --color-brand: var(--brand);
+  --color-nav: var(--nav);
+  --color-nav-elevated: var(--nav-elevated);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-strong: var(--nav-strong);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-line: var(--nav-line);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-active: var(--nav-active);
   --color-sidebar: var(--sidebar);
   --color-sidebar-elevated: var(--sidebar-elevated);
   --color-sidebar-ink: var(--sidebar-ink);
@@ -194,6 +232,16 @@ body {
   color: var(--foreground);
   max-width: 100%;
   overflow-x: clip;
+  /* No sideways rubber-band on phones (the page "moving left and right"). */
+  overscroll-behavior-x: none;
+}
+
+/* iOS Safari < 16 has no overflow: clip; hidden on body only (html stays visible) is
+   propagated to the viewport, so sticky headers keep working. */
+@supports not (overflow: clip) {
+  body {
+    overflow-x: hidden;
+  }
 }
 
 body {
@@ -385,10 +433,10 @@ table.table-register thead {
   font-weight: 600;
 }
 
-/* Dark sidebar scrollbar stays subtle. */
+/* Navigation rail scrollbar stays subtle in both themes. */
 .mt-sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: var(--nav-scrollbar) transparent;
 }
 
 /* Soft brand glow behind the login hero. */
